@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/EdhDeckBuilder.Tests.csproj" />
+  </Folder>
+  <Project Path="EdhDeckBuilder.Agent/EdhDeckBuilder.Agent.csproj" />
+  <Project Path="EdhDeckBuilder.Core/EdhDeckBuilder.Core.csproj" />
+  <Project Path="EdhDeckBuilder.Infrastructure/EdhDeckBuilder.Infrastructure.csproj" />
+  <Project Path="EdhDeckBuilder.Web/EdhDeckBuilder.Web.csproj" />
+</Solution>
