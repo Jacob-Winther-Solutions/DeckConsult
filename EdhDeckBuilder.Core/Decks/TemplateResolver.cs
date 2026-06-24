@@ -23,18 +23,24 @@ public static class TemplateResolver
         DeckTemplate baseline,
         IReadOnlyList<WeightedArchetype> archetypes,
         IReadOnlyList<WeightedTheme>?    themes   = null,
+        BracketProfile?                  bracket  = null,
         int deckSize  = 99,
         int minLands  = 30,
         int maxLands  = 45)
     {
-        // 1. Union of all roles mentioned by the baseline, selected archetypes, and themes.
+        // 1. Union of all roles mentioned by the baseline, archetypes, themes, and bracket.
         var roles = new HashSet<CardRole>(baseline.Targets.Keys);
         foreach (var wa in archetypes)
             roles.UnionWith(wa.Profile.Adjustments.Keys);
         foreach (var wt in themes ?? [])
             roles.UnionWith(wt.Profile.Adjustments.Keys);
+        if (bracket is not null)
+            roles.UnionWith(bracket.Adjustments.Keys);
 
-        // 2. Raw ideal = baseline ideal + Σarchetype (adj × weight) + Σtheme (adj × weight), ≥ 0.
+        // 2. Raw ideal = baseline ideal
+        //              + Σarchetype (adj × weight)
+        //              + Σtheme (adj × weight)
+        //              + bracket adjustment (weight 1.0), ≥ 0.
         var raw = new Dictionary<CardRole, double>();
         foreach (var role in roles)
         {
@@ -45,6 +51,8 @@ public static class TemplateResolver
             foreach (var wt in themes ?? [])
                 if (wt.Profile.Adjustments.TryGetValue(role, out var adj))
                     value += adj * wt.Weight;
+            if (bracket is not null && bracket.Adjustments.TryGetValue(role, out var badj))
+                value += badj;
             raw[role] = Math.Max(0, value);
         }
 
@@ -72,6 +80,7 @@ public static class TemplateResolver
 
         var nameParts = archetypes.Select(a => a.Profile.Name)
             .Concat((themes ?? []).Select(t => t.Profile.Name))
+            .Concat(bracket is not null ? [$"Bracket {(int)bracket.Bracket}"] : Array.Empty<string>())
             .ToList();
 
         return new DeckTemplate

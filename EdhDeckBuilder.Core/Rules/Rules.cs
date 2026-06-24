@@ -27,15 +27,24 @@ public sealed class DeckValidator(IEnumerable<IDeckRule> rules)
     public DeckValidationResult Validate(Deck deck)
         => new(_rules.SelectMany(r => r.Check(deck)).ToList());
 
-    /// <summary>The standard EDH hard-rule set.</summary>
-    public static DeckValidator Standard { get; } = new(
+    private static readonly IDeckRule[] _standardRules =
     [
         new DeckSizeRule(),
         new SingletonRule(),
         new ColorIdentityRule(),
         new CommanderRule(),
         new BanlistRule(),
-    ]);
+    ];
+
+    /// <summary>The standard EDH hard-rule set (format-legal enforcement only).</summary>
+    public static DeckValidator Standard { get; } = new(_standardRules);
+
+    /// <summary>
+    /// Standard rules plus a social-contract bracket check that warns when the deck's cards
+    /// exceed the stated bracket.
+    /// </summary>
+    public static DeckValidator WithBracket(Bracket bracket) =>
+        new([.._standardRules, new BracketRule(bracket)]);
 }
 
 // --- Hard rules -------------------------------------------------------------
@@ -114,4 +123,68 @@ public sealed class BanlistRule : IDeckRule
                 yield return new(nameof(BanlistRule), Severity.Error,
                     $"'{card.Name}' is banned in Commander.");
     }
+}
+
+/// <summary>
+/// Social-contract rule: warns when a card on the RC Game Changers list is present in a deck
+/// that claims to be below Bracket 3. Not a hard legality error — brackets are a table agreement.
+/// Keep <see cref="GameChangersList.Cards"/> in sync with the RC's published list at
+/// https://mtgcommander.net/index.php/the-game-changers/
+/// </summary>
+public sealed class BracketRule(Bracket maxBracket) : IDeckRule
+{
+    public IEnumerable<RuleViolation> Check(Deck deck)
+    {
+        // Game changers elevate a deck to at minimum Bracket 3; no warning needed above that.
+        if (maxBracket >= Bracket.Three) yield break;
+
+        var all = deck.Commanders.Concat(deck.Cards.Select(s => s.Card));
+        foreach (var card in all)
+        {
+            if (GameChangersList.Cards.Contains(card.Name))
+                yield return new(nameof(BracketRule), Severity.Warning,
+                    $"'{card.Name}' is a Game Changer and elevates this deck above Bracket {(int)maxBracket}.");
+        }
+    }
+}
+
+/// <summary>
+/// Cards that the RC designates as "Game Changers" — their presence pushes a deck to Bracket 3+.
+/// Last reviewed 2024-11. Keep in sync with https://mtgcommander.net/index.php/the-game-changers/
+/// </summary>
+public static class GameChangersList
+{
+    public static IReadOnlySet<string> Cards { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // Fast mana
+        "Jeweled Lotus",
+        "Mana Crypt",
+        "Mana Vault",
+        "Chrome Mox",
+        "Mox Diamond",
+        // Tutors
+        "Demonic Tutor",
+        "Vampiric Tutor",
+        "Imperial Seal",
+        "Grim Tutor",
+        // Interaction
+        "Cyclonic Rift",
+        "Fierce Guardianship",
+        "Mana Drain",
+        "Force of Will",
+        "Flusterstorm",
+        // Resource denial / advantage engines
+        "Rhystic Study",
+        "Smothering Tithe",
+        "Necropotence",
+        "Sylvan Library",
+        // Extra turns / mass land destruction
+        "Expropriate",
+        "Armageddon",
+        "Ravages of War",
+        // Other
+        "The One Ring",
+        "Thassa's Oracle",
+        "Tainted Pact",
+    };
 }
