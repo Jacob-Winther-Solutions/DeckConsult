@@ -17,9 +17,11 @@ public sealed record DeckTemplate
     public required IReadOnlyDictionary<CardRole, RoleTarget> Targets { get; init; }
 
     /// <summary>
-    /// A sensible midrange starting point informed by the Command Zone methodology. Ideals sum to
-    /// exactly 99 so the resolver applies no scaling in the unmodified case. Tune per commander
-    /// and strategy via archetypes and themes.
+    /// A sensible midrange starting point informed by the Command Zone methodology.
+    /// These are <em>coverage</em> targets, not physical slot counts: cards with secondary roles
+    /// satisfy multiple targets simultaneously, so ideals intentionally sum above 99 (~107 here).
+    /// The physical 99-card constraint is enforced by the fill engine, which treats these as
+    /// coverage objectives. Tune per commander and strategy via archetypes, themes, and bracket.
     /// </summary>
     public static DeckTemplate Balanced { get; } = new()
     {
@@ -33,8 +35,10 @@ public sealed record DeckTemplate
             [CardRole.TargetedDisruption] = new(8,  10, 12),
             [CardRole.MassDisruption]     = new(4,  6,  8),
             [CardRole.Protection]         = new(2,  3,  5),
-            [CardRole.Payoff]             = new(8,  12, 18),
-            [CardRole.Synergy]            = new(5,  10, 18),
+            [CardRole.Tutor]              = new(0,  2,  4),
+            [CardRole.Plan]               = new(10, 14, 20),
+            [CardRole.Payoff]             = new(6,  9,  14),
+            [CardRole.Synergy]            = new(3,  5,  10),
         },
     };
 }

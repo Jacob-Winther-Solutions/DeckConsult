@@ -134,14 +134,15 @@ public sealed class BracketTests
     }
 
     [Fact]
-    public void Bracket_with_archetype_and_theme_still_sums_to_deck_size()
+    public void Bracket_with_archetype_and_theme_has_plan_and_tutor_coverage()
     {
         var result = TemplateResolver.Resolve(DeckTemplate.Balanced,
             archetypes: [new WeightedArchetype(ArchetypeLibrary.Get(Archetype.Combo))],
             themes:     [new WeightedTheme(ThemeLibrary.Get(Theme.BigMana))],
             bracket:    BracketLibrary.Get(Bracket.Four));
 
-        Assert.Equal(99, result.Targets.Values.Sum(t => t.Ideal));
+        Assert.True(result.Targets[CardRole.Plan].Ideal > 0);
+        Assert.True(result.Targets[CardRole.Tutor].Ideal > 0);
     }
 
     [Fact]

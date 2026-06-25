@@ -49,8 +49,9 @@ public static class ArchetypeLibrary
                     [CardRole.TargetedDisruption] = +4,
                     [CardRole.MassDisruption]     = +2,
                     [CardRole.Protection]         = +2,
-                    [CardRole.Payoff]             = -6,
-                    [CardRole.Synergy]            = -3,
+                    [CardRole.Plan]               = -2,  // reactive decks invest less in proactive plan pieces
+                    [CardRole.Payoff]             = -5,
+                    [CardRole.Synergy]            = -1,
                 },
             },
             new ArchetypeProfile
@@ -62,8 +63,9 @@ public static class ArchetypeLibrary
                 {
                     [CardRole.Land]               = -3,
                     [CardRole.Ramp]               = -3,
-                    [CardRole.Payoff]             = +6,
-                    [CardRole.Synergy]            = +3,
+                    [CardRole.Plan]               = +5,  // aggro threats are the plan (Goblin Bushwhacker, etc.)
+                    [CardRole.Payoff]             = +3,
+                    [CardRole.Synergy]            = +1,
                     [CardRole.CardAdvantage]      = -1,
                 },
             },
@@ -77,7 +79,8 @@ public static class ArchetypeLibrary
                     [CardRole.Tutor]              = +5,
                     [CardRole.Protection]         = +3,
                     [CardRole.CardAdvantage]      = +2,
-                    [CardRole.Payoff]             = -4,
+                    [CardRole.Plan]               = +4,  // combo pieces are the plan
+                    [CardRole.Payoff]             = -5,
                     [CardRole.TargetedDisruption] = -2,
                 },
             },
@@ -88,7 +91,8 @@ public static class ArchetypeLibrary
                 Description = "Resilient, efficient threats with enough interaction to pivot between roles.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
-                    [CardRole.Payoff]             = +3,
+                    [CardRole.Plan]               = +2,
+                    [CardRole.Payoff]             = +2,
                     [CardRole.TargetedDisruption] = +2,
                     [CardRole.CardAdvantage]      = +2,
                     [CardRole.Ramp]               = +1,

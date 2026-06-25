@@ -1,0 +1,182 @@
+{
+  "info": {
+    "_postman_id": "e4b3f2a1-0000-0000-0000-edhdec0bui1d",
+    "name": "EdhDeckBuilder — API Exploration",
+    "description": "Manual exploration of the Scryfall and EDHREC APIs used by EdhDeckBuilder.Infrastructure.\n\nChange the collection variables at the top to explore different commanders and cards:\n  - `commander_slug`  The EDHREC slug (see rule below)\n  - `card_name`       Exact or fuzzy name for Scryfall lookups\n\nEDHREC slug rule: lowercase, spaces and hyphens become hyphens, commas/apostrophes/punctuation stripped.\n  Korvold, Fae-Cursed King  →  korvold-fae-cursed-king\n  Atraxa, Praetors' Voice   →  atraxa-praetors-voice\n  Edgar Markov              →  edgar-markov",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "commander_slug",
+      "value": "korvold-fae-cursed-king",
+      "description": "EDHREC slug for the commander you want to explore."
+    },
+    {
+      "key": "card_name",
+      "value": "Sol Ring",
+      "description": "Card name for Scryfall named-card lookups."
+    }
+  ],
+  "item": [
+    {
+      "name": "Scryfall",
+      "description": "Official Scryfall API — documented at https://scryfall.com/docs/api\nBe polite: Scryfall asks for 50–100 ms between requests.\n\nNote: do NOT run 'Download oracle_cards bulk file' from Postman — the file is ~250 MB and Postman will time out or run out of memory. It is here only so you can inspect the manifest and copy the download_uri.",
+      "item": [
+        {
+          "name": "Get Bulk Data Manifest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.scryfall.com/bulk-data",
+              "protocol": "https",
+              "host": ["api", "scryfall", "com"],
+              "path": ["bulk-data"]
+            },
+            "description": "Returns a list of all available bulk-data files.\nScryfallBulkClient calls this first to resolve the oracle_cards download_uri.\n\nLook for the entry where type == 'oracle_cards'. Its download_uri is the large file the client downloads. The updated_at field shows when Scryfall last rebuilt it (usually daily)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Card by Exact Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.scryfall.com/cards/named?exact={{card_name}}",
+              "protocol": "https",
+              "host": ["api", "scryfall", "com"],
+              "path": ["cards", "named"],
+              "query": [
+                { "key": "exact", "value": "{{card_name}}" }
+              ]
+            },
+            "description": "Returns one card whose name matches exactly. 404 if no exact match.\n\nUse this to inspect the raw JSON shape a card has in the oracle_cards bulk file:\n  - type_line (what ScryfallMapper parses for CardType flags and IsLegendary)\n  - color_identity (the string array FromScryfall() converts)\n  - legalities.commander (what drives CommanderLegality and CanBeCommander)\n  - image_uris vs card_faces[0].image_uris (DFC layout)\n  - mana_cost null on lands; card_faces[0].mana_cost on split/DFC cards"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Card by Fuzzy Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.scryfall.com/cards/named?fuzzy={{card_name}}",
+              "protocol": "https",
+              "host": ["api", "scryfall", "com"],
+              "path": ["cards", "named"],
+              "query": [
+                { "key": "fuzzy", "value": "{{card_name}}" }
+              ]
+            },
+            "description": "Tolerates partial names and typos — returns the closest match. Handy when you are unsure of punctuation or exact spelling."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.scryfall.com/cards/search?q=name%3A%22{{card_name}}%22&order=name",
+              "protocol": "https",
+              "host": ["api", "scryfall", "com"],
+              "path": ["cards", "search"],
+              "query": [
+                { "key": "q",     "value": "name:\"{{card_name}}\"" },
+                { "key": "order", "value": "name" }
+              ]
+            },
+            "description": "Full Scryfall query syntax. Returns paginated results (up to 175 per page).\nUseful for verifying how many cards CardRepository.SearchAsync() should plausibly return for a given substring — the repository does a simple case-insensitive Contains(), not Scryfall's query syntax."
+          },
+          "response": []
+        },
+        {
+          "name": "Get DFC Card (Delver of Secrets)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.scryfall.com/cards/named?exact=Delver of Secrets",
+              "protocol": "https",
+              "host": ["api", "scryfall", "com"],
+              "path": ["cards", "named"],
+              "query": [
+                { "key": "exact", "value": "Delver of Secrets" }
+              ]
+            },
+            "description": "A double-faced card — useful for verifying the DFC fallback logic in ScryfallMapper.\n\nExpect: top-level mana_cost and image_uris are null; card_faces[0] carries the front-face mana_cost, type_line, oracle_text, and image_uris instead.\nScryfallMapper.ToCard() falls back to card_faces[0] for all those fields."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "EDHREC",
+      "description": "Unofficial EDHREC JSON API at json.edhrec.com — undocumented and may change.\n\nSlug derivation matches EdhrecSlugger.FromCard():\n  1. Lowercase the full card name\n  2. Keep a–z, 0–9; replace spaces AND hyphens with a single hyphen\n  3. Strip everything else (commas, apostrophes, punctuation)\n  4. Collapse consecutive hyphens\n\nExamples:\n  Korvold, Fae-Cursed King  →  korvold-fae-cursed-king\n  Atraxa, Praetors' Voice   →  atraxa-praetors-voice\n  Edgar Markov              →  edgar-markov\n  Kenrith, the Returned King→  kenrith-the-returned-king\n\nResponse shape that matters for EdhrecMapper:\n  container.json_dict.cardlists[]\n    .header          — section name (\"Ramp\", \"High Synergy Cards\", etc.)\n    .cardviews[]\n      .name            — card name (must resolve in CardRepository)\n      .num_decks       — how many decks include it\n      .potential_decks — total comparable decks\n      inclusion = num_decks / potential_decks",
+      "item": [
+        {
+          "name": "Get Commander Page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://json.edhrec.com/pages/commanders/{{commander_slug}}.json",
+              "protocol": "https",
+              "host": ["json", "edhrec", "com"],
+              "path": ["pages", "commanders", "{{commander_slug}}.json"]
+            },
+            "description": "The primary data source — maps to SuggestionSource.GetRecommendationsAsync().\nCached by EdhrecClient at {CacheDirectory}/{commander_slug}.json with a 7-day TTL.\n\nTip: look at the 'High Synergy Cards' section — it has the highest-signal cards for this specific commander, often stronger than the universally popular ones in 'Top Cards'."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Average Deck",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://json.edhrec.com/pages/average-decks/{{commander_slug}}.json",
+              "protocol": "https",
+              "host": ["json", "edhrec", "com"],
+              "path": ["pages", "average-decks", "{{commander_slug}}.json"]
+            },
+            "description": "Maps to SuggestionSource.GetAverageDeckAsync().\nCached at {CacheDirectory}/avg-{commander_slug}.json (different key from the commander page).\n\nContains a representative 99-card deck. Good sanity check: all card names here should resolve in CardRepository. Any that don't are either very new cards (not yet in the Scryfall bulk cache) or EDHREC using a slightly different name spelling."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Commander Page — Atraxa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://json.edhrec.com/pages/commanders/atraxa-praetors-voice.json",
+              "protocol": "https",
+              "host": ["json", "edhrec", "com"],
+              "path": ["pages", "commanders", "atraxa-praetors-voice.json"]
+            },
+            "description": "Hardcoded example for Atraxa, Praetors' Voice — one of the most popular commanders. Useful as a reference for what a large, well-populated response looks like (many sections, high card counts)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Commander Page — Non-existent (404 example)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://json.edhrec.com/pages/commanders/this-commander-does-not-exist.json",
+              "protocol": "https",
+              "host": ["json", "edhrec", "com"],
+              "path": ["pages", "commanders", "this-commander-does-not-exist.json"]
+            },
+            "description": "Deliberately invalid slug — should return 404.\nEdhrecClient catches this as HttpRequestException with StatusCode.NotFound and returns null. SuggestionSource then returns an empty candidate list and logs a warning."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -8,17 +8,18 @@ public sealed class TemplateResolverTests
     // --- baseline behaviour -------------------------------------------------
 
     [Fact]
-    public void No_archetypes_or_themes_produces_ideals_summing_to_deck_size()
+    public void Balanced_template_coverage_ideals_exceed_deck_size()
     {
+        // Coverage targets intentionally sum above 99; overlap fills the gap physically.
         var result = TemplateResolver.Resolve(DeckTemplate.Balanced, []);
-        Assert.Equal(99, result.Targets.Values.Sum(t => t.Ideal));
+        Assert.True(result.Targets.Values.Sum(t => t.Ideal) > 99);
     }
 
     [Fact]
-    public void Partner_pair_deck_size_sums_to_98()
+    public void Balanced_template_has_positive_plan_coverage()
     {
-        var result = TemplateResolver.Resolve(DeckTemplate.Balanced, [], deckSize: 98);
-        Assert.Equal(98, result.Targets.Values.Sum(t => t.Ideal));
+        var result = TemplateResolver.Resolve(DeckTemplate.Balanced, []);
+        Assert.True(result.Targets[CardRole.Plan].Ideal > 0);
     }
 
     [Fact]
@@ -52,14 +53,14 @@ public sealed class TemplateResolverTests
     }
 
     [Fact]
-    public void Blended_archetypes_still_sum_to_deck_size()
+    public void Blended_archetypes_each_contribute_plan_coverage()
     {
         var result = TemplateResolver.Resolve(DeckTemplate.Balanced,
         [
             new WeightedArchetype(ArchetypeLibrary.Get(Archetype.Aggro)),
             new WeightedArchetype(ArchetypeLibrary.Get(Archetype.Control)),
         ]);
-        Assert.Equal(99, result.Targets.Values.Sum(t => t.Ideal));
+        Assert.True(result.Targets[CardRole.Plan].Ideal > 0);
     }
 
     [Fact]
@@ -114,13 +115,23 @@ public sealed class TemplateResolverTests
     }
 
     [Fact]
-    public void Archetype_and_theme_combined_still_sum_to_deck_size()
+    public void Tokens_theme_increases_plan_coverage()
+    {
+        var baseline = TemplateResolver.Resolve(DeckTemplate.Balanced, []);
+        var tokens   = TemplateResolver.Resolve(DeckTemplate.Balanced, [],
+            themes: [new WeightedTheme(ThemeLibrary.Get(Theme.Tokens))]);
+
+        Assert.True(tokens.Targets[CardRole.Plan].Ideal > baseline.Targets[CardRole.Plan].Ideal);
+    }
+
+    [Fact]
+    public void Archetype_and_theme_combined_coverage_still_exceeds_deck_size()
     {
         var result = TemplateResolver.Resolve(DeckTemplate.Balanced,
             archetypes: [new WeightedArchetype(ArchetypeLibrary.Get(Archetype.Aggro))],
             themes:     [new WeightedTheme(ThemeLibrary.Get(Theme.Tokens))]);
 
-        Assert.Equal(99, result.Targets.Values.Sum(t => t.Ideal));
+        Assert.True(result.Targets.Values.Sum(t => t.Ideal) > 99);
     }
 
     [Fact]

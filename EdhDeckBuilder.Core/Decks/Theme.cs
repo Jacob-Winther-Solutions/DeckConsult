@@ -43,14 +43,15 @@ public static class ThemeLibrary
             {
                 Theme = Theme.BigMana,
                 Name = "Big Mana",
-                Description = "Ramp hard, then overpower the table with expensive payoffs.",
+                Description = "Ramp hard, then overpower the table with expensive spells.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
                     [CardRole.Land]               = +2,
                     [CardRole.Ramp]               = +5,
-                    [CardRole.Payoff]             = +2,
+                    [CardRole.Plan]               = +2,  // the expensive spells themselves are the plan
+                    [CardRole.Payoff]             = +1,
                     [CardRole.TargetedDisruption] = -2,
-                    [CardRole.Synergy]            = -2,
+                    [CardRole.Synergy]            = -3,
                 },
             },
             new ThemeProfile
@@ -60,7 +61,8 @@ public static class ThemeLibrary
                 Description = "Sacrifice synergies and incremental drain; values recursion heavily.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
-                    [CardRole.Synergy]            = +6,
+                    [CardRole.Plan]               = +4,  // sacrifice outlets and aristocrat creatures are the plan
+                    [CardRole.Synergy]            = +2,  // trigger effects and death-matters engines
                     [CardRole.Recursion]          = +2,
                     [CardRole.Payoff]             = +1,
                     [CardRole.TargetedDisruption] = -1,
@@ -74,7 +76,7 @@ public static class ThemeLibrary
                 Adjustments = new Dictionary<CardRole, int>
                 {
                     [CardRole.Protection]         = +5,
-                    [CardRole.Synergy]            = +3,
+                    [CardRole.Plan]               = +3,  // equipment and auras are the plan
                     [CardRole.TargetedDisruption] = +1,
                     [CardRole.Payoff]             = -5,
                 },
@@ -86,7 +88,7 @@ public static class ThemeLibrary
                 Description = "Go wide with creature tokens and anthems/payoffs that scale on count.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
-                    [CardRole.Synergy]        = +5,
+                    [CardRole.Plan]           = +5,  // token-making spells are the plan (Raise the Alarm, etc.)
                     [CardRole.Payoff]         = +3,
                     [CardRole.MassDisruption] = -1,
                 },
@@ -98,7 +100,8 @@ public static class ThemeLibrary
                 Description = "Convert life total padding into card advantage and incremental board presence.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
-                    [CardRole.Synergy]            = +4,
+                    [CardRole.Plan]               = +3,  // life-gaining spells are the plan
+                    [CardRole.Synergy]            = +1,  // "whenever you gain life" triggers
                     [CardRole.Payoff]             = +3,
                     [CardRole.Recursion]          = +1,
                     [CardRole.TargetedDisruption] = -2,
@@ -111,8 +114,9 @@ public static class ThemeLibrary
                 Description = "Fill the graveyard cheaply, then cheat large threats back into play.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
-                    [CardRole.Recursion]          = +6,
-                    [CardRole.Synergy]            = +3,
+                    [CardRole.Recursion]          = +4,  // reanimation spells
+                    [CardRole.Plan]               = +3,  // self-mill and discard enablers set up the graveyard
+                    [CardRole.Synergy]            = +1,
                     [CardRole.Payoff]             = +2,
                     [CardRole.Ramp]               = -2,
                     [CardRole.TargetedDisruption] = -1,

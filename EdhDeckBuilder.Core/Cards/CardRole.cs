@@ -17,9 +17,18 @@ public enum CardRole
     Tutor,
     Protection,           // hexproof, indestructible, regenerate, phasing — defensive only
     Recursion,
-    Payoff,               // win conditions and theme payoffs
-    Synergy,              // glue that supports the deck's theme
-    Utility,
+
+    /// <summary>
+    /// The core strategy — cards that directly embody what the deck is trying to do. In a
+    /// Tokens deck, "Raise the Alarm" is the Plan: it makes tokens, which is the entire point.
+    /// In a Spellslinger deck, cantrips and instants are the Plan. In Voltron, equipment and
+    /// auras are the Plan. This is the role to maximise for overlap, since everything else in
+    /// the deck exists to enable or protect it.
+    /// </summary>
+    Plan,
+
+    Payoff,               // win conditions that convert the plan into a win (Purphoros, Anointed Procession)
+    Synergy,              // glue that supports the plan but isn't the plan itself
 }
 
 /// <summary>Where a role assignment came from, so the UI can surface provenance and confidence.</summary>
