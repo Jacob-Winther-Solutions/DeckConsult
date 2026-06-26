@@ -10,6 +10,8 @@ internal static class ScryfallMapper
         var face0 = dto.CardFaces?.Count > 0 ? dto.CardFaces[0] : null;
         var frontTypeLine = face0?.TypeLine ?? dto.TypeLine;
 
+        var oracleText = dto.OracleText ?? face0?.OracleText ?? string.Empty;
+
         return new Card
         {
             ScryfallId        = dto.Id,
@@ -22,11 +24,11 @@ internal static class ScryfallMapper
             Types             = ParseTypes(frontTypeLine),
             IsLegendary       = frontTypeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase),
             IsBasicLand       = frontTypeLine.Contains("Basic", StringComparison.OrdinalIgnoreCase),
-            OracleText        = dto.OracleText ?? face0?.OracleText ?? string.Empty,
+            OracleText        = oracleText,
             Power             = dto.Power,
             Toughness         = dto.Toughness,
             CommanderLegality = ParseLegality(dto.Legalities.Commander),
-            CanBeCommander    = IsLegendaryCreatureCommander(dto.Legalities.Commander, frontTypeLine),
+            CanBeCommander    = IsCommanderEligible(dto.Legalities.Commander, frontTypeLine, oracleText),
             Images            = MapImages(dto.ImageUris ?? face0?.ImageUris),
         };
     }
@@ -57,12 +59,17 @@ internal static class ScryfallMapper
         _            => Legality.NotLegal,
     };
 
-    // Basic heuristic: legendary creature + legal. Partner, background, "can be your commander"
-    // text, etc. are deferred — see TODO.md.
-    private static bool IsLegendaryCreatureCommander(string legality, string typeLine)
+    // A card can be a Commander if it is a legendary creature, OR if its oracle text explicitly
+    // states "can be your commander" (covers planeswalkers like Teferi, Temporal Archmage and
+    // any future special cases printed with that text).
+    private static bool IsCommanderEligible(string legality, string typeLine, string oracleText)
         => legality == "legal"
-        && typeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase)
-        && typeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
+        && (
+            (typeLine.Contains("Legendary",  StringComparison.OrdinalIgnoreCase)
+             && typeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase))
+            ||
+            oracleText.Contains("can be your commander", StringComparison.OrdinalIgnoreCase)
+        );
 
     private static CardImages? MapImages(ScryfallImageUris? uris) =>
         uris is null ? null : new CardImages(uris.Small, uris.Normal, uris.Large, uris.ArtCrop);

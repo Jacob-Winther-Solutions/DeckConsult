@@ -9,12 +9,13 @@ public sealed class ScryfallMapperTests
     // --- helpers ------------------------------------------------------------
 
     private static ScryfallCard Make(
-        string name      = "Test Card",
-        string typeLine  = "Sorcery",
-        string manaCost  = "{1}",
-        decimal cmc      = 1,
-        string[]? colors = null,
-        string legality  = "legal",
+        string name        = "Test Card",
+        string typeLine    = "Sorcery",
+        string manaCost    = "{1}",
+        decimal cmc        = 1,
+        string[]? colors   = null,
+        string legality    = "legal",
+        string? oracleText = null,   // null → mapper falls back to face oracle text or ""
         ScryfallImageUris? images   = null,
         List<ScryfallCardFace>? faces = null) => new()
     {
@@ -25,7 +26,7 @@ public sealed class ScryfallMapperTests
         Cmc             = cmc,
         ColorIdentity   = colors?.ToList() ?? [],
         TypeLine        = typeLine,
-        OracleText      = "",
+        OracleText      = oracleText,
         Legalities      = new ScryfallLegalities { Commander = legality },
         ImageUris       = images,
         CardFaces       = faces,
@@ -110,12 +111,53 @@ public sealed class ScryfallMapperTests
     }
 
     [Fact]
-    public void Legendary_planeswalker_cannot_be_commander_under_basic_heuristic()
+    public void Legendary_planeswalker_without_oracle_text_cannot_be_commander()
     {
-        // CanBeCommander for planeswalkers requires oracle text detection — deferred in TODO.md
         var card = ScryfallMapper.ToCard(
-            Make(typeLine: "Legendary Planeswalker — Jace", legality: "legal"));
+            Make(typeLine: "Legendary Planeswalker — Jace", legality: "legal", oracleText: ""));
         Assert.False(card.CanBeCommander);
+    }
+
+    [Fact]
+    public void Legendary_planeswalker_with_can_be_your_commander_text_can_be_commander()
+    {
+        // e.g. Teferi, Temporal Archmage — has explicit "can be your commander" oracle text
+        var card = ScryfallMapper.ToCard(Make(
+            typeLine: "Legendary Planeswalker — Teferi",
+            legality: "legal",
+            oracleText: "You may activate loyalty abilities of Teferi, Temporal Archmage on any player's turn. Teferi, Temporal Archmage can be your commander."));
+        Assert.True(card.CanBeCommander);
+    }
+
+    [Fact]
+    public void Card_with_can_be_your_commander_text_but_banned_cannot_be_commander()
+    {
+        var card = ScryfallMapper.ToCard(Make(
+            typeLine: "Legendary Planeswalker — Teferi",
+            legality: "banned",
+            oracleText: "Teferi, Temporal Archmage can be your commander."));
+        Assert.False(card.CanBeCommander);
+    }
+
+    [Fact]
+    public void DFC_with_can_be_your_commander_on_front_face_oracle_text_can_be_commander()
+    {
+        // Some DFCs carry the text on the front face; oracle text falls back to face0
+        var dto = Make(
+            typeLine: "Legendary Planeswalker // Land",
+            legality: "legal",
+            oracleText: null,   // top-level null — falls back to face
+            faces:
+            [
+                new ScryfallCardFace
+                {
+                    TypeLine   = "Legendary Planeswalker — Ugin",
+                    OracleText = "Ugin, the Spirit Dragon can be your commander.",
+                },
+                new ScryfallCardFace { TypeLine = "Land" },
+            ]);
+        var card = ScryfallMapper.ToCard(dto);
+        Assert.True(card.CanBeCommander);
     }
 
     // --- legality mapping ---------------------------------------------------

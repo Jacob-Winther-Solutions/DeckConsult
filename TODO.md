@@ -168,17 +168,18 @@ rules, and card ingestion need format-specific variants.
 
 ## Other deferred
 
-- [ ] `CanBeCommander` logic at Scryfall ingestion (legendary creature, partner, background,
-      "can be your commander" text). Currently stored as a field but only set if Scryfall
-      reports it; the heuristic fallback is missing.
+- [x] `CanBeCommander` logic at Scryfall ingestion — extended to catch legendary creatures
+      AND any card whose oracle text contains "can be your commander" (planeswalkers with the
+      RC ruling, special cases). `ScryfallMapper.IsCommanderEligible`. 4 new tests.
 - [ ] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
       `DeckBuilder.DistributeBasics` returns an empty dict when `ColorIdentity == Color.None`.
       Wastes handling needs to be added before colorless commanders are supported.
 - [ ] **MDFC land credit assignment.** The `LandCredit` field on `FillCandidate` exists and is
       plumbed through; `LlmClassifier` needs to assign non-zero values based on how playable the
       land face is for the given commander (currently defaults to 0 for all cards).
-- [ ] Power-bracket modeling and the Game Changers list (data is in `BracketLibrary` and
-      `GameChangersList`; integration into the selector prompt is deferred).
+- [x] Power-bracket integration into selector prompt — `SelectionPrompt.AppendBracketGuidance`
+      emits bracket number, name, and description; Brackets 1–2 list all Game Changers to avoid;
+      Brackets 4–5 encourage Game Changers. 7 new tests.
 - [ ] Per-call temperature audit: `Temperature` is deprecated for models after Claude Opus 4.6.
       Once the SDK removes backward-compatibility handling, update both `LlmClassifier` and
       `LlmSelector` to remove the field or replace it with the new mechanism when available.

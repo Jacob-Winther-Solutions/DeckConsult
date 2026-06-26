@@ -1,0 +1,125 @@
+# Udviklerguide: API-integrationer til EDH & Brawl AI Agent
+
+Denne guide opsummerer de bedste datakilder, API'er og arkitekturmønstre til opbygning af en AI Agent, der kan generere dæklister og identificere staples til **MTG Arena Brawl** (og Commander/EDH), med fokus på formatspecifik validering.
+
+---
+
+## 1. Primære API-kilder
+
+### A. Scryfall API (Format- & Lovlighedsvalidering)
+Scryfall tilbyder det mest robuste og stabile REST API til Magic: The Gathering. Selvom det ikke indeholder meta-procenter, er det essentielt til at filtrere kortpuljer, så din AI ikke foreslår kort, der ikke findes på Arena.
+
+* **Base URL:** `https://api.scryfall.com`
+* **Format-filtrering (Brawl):** `https://api.scryfall.com/cards/search?q=f:brawl`
+* **Format-filtrering (Historic Brawl / Timeless Brawl):** `https://api.scryfall.com/cards/search?q=f:hbrawl`
+* **Søgesyntaks til AI-prompts (Eksempel):**
+  For at finde alle sorte dæmoner, der er lovlige i Brawl, sorteret efter popularitet i EDH:
+  `GET /cards/search?q=f:brawl+c:b+t:demon&order=edhrec`
+
+### B. EDHREC "Skjulte" API (Synergi & Statistik)
+EDHREC har et åbent, uofficielt JSON-API, som føder deres egen frontend. Det kræver ingen API-nøgle og er ekstremt hurtigt. Formatet følger en forudsigelig URL-struktur.
+
+* **Base URL:** `https://json.edhrec.com/pages`
+* **Kommandør-endpoint (Eksempel):** `https://json.edhrec.com/pages/commanders/the-ur-dragon.json`
+* **Brawl-specifikt endpoint:** `https://json.edhrec.com/pages/formats/brawl.json`
+* **Datastruktur:** Returnerer rå arrays opdelt efter korttyper (`creatures`, `instants`, `artifacts`), hvor hvert objekt indeholder:
+  * `sanitized_cardstring`: Unikt ID til nemt match mod Scryfall.
+  * `count`: Antal dæk, kortet optræder i.
+  * `synergy`: Procentvis afvigelse/synergi-score (vigtigt vægtningstal til din AI).
+
+---
+
+## 2. Arkitekturmønster til AI Agenten
+
+For at sikre, at din AI Agent leverer 100% præcise og lovlige Brawl-dæk (og ikke forveksler dem med almindelig multiplayer EDH), anbefales en **to-trins valideringspipeline**:
+
+```
+[ Bruger: "Hjælp mig med et Brawl-dæk til <Kommandør>" ]
+                        │
+                        ▼
+┌────────────────────────────────────────────────────────┐
+│ TRIN 1: Hent synergi-data (EDHREC API)                  │
+│ - Slå kommandørens JSON op                             │
+│ - Ekstrahér top-synergi kort og basale staples         │
+└───────────────────────┬────────────────────────────────┘
+                        │
+                        ▼
+┌────────────────────────────────────────────────────────┐
+│ TRIN 2: Format- & Lovlighedsfilter (Scryfall API)      │
+│ - Batch-validér de foreslåede kort mod `f:brawl`       │
+│ - Sorter automatisk kort fra, som er banned eller      │
+│   ikke udgivet på MTG Arena (f.eks. Sol Ring, Cyc Rift)│
+└───────────────────────┬────────────────────────────────┘
+                        │
+                        ▼
+┌────────────────────────────────────────────────────────┐
+│ TRIN 3: LLM Behandling & Output                        │
+│ - Prompt AI'en med de filtrerede, lovlige kort         │
+│ - Lad AI'en sammensætte dækket ud fra kurve/strategi   │
+└───────────────────────┬────────────────────────────────┘
+                        │
+                        ▼
+[ Resultat: Lovlig dækliste klar til export (MTGA format) ]
+```
+
+---
+
+## 3. Python Eksempel: Hent og Filtrér data
+
+Dette rå kodeskitse viser, hvordan din agents værktøjer (tools) kan hente top-synergi kort fra EDHREC og krydstjekke dem mod Scryfalls Brawl-database.
+
+```python
+import requests
+import urllib.parse
+
+def get_brawl_legal_synergy_cards(commander_name):
+    # 1. Formatér navn til EDHREC URL (f.eks. "Ashiok, Wicked Manipulator" -> "ashiok-wicked-manipulator")
+    sanitized_name = commander_name.lower().replace(",", "").replace(" ", "-")
+    edhrec_url = f"https://json.edhrec.com/pages/commanders/{sanitized_name}.json"
+    
+    response = requests.get(edhrec_url)
+    if response.status_code != 200:
+        return f"Kunne ikke hente data for {commander_name} fra EDHREC."
+        
+    data = response.json()
+    
+    # Ekstrahér et udpluk af foreslåede kort (f.eks. fra 'creatures' sektionen)
+    proposed_cards = []
+    if 'creatures' in data.get('container', {}).get('json_dict', {}):
+        card_list = data['container']['json_dict']['creatures']
+        # Tag de top 15 mest synergistiske væsner
+        proposed_cards = [card['name'] for card in card_list[:15]]
+    
+    # 2. Validér mod Scryfall (Tjek om de er lovlige i Brawl)
+    brawl_legal_cards = []
+    
+    for card_name in proposed_cards:
+        query = f'exact:"{card_name}" f:brawl'
+        scryfall_url = f"https://api.scryfall.com/cards/search?q={urllib.parse.quote(query)}"
+        
+        scry_res = requests.get(scryfall_url)
+        if scry_res.status_code == 200:
+            # Kortet findes og er lovligt i Brawl!
+            brawl_legal_cards.append(card_name)
+            
+    return {
+        "commander": commander_name,
+        "recommended_legal_creatures": brawl_legal_cards
+    }
+
+# Eksempel på kald som din AI Agent kan køre:
+# print(get_brawl_legal_synergy_cards("Ashiok, Wicked Manipulator"))
+```
+
+---
+
+## 4. Eksterne supplerende kilder (til Scraping)
+
+Hvis din AI Agent har brug for at kende de absolut nyeste "trends" og præcise dæk-procenter direkte fra Arena-metaen, kan du supplere dine API'er med ugentlig webscraping (f.eks. via BeautifulSoup eller Apify) af disse to sider:
+
+1. **MTGDecks (Brawl Staples):** `https://mtgdecks.net/Brawl/staples`
+   * *Hvorfor:* De tracker ugentlige procenter for præcis hvilke lands, removal og mana-rocks, der spilles mest på Arena.
+2. **AetherHub Meta:** `https://aetherhub.com/Meta/`
+   * *Hvorfor:* Giver adgang til dæklister direkte fra spillere, der uploader via tracker-klienter.
+
+Gem disse scraped top-200 tabeller i en lokal JSON-fil eller vektor-database som et "Meta-filter", din AI kan konsultere for at prioritere dæksammensætningen.

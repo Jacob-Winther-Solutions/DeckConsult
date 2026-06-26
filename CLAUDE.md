@@ -17,7 +17,7 @@ work; `AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 215 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 225 tests, all green.
 
 | Project | Status |
 |---|---|

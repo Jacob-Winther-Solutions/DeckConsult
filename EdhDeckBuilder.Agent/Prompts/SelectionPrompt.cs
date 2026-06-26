@@ -1,6 +1,8 @@
 using Anthropic.Models.Messages;
-using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Agent.Models;
+using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Decks;
+using EdhDeckBuilder.Core.Rules;
 using System.Text;
 using System.Text.Json;
 
@@ -55,7 +57,7 @@ public static class SelectionPrompt
         sb.AppendLine();
 
         sb.AppendLine($"Role needed: {role}");
-        sb.AppendLine($"Bracket: {context.Constraints.Bracket}");
+        AppendBracketGuidance(sb, context.Constraints.Bracket);
 
         if (!string.IsNullOrWhiteSpace(context.Constraints.CurveNote))
             sb.AppendLine($"Curve note: {context.Constraints.CurveNote}");
@@ -103,6 +105,26 @@ public static class SelectionPrompt
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendBracketGuidance(StringBuilder sb, Bracket bracket)
+    {
+        var profile = BracketLibrary.All[bracket];
+        sb.AppendLine($"Bracket: {(int)bracket} — {profile.Name}: {profile.Description}");
+
+        if (bracket <= Bracket.Two)
+        {
+            sb.Append("Game Changer cards are above this power level — rank them last if they appear. ");
+            sb.Append("Game Changers: ");
+            sb.AppendJoin(", ", GameChangersList.Cards.OrderBy(n => n));
+            sb.AppendLine(".");
+        }
+        else if (bracket >= Bracket.Four)
+        {
+            sb.AppendLine(
+                "Game Changer cards (Mana Crypt, Demonic Tutor, Rhystic Study, Cyclonic Rift, etc.) " +
+                "are expected at this power level — rank them highly when relevant to the role.");
+        }
     }
 
     private static InputSchema BuildSchema()
