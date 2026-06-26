@@ -1,7 +1,57 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>EDH Deck Builder</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h1 class="display-5 fw-bold">EDH Deck Builder</h1>
+        <p class="lead text-muted">
+            Natural-language Commander deck construction powered by an LLM-assisted pipeline.
+            Describe what you want; the agent builds a tuned 99-card deck around your commander.
+        </p>
+    </div>
 
-Welcome to your new app.
+    <div class="row g-4">
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Commander Builder</h5>
+                    <p class="card-text text-muted flex-grow-1">
+                        Pick your commander, choose an archetype and theme, set a power bracket
+                        and optional budget — the agent fills the remaining 99 cards with rationale
+                        for every pick.
+                    </p>
+                    <a href="commander" class="btn btn-primary mt-auto">Build a deck</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 text-muted">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Commander Discovery <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">Soon</span></h5>
+                    <p class="card-text flex-grow-1">
+                        Describe a strategy and get a shortlist of commanders that fit, each with
+                        an explanation of how their abilities support the plan.
+                    </p>
+                    <button class="btn btn-outline-secondary mt-auto" disabled>Coming soon</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 text-muted">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Brawl Builder <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">Soon</span></h5>
+                    <p class="card-text flex-grow-1">
+                        Historic Brawl deck construction for MTG Arena — eternal card pool,
+                        1v1 tuning, and separate ranked vs. casual queue profiles.
+                    </p>
+                    <button class="btn btn-outline-secondary mt-auto" disabled>Coming soon</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

@@ -1,10 +1,14 @@
+using EdhDeckBuilder.Agent;
+using EdhDeckBuilder.Infrastructure;
 using EdhDeckBuilder.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddAgent(builder.Configuration);
 
 var app = builder.Build();
 

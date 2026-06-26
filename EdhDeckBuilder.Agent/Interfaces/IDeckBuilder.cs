@@ -34,5 +34,6 @@ public interface IDeckBuilder
         IReadOnlyList<WeightedTheme>? themes = null,
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
+        IProgress<string>? progress = null,
         CancellationToken ct = default);
 }

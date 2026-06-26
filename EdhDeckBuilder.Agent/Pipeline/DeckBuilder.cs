@@ -37,20 +37,25 @@ public sealed class DeckBuilder(
         IReadOnlyList<WeightedTheme>? themes = null,
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
+        IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
         // 1. Resolve template.
+        progress?.Report("Resolving template");
         var resolved = TemplateResolver.Resolve(template, archetypes, themes, bracket);
 
         // 2. Gather candidate pool from EDHREC (one call per commander; merged).
+        progress?.Report("Gathering card pool");
         var rawPool = await GatherPoolAsync(commanders, ct);
 
         // 3. Filter pool: legal, CI ⊆ commander CI, not a commander card.
+        progress?.Report("Filtering pool");
         var colorIdentity = commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
         var commanderIds  = commanders.Select(c => c.OracleId).ToHashSet();
         var filteredPool  = FilterPool(rawPool, commanderIds, colorIdentity);
 
         // 4. Classify commanders → profiles → net targets.
+        progress?.Report("Classifying commanders");
         var commanderCandidates = commanders
             .Select(c => new CardCandidate(c, 1.0, "Commanders"))
             .ToList();
@@ -76,23 +81,29 @@ public sealed class DeckBuilder(
         };
 
         // 6. Classify pool → FillCandidates.
+        progress?.Report("Classifying card pool");
         var fillPool = await ClassifyPoolAsync(filteredPool, commanders, ct);
 
         // 7. Fill engine (Passes A + B: greedy fill + reconciliation).
+        progress?.Report("Filling deck");
         var engine     = new FillEngine(selector);
         var fillResult = await engine.FillAsync(context, fillPool, ct);
 
         // 8. Color-fixing pass (Pass C).
+        progress?.Report("Applying color fixing");
         var fixingWarnings = ColorFixingPass.Apply(context, fillResult.State, fillPool);
 
         // 9. Repair illegal cards (post-fill safety net).
+        progress?.Report("Repairing illegal cards");
         RepairEngine.RepairIllegalCards(context, fillResult.State, fillPool);
 
         // 10. Distribute basic lands proportionally by pip demand.
+        progress?.Report("Distributing basic lands");
         var basicLandCounts = DistributeBasics(
             fillResult.State.BasicCount, colorIdentity, fillResult.State);
 
         // 11. Assemble result.
+        progress?.Report("Assembling result");
         return RepairEngine.Assemble(
             context, fillResult, fixingWarnings, fillPool, resolved, basicLandCounts);
     }

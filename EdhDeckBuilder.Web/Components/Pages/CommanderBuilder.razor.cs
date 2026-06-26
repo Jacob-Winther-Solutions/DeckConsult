@@ -1,0 +1,246 @@
+using EdhDeckBuilder.Agent.Interfaces;
+using EdhDeckBuilder.Agent.Models;
+using EdhDeckBuilder.Core.Abstractions;
+using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Decks;
+using Microsoft.AspNetCore.Components;
+
+namespace EdhDeckBuilder.Web.Components.Pages;
+
+public partial class CommanderBuilder
+{
+    [Inject] private ICardRepository CardRepository { get; set; } = default!;
+    [Inject] private IDeckBuilder DeckBuilder { get; set; } = default!;
+
+    // ── Progress stage definitions ─────────────────────────────────────────
+
+    private static readonly string[] AllStages =
+    [
+        "Resolving template",
+        "Gathering card pool",
+        "Filtering pool",
+        "Classifying commanders",
+        "Classifying card pool",
+        "Filling deck",
+        "Applying color fixing",
+        "Repairing illegal cards",
+        "Distributing basic lands",
+        "Assembling result",
+    ];
+
+    // ── Form state ─────────────────────────────────────────────────────────
+
+    private string _commanderQuery = "";
+    private List<Card> _searchResults = [];
+    private List<Card> _selectedCommanders = [];
+    private bool _showDropdown;
+    private bool _isSearching;
+    private CancellationTokenSource? _searchCts;
+
+    private readonly Dictionary<Archetype, double> _archetypeWeights = new();
+    private readonly Dictionary<Theme, double> _themeWeights = new();
+    private Bracket _bracket = Bracket.Three;
+
+    // ── Build state ────────────────────────────────────────────────────────
+
+    private bool _isBuilding;
+    private string? _currentStage;
+    private readonly List<string> _completedStages = [];
+    private DeckBuildResult? _result;
+    private string? _errorMessage;
+    private CancellationTokenSource? _buildCts;
+
+    // ── Commander search ───────────────────────────────────────────────────
+
+    private async Task OnCommanderInput(ChangeEventArgs e)
+    {
+        _commanderQuery = e.Value?.ToString() ?? "";
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchCts.Token);
+            await SearchAsync();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (_commanderQuery.Length < 2)
+        {
+            _searchResults.Clear();
+            _showDropdown = false;
+            return;
+        }
+        _isSearching = true;
+        StateHasChanged();
+
+        var results = await CardRepository.SearchAsync(_commanderQuery);
+        _searchResults = [.. results.Where(c => c.CanBeCommander).Take(8)];
+        _showDropdown = _searchResults.Count > 0;
+        _isSearching = false;
+        StateHasChanged();
+    }
+
+    private void OnSearchFocus() => _showDropdown = _searchResults.Count > 0;
+
+    private async Task OnSearchBlur()
+    {
+        await Task.Delay(200);
+        _showDropdown = false;
+        StateHasChanged();
+    }
+
+    private void SelectCommander(Card card)
+    {
+        if (_selectedCommanders.Count < 2 && !_selectedCommanders.Contains(card))
+            _selectedCommanders.Add(card);
+        _commanderQuery = "";
+        _searchResults.Clear();
+        _showDropdown = false;
+    }
+
+    private void RemoveCommander(Card card) => _selectedCommanders.Remove(card);
+
+    // ── Archetype / theme toggles ──────────────────────────────────────────
+
+    private void ToggleArchetype(Archetype a)
+    {
+        if (_archetypeWeights.ContainsKey(a)) _archetypeWeights.Remove(a);
+        else _archetypeWeights[a] = 1.0;
+    }
+
+    private void SetArchetypeWeight(Archetype a, double w) => _archetypeWeights[a] = w;
+
+    private void ToggleTheme(Theme t)
+    {
+        if (_themeWeights.ContainsKey(t)) _themeWeights.Remove(t);
+        else _themeWeights[t] = 1.0;
+    }
+
+    private void SetThemeWeight(Theme t, double w) => _themeWeights[t] = w;
+
+    // ── Build ──────────────────────────────────────────────────────────────
+
+    private async Task StartBuildAsync()
+    {
+        if (_selectedCommanders.Count == 0) return;
+
+        _isBuilding = true;
+        _currentStage = null;
+        _completedStages.Clear();
+        _errorMessage = null;
+        _buildCts = new CancellationTokenSource();
+
+        var archetypes = _archetypeWeights
+            .Select(kv => new WeightedArchetype(ArchetypeLibrary.All[kv.Key], kv.Value))
+            .ToList();
+
+        var themes = _themeWeights.Count > 0
+            ? _themeWeights
+                .Select(kv => new WeightedTheme(ThemeLibrary.All[kv.Key], kv.Value))
+                .ToList()
+            : null;
+
+        var bracketProfile = BracketLibrary.All[_bracket];
+
+        var curveNote = _archetypeWeights.ContainsKey(Archetype.Aggro) && _archetypeWeights[Archetype.Aggro] >= 0.5
+            ? "Strongly favor threats with mana value ≤3."
+            : "";
+
+        var constraints = new SoftConstraints
+        {
+            Bracket = _bracket,
+            CurveNote = curveNote,
+        };
+
+        var progress = new Progress<string>(OnStageReport);
+
+        try
+        {
+            _result = await DeckBuilder.BuildAsync(
+                [.. _selectedCommanders],
+                DeckTemplate.Balanced,
+                archetypes,
+                themes,
+                bracketProfile,
+                constraints,
+                progress,
+                _buildCts.Token);
+
+            await InvokeAsync(() =>
+            {
+                if (_currentStage is not null) _completedStages.Add(_currentStage);
+                _currentStage = null;
+                _isBuilding = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            await InvokeAsync(() =>
+            {
+                _isBuilding = false;
+                _currentStage = null;
+                _completedStages.Clear();
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isBuilding = false;
+                _currentStage = null;
+                _completedStages.Clear();
+                _errorMessage = $"Build failed: {ex.Message}";
+                StateHasChanged();
+            });
+        }
+    }
+
+    private void OnStageReport(string stage)
+    {
+        _ = InvokeAsync(() =>
+        {
+            if (_currentStage is not null) _completedStages.Add(_currentStage);
+            _currentStage = stage;
+            StateHasChanged();
+        });
+    }
+
+    private void CancelBuild() => _buildCts?.Cancel();
+
+    private void ResetForm()
+    {
+        _result = null;
+        _errorMessage = null;
+        _selectedCommanders.Clear();
+        _commanderQuery = "";
+        _searchResults.Clear();
+        _archetypeWeights.Clear();
+        _themeWeights.Clear();
+        _bracket = Bracket.Three;
+    }
+
+    // ── Color identity display ─────────────────────────────────────────────
+
+    internal static IEnumerable<ColorPip> GetColorPips(Color identity)
+    {
+        if (identity == Color.None)
+            yield return new("C", "badge bg-secondary", "");
+        if (identity.HasFlag(Color.White))
+            yield return new("W", "badge border", "background:#f9fafb;color:#555;");
+        if (identity.HasFlag(Color.Blue))
+            yield return new("U", "badge bg-primary", "");
+        if (identity.HasFlag(Color.Black))
+            yield return new("B", "badge bg-dark", "");
+        if (identity.HasFlag(Color.Red))
+            yield return new("R", "badge bg-danger", "");
+        if (identity.HasFlag(Color.Green))
+            yield return new("G", "badge bg-success", "");
+    }
+
+    internal sealed record ColorPip(string Symbol, string BadgeClass, string Style);
+}
