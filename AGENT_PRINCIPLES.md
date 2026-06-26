@@ -340,21 +340,49 @@ validate → repair if needed.
 
 ---
 
-## Open decisions checklist (surface these, don't bury them)
+## Open decisions checklist
 
-- [ ] Pipeline vs. tool loop (default: pipeline)
-- [ ] Exact land count + Pass B interaction with dual-purpose utility lands
-- [ ] Fill order + reconciliation policy (coverage vs. physical mismatch)
-- [ ] Repair policy: deterministic trim vs. LLM fallback
-- [ ] Which structured-output mechanism the C# SDK exposes (native `output_format` vs. forced tool call)
-- [ ] Per-call model + temperature choices (classification vs. selection)
-- [ ] Weighted-deviation metric the swap loop minimizes + its iteration bound (swap loop monotonicity constraint is settled — §13)
-- [ ] Out-of-range handling: how an unsatisfiable target is surfaced rather than silently accepted
-- [ ] Dual-purpose lands: preliminary land pass before spell fill vs. iterate between the two
-- [ ] Commander coverage weight multiplier (default suggested: 1.5×; tune once fill engine exists)
+All decisions listed here are now **closed**. The implementation is in `EdhDeckBuilder.Agent/`.
 
-**Closed:**
-- ~~Classification cache key~~ → global-stable (OracleId) for most roles; Plan and Synergy not cached (§7)
-- ~~Core's overlap support for Always/Modal/Transform~~ → closed: `RoleProfile`, `RoleContribution`, `RoleRelation` with `CoverageFor(role)` already exist in Core; defaults (Always=1.0, Modal=0.5, Transform=0.75) are set; classifier provides actual weights
-- ~~Coverage-credit discount for Modal/Transform~~ → closed: weights are per-contribution in `RoleContribution.Weight`; use the classifier's values, fall back to the defaults in `RoleProfile`
-- ~~Coverage targets vs. physical slot counts~~ → closed: targets are coverage (may sum >99); fill engine holds the 99-card hard constraint (§2, §13)
+**Closed (implementation complete):**
+
+- ~~Pipeline vs. tool loop~~ → **pipeline**. `Pipeline/DeckBuilder.cs` — 10-stage sequential
+  pipeline; no ReAct loop.
+- ~~Exact land count + Pass B interaction~~ → `ReservedLandCount = NetTargets[Land].Ideal`
+  (typically 38). Utility lands from the pool are added during **Pass C** (`ColorFixingPass`)
+  after spell fill completes; they take land slots (not spell slots). Spell-category coverage
+  they provide is credited via `FillCandidate.Roles`. No preliminary land pass needed.
+- ~~Fill order + reconciliation policy~~ → order: Plan → MassDisruption → Tutor → Protection →
+  Payoff → TargetedDisruption → Ramp → CardAdvantage → Synergy (scarce → abundant, in
+  `FillEngine.FillOrder`). Reconciliation: bounded monotonic swap loop, max 50 iterations,
+  accepts only swaps that strictly reduce `Σ|coverage − ideal|`.
+- ~~Repair policy~~ → **deterministic**: `RepairEngine.RepairIllegalCards` swaps any
+  color-identity violator with the highest-inclusion legal alternative from the pool (same
+  primary role first, then same card type). No LLM fallback.
+- ~~Structured-output mechanism~~ → **forced tool call**. Native `output_format` is not
+  exposed in the C# SDK (v12.30.0). Both calls use `ToolChoiceTool { Name = "..." }` with
+  `Tool.Strict = true`. Response parsed from `ToolUseBlock.Input`.
+- ~~Per-call model + temperature~~ → classification: `claude-haiku-4-5-20251001`, temperature
+  0.1; selection: `claude-sonnet-4-6`, temperature 0.6. Note: `Temperature` is deprecated for
+  models after Claude Opus 4.6 — expect a `CS0618` warning at build time; value 1.0 is accepted
+  for backward compatibility, other values raise a 400 in future API versions.
+- ~~Weighted-deviation metric + iteration bound~~ → `Σ|coverage − ideal|`, uniform role weights.
+  Max 50 iterations. Monotonicity enforced: if no swap reduces deviation, stop immediately.
+- ~~Out-of-range handling~~ → surfaced, never silently accepted. `DeckBuildResult.CoverageWarnings`
+  lists roles outside their min/max band; `DeckBuildResult.CutSuggestions` lists the weakest 5
+  cards in each over-covered role. The build completes and the user decides.
+- ~~Dual-purpose lands~~ → no separate preliminary pass. Utility lands in the EDHREC pool are
+  classified and treated as `CardRole.Land` candidates. `FillEngine` can commit them during greedy
+  fill (land slots); `ColorFixingPass` adds more after spell fill. Coverage they provide to spell
+  categories is credited by `FillCandidate.Roles` automatically.
+- ~~Commander coverage weight multiplier~~ → **1.5×**, decided and implemented in
+  `DeckBuilder.ComputeNetTargets`. For a partner pair, both commanders contribute at 1.5×.
+- ~~Classification cache key~~ → global-stable (OracleId) for most roles; Plan and Synergy not
+  cached (§7).
+- ~~Core's overlap support for Always/Modal/Transform~~ → `RoleProfile`, `RoleContribution`,
+  `RoleRelation` with `CoverageFor(role)` already exist in Core; defaults (Always=1.0, Modal=0.5,
+  Transform=0.75) are set; classifier provides actual weights.
+- ~~Coverage-credit discount for Modal/Transform~~ → weights are per-contribution in
+  `RoleContribution.Weight`; use the classifier's values, fall back to the defaults in `RoleProfile`.
+- ~~Coverage targets vs. physical slot counts~~ → targets are coverage (may sum >99); fill engine
+  holds the 99-card hard constraint (§2, §13).

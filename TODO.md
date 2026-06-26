@@ -2,66 +2,203 @@
 
 A living list of deferred work. Check items off as they land.
 
-## Scoring & fill layer  (deferred — pick up when ready)
+---
 
-The layer that takes the EDHREC candidate pool and fills the resolved template's role
-targets with actual cards. Deliberately left for later; capturing the considerations now.
+## Web UI  (not started — pick up after Agent is wired end-to-end)
 
-- [ ] **Priority-order fill.** Fill roles in a sensible order (lands → ramp → draw → removal
-      → wipes → protection → payoff → synergy). Before adding a dedicated card for a role,
-      credit coverage already provided by multi-role cards placed earlier. This is the
-      primary defense against overfilling a category low in the priority order.
-- [ ] **Per-role candidate scoring.** Rank pool cards for a role using: EDHREC synergy /
-      inclusion %, archetype fit, mana-curve fit, and an **overlap bonus** — a card that
-      covers two still-needed roles should outscore a single-purpose card.
-- [ ] **Target semantics decision.** Decide whether template targets are *physical* (primary)
-      counts or *coverage* counts. Leaning coverage-based (sums > 99, satisfied within 99
-      physical cards via overlap). Reconcile with `TemplateResolver`, which currently
-      normalizes *primary* counts to 99 — may need a coverage-target mode.
-- [ ] **Curve management.** Track mana-value distribution, not just role counts.
-- [ ] **Constraints as pre-filters.** Color identity, banlist, budget, power bracket applied
-      to the pool *before* scoring.
-- [ ] **Diminishing returns.** Avoid stacking too many near-identical effects.
-- [ ] **Explainability.** Keep a per-card reason (why included, which role, what it overlaps)
-      so the UI can show it.
-- [ ] **(Stretch) Opening-hand / curve simulation** to sanity-check consistency.
+The `EdhDeckBuilder.Web` Blazor project is scaffolded but contains only boilerplate.
 
-## Multi-role classification  (in progress)
+- [ ] Wire `IDeckBuilder` into a Blazor page / component tree.
+- [ ] Role-grouped deck view: display the final 99 as expandable role buckets, each card
+      showing its `CardSuggestion.Reason`.
+- [ ] Basic land section: display `DeckBuildResult.BasicLandCounts` (e.g. "20× Forest,
+      11× Mountain").
+- [ ] Runner-up panel: show `DeckBuildResult.RunnerUps` so the user can drag-and-swap cards
+      without triggering a full rebuild.
+- [ ] Coverage summary: bar or table comparing `DeckBuildResult.ActualCoverage` against
+      `DeckBuildResult.PlannedTemplate` targets.
+- [ ] Cut suggestions: surface `DeckBuildResult.CutSuggestions` for over-covered roles.
+- [ ] Commander input: search box (Scryfall autocomplete) → select one or two commanders.
+- [ ] Archetype / theme picker: let the user weight archetypes and themes before building.
+- [ ] Budget input in the UI (see Budget section below).
+- [ ] Deck persistence (save/load to local storage or a backend store).
+
+---
+
+## Budget-aware card selection  (new feature)
+
+Players on tight budgets should get a competitive deck within their price range rather than
+a list full of expensive staples they have to manually replace. Two independent budget axes:
+
+- **Per-card budget** (`MaxCardPriceUsd`) — no single card may exceed this amount. The
+  primary lever: directly prevents the LLM from selecting expensive staples.
+- **Total deck budget** (`TotalBudgetUsd`) — the sum of all 99 cards must stay within this
+  amount. Useful when a player is fine with one or two expensive pieces but wants to stay
+  under a total spend. Both fields are nullable/optional and can be combined.
+
+- [ ] **Add both budget fields to `SoftConstraints`** — `decimal? MaxCardPriceUsd` and
+      `decimal? TotalBudgetUsd`. The builder already passes `SoftConstraints` to the selector
+      prompt, so this is the natural place to carry them.
+- [ ] **Fetch card prices.** Scryfall bulk card data includes `prices.usd` and `prices.usd_foil`.
+      Store the non-foil price on `Card` at ingestion time. Scryfall bulk data is already cached
+      locally, so no extra network call is needed.
+- [ ] **Pass budget to the selector prompt.** The selection prompt should instruct the LLM to
+      deprioritize cards that would breach either threshold and prefer affordable alternatives.
+      Budget is a soft preference — if no affordable card can fill a role, pick the best
+      available and flag it in the result.
+- [ ] **Surface budget violations in the result.** Add a `BudgetWarnings` field (or reuse
+      `CoverageWarnings`) listing any cards that exceeded `MaxCardPriceUsd`, plus the total
+      deck price so the user can see at a glance whether they are within `TotalBudgetUsd`.
+- [ ] **UI:** Two budget fields on the deck-build form ("max per card" and "total deck");
+      highlight over-budget cards in the deck view; show running total price in the header.
+
+---
+
+## Commander selection / discovery  (new feature)
+
+Currently the user must already know which commander they want. A discovery mode would let
+them describe a strategy and get back a shortlist of commanders that fit, before building a deck.
+
+- [ ] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
+      optional colors or color identity constraints, and optionally a free-text description
+      ("I want a grindy aristocrats deck that can play against Bracket 3–4").
+- [ ] **Query the commander pool.** Scryfall can return all legendary creatures legal in
+      Commander filtered by color identity. This becomes the candidate set.
+- [ ] **Score and rank commanders.** Ask the LLM to evaluate each candidate against the
+      stated strategy: does this commander's abilities actively support the archetype and theme,
+      or is it a generic good-stuff commander? Return a ranked shortlist (top 5–10) with a
+      one-paragraph explanation per candidate.
+- [ ] **Wire into the pipeline.** Selecting a commander from the shortlist should feed directly
+      into the existing `IDeckBuilder.BuildAsync` flow, pre-populating the archetype/theme
+      weights the discovery mode resolved.
+- [ ] **Consider a new interface `ICommanderSelector`** in the Agent layer, parallel to
+      `ILlmClassifier` and `ICardSelector`, so the LLM call is mockable and independently
+      testable.
+- [ ] **UI:** A "Help me choose a commander" entry point before the deck-build form. Shows
+      the shortlist with art, color identity, and the LLM's explanation; user clicks one to
+      proceed to the full build.
+
+---
+
+## Additional card sources — Aetherhub + mtgrocks  (prerequisite for Brawl)
+
+These sources are useful for Commander too, not just Brawl. Implement them as general
+`ISuggestionSource` / supplementary data providers before building Brawl-specific support.
+
+- **Aetherhub** — has a Commander meta page (popular commanders and their win-rate / play-rate
+  data) and Historic Brawl deck lists. A Commander `ISuggestionSource` backed by Aetherhub
+  would complement EDHREC with meta-relevance signals.
+- **mtgrocks** — has a Commander staples page that tracks which cards appear most frequently
+  across top-performing Commander lists. Useful as a signal for cards that are strong regardless
+  of commander, supplementing EDHREC's per-commander inclusion rates.
+
+- [ ] Investigate Aetherhub's API / scraping surface for Commander meta data and per-commander
+      card lists. Determine whether it returns JSON or requires HTML parsing.
+- [ ] Implement `AetherhubCommanderSource : ISuggestionSource` in Infrastructure. Cache
+      per-commander (alongside the existing EDHREC cache).
+- [ ] Investigate mtgrocks for Commander staples data (likely a static/semi-static list).
+      Implement `MtgrocksStaplesSource` — could be a supplementary signal rather than a full
+      `ISuggestionSource` (e.g. a weight bump on cards that appear on the staples list).
+- [ ] Decide how multiple `ISuggestionSource` implementations are merged in `DeckBuilder`.
+      The current merge keeps the highest inclusion per card; ensure the merge strategy still
+      makes sense when sources have different inclusion scales.
+
+---
+
+## Historic Brawl format support  (new format — depends on Additional sources above)
+
+Historic Brawl on MTG Arena is 100-card singleton, same physical count as Commander, but
+with meaningful differences: 1-vs-1, an **eternal** card pool (no rotation — cards are only
+removed via the Historic Brawl ban list when sets release new cards are added), and two
+distinct queues with different power expectations.
+
+Key differences from EDH to plan around:
+
+- **Card pool:** Scryfall exposes `legalities.historicbrawl`. Card ingestion needs a separate
+  flag rather than reusing the Commander legal pool. The pool is eternal — no rotation, just
+  a separate ban list.
+- **Two queues — ranked vs. casual:** MTG Arena is adding a ranked queue (heavily meta-
+  oriented, expect optimized lists) and a non-ranked queue (more casual). This is analogous
+  to the bracket system in Commander and should be part of the input model — the builder
+  should know which queue the user is targeting and adjust the `DeckTemplate` baseline and
+  selector guidance accordingly.
+- **1v1 meta:** Board wipes are weaker (only one opponent), reactive spells and counterspells
+  matter more, and go-wide threats are relatively stronger. The `DeckTemplate` targets need a
+  Brawl-specific baseline — the Commander baseline will produce badly tuned lists.
+- **Sources:** EDHREC does not cover Historic Brawl. Use Aetherhub (Brawl deck lists and
+  meta reports) and mtgdecks.net (Brawl commander-specific recommendations). Both require
+  their own `ISuggestionSource` implementations in Infrastructure.
+- **Commander legality:** Any legendary creature or planeswalker legal in the format can be
+  the commander — broader than EDH (planeswalkers allowed). `CanBeCommander` logic needs a
+  format-aware variant.
+- **Arena-only cards:** Alchemy and Historic Anthology cards exist only on Arena. Scryfall
+  includes them; the card model may need an `IsArenaOnly` flag so users can choose to include
+  or exclude them.
+
+Suggested approach: model this as a second `FormatProfile` (alongside Commander), not a
+separate codebase. Most of the Agent pipeline (fill engine, LLM seam, color-fixing) is
+format-agnostic. Only `ISuggestionSource`, the `DeckTemplate` baseline, commander legality
+rules, and card ingestion need format-specific variants.
+
+- [ ] Define `FormatProfile` (or equivalent) in Core: legality check, deck size, commander
+      count, baseline `DeckTemplate`, and queue/power-level model.
+- [ ] Add `historicbrawl` legality flag and `IsArenaOnly` flag to `Card` ingestion.
+- [ ] Implement `AetherhubBrawlSource` and `MtgdecksBrawlSource` in Infrastructure.
+- [ ] Create Brawl `DeckTemplate` baselines — one for ranked (tighter, more interaction)
+      and one for casual — or model it as a Brawl-specific bracket equivalent.
+- [ ] Update `IDeckBuilder.BuildAsync` (or a new `IBrawlDeckBuilder`) to accept a
+      `FormatProfile` and route to the correct template, sources, and legality rules.
+- [ ] Test with a known strong Historic Brawl commander (e.g. Atraxa, Raffine, Sheoldred).
+
+---
+
+## Multi-role classification  (partially deferred)
 
 - [x] Data model: `RoleProfile` (primary + secondary contributions), `RoleRelation`
       (Always / Modal / Transform), coverage accounting on `Deck`.
-- [ ] Classifier produces `RoleProfile`s (heuristic first pass, LLM for ambiguous cards).
-- [ ] Context-aware classification (e.g. Jeska's Will behaves differently with vs without the
-      commander on board; depends on commander castability and deck context).
-- [ ] Tune default coverage weights (Always 1.0, Modal ~0.5, Transform ~0.75).
-- [ ] Coverage-gap report / template-adherence warnings (read-only feedback).
+- [x] Classifier produces `RoleProfile`s — `LlmClassifier` via forced tool call.
+- [ ] Context-aware classification: e.g. Jeska's Will behaves differently with vs. without
+      the commander on board; depends on commander castability and deck context.
+- [ ] Tune default coverage weights (Always=1.0, Modal=0.5, Transform=0.75 are currently
+      baked into Core defaults; may need per-commander calibration once real builds are tested).
+- [ ] Coverage-gap report / template-adherence warnings in the UI (data is in
+      `DeckBuildResult.CoverageWarnings`; rendering is deferred to the Web layer).
 
-## Agent output model  (deferred — build with the Agent layer)
-
-The Agent layer sits between Infrastructure and the Web. It receives `CardCandidate`s from
-`ISuggestionSource`, reasons about the full deck context, and produces a final result.
-
-`CardCandidate` (Core) carries raw signals: inclusion rate and thematic section.
-The Agent enriches a subset into `CardSuggestion`s with LLM-generated reasoning.
-
-- [ ] **`CardSuggestion` record** in Agent layer: `Card` + `string Reason`.
-      Reason is generated by the LLM with full deck context — not a score, but a sentence
-      ("Fills your Ramp gap", "High synergy with your commander's proliferate ability",
-      "Redundant with Sol Ring and Mind Stone — consider cutting one of the three").
-- [ ] **`DeckBuildResult` record** in Agent layer: `IReadOnlyList<CardSuggestion> Deck` (the 99)
-      + `IReadOnlyList<CardCandidate> RunnerUps` (evaluated but not chosen — default ~15).
-      The runner-up list lets the user review near-misses and make manual overrides without
-      rebuilding the deck from scratch.
-- [ ] Wire `DeckBuildResult` into the Web UI: deck view shows suggestions with their reasons;
-      a secondary panel shows runner-ups for manual review.
+---
 
 ## Other deferred
 
 - [ ] `CanBeCommander` logic at Scryfall ingestion (legendary creature, partner, background,
-      "can be your commander" text).
-- [ ] **MDFC land contributions.** Cards like Valakut Awakening // Valakut Stoneforge have a land
-      backside that many players count toward their land total, but their front-face `CardType` is
-      not Land. The `TemplateResolver` land floor/ceiling and the scoring layer's land fill both
-      need to credit MDFC-land backs so Landfall decks and low-land combo builds count correctly.
-- [ ] Power-bracket modeling and the Game Changers list.
-- [ ] Deck persistence (save/load).
+      "can be your commander" text). Currently stored as a field but only set if Scryfall
+      reports it; the heuristic fallback is missing.
+- [ ] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
+      `DeckBuilder.DistributeBasics` returns an empty dict when `ColorIdentity == Color.None`.
+      Wastes handling needs to be added before colorless commanders are supported.
+- [ ] **MDFC land credit assignment.** The `LandCredit` field on `FillCandidate` exists and is
+      plumbed through; `LlmClassifier` needs to assign non-zero values based on how playable the
+      land face is for the given commander (currently defaults to 0 for all cards).
+- [ ] Power-bracket modeling and the Game Changers list (data is in `BracketLibrary` and
+      `GameChangersList`; integration into the selector prompt is deferred).
+- [ ] Per-call temperature audit: `Temperature` is deprecated for models after Claude Opus 4.6.
+      Once the SDK removes backward-compatibility handling, update both `LlmClassifier` and
+      `LlmSelector` to remove the field or replace it with the new mechanism when available.
+- [ ] (Stretch) Opening-hand / curve simulation to sanity-check consistency.
+
+---
+
+## Done
+
+- [x] **Core** — domain model, rules, templates, archetypes, themes, bracket system.
+- [x] **Infrastructure** — Scryfall bulk client + EDHREC client + `SuggestionSource`.
+- [x] **Agent — models & interfaces** — `BuildContext`, `BuildState`, `FillCandidate`,
+      `SoftConstraints`, `CardSuggestion`, `DeckBuildResult`, `ILlmClassifier`, `ICardSelector`,
+      `IDeckBuilder`, `ClassificationResult`, `SelectionResult`.
+- [x] **Agent — fill engine** — `FillEngine` (greedy fill + bounded monotonic reconciliation
+      swap loop, max 50 iterations), `ColorFixingPass` (Pass C: pip-demand scoring, 8-basic
+      floor, 50% non-basic cap), 31 unit tests.
+- [x] **Agent — LLM seam** — `LlmClassifier` (Haiku, forced tool call, batched, globally
+      cached except Plan/Synergy), `LlmSelector` (Sonnet, forced tool call, per-build rationale
+      capture), `ClassificationCache`, `ClassificationPrompt`, `SelectionPrompt`.
+- [x] **Agent — pipeline** — `RepairEngine` (deterministic CI-violation repair + result
+      assembly), `DeckBuilder` (10-stage orchestration), 5 integration tests.
+- [x] **Agent — DI** — `ServiceCollectionExtensions.AddAgent(configuration)`.
