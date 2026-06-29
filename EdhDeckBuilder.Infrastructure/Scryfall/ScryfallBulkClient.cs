@@ -45,7 +45,17 @@ internal sealed class ScryfallBulkClient(
 
     private async Task<string> ResolveDownloadUriAsync(CancellationToken ct)
     {
-        await using var stream = await http.GetStreamAsync(BulkDataUrl, ct);
+        using var response = await http.GetAsync(BulkDataUrl, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException(
+                $"Scryfall bulk-data manifest returned {(int)response.StatusCode}: {body}",
+                inner: null,
+                response.StatusCode);
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
         var list = await JsonSerializer.DeserializeAsync<BulkDataList>(stream, JsonOptions, ct)
             ?? throw new InvalidOperationException("Scryfall bulk-data manifest was null.");
 

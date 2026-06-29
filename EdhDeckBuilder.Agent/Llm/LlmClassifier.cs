@@ -18,7 +18,6 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
 {
     private const string Model = "claude-haiku-4-5-20251001";
     private const int MaxTokens = 4096;
-    private const double Temperature = 0.1;
 
     public async Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
         IReadOnlyList<CardCandidate> candidates,
@@ -45,7 +44,6 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
         {
             Model = Model,
             MaxTokens = MaxTokens,
-            Temperature = Temperature,
             System = new MessageCreateParamsSystem(ClassificationPrompt.SystemPrompt),
             Tools = [ClassificationPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = ClassificationPrompt.ToolName },

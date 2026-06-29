@@ -30,7 +30,7 @@ public static class SelectionPrompt
         ## Output rules
         - Rank every candidate provided — do not omit any.
         - Rank 1 is the best, rank N (the total count) is the worst.
-        - The rationale should be 1–2 sentences explaining the key consideration for this card's position.
+        - The rationale should be 1–2 sentences explaining the key consideration for this card's position. Focus on why this card fits THIS specific deck — the commanders, the archetype, the synergies. Do not mention EDHREC, Scryfall, Archidekt, or any other external tool or data source.
         - Return the oracle_id values exactly as provided — do not invent or modify any.
         """;
 
@@ -132,14 +132,16 @@ public static class SelectionPrompt
         const string json = """
             {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "selections": {
                   "type": "array",
                   "items": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                       "oracle_id": { "type": "string" },
-                      "rank":      { "type": "integer", "minimum": 1 },
+                      "rank":      { "type": "integer" },
                       "rationale": { "type": "string" }
                     },
                     "required": ["oracle_id","rank","rationale"]

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\EdhDeckBuilder.Core\EdhDeckBuilder.Core.csproj" />
@@ -11,6 +11,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>3ac1fc87-c6d2-4c18-b8c0-03dc4ef87717</UserSecretsId>
   </PropertyGroup>
 
 </Project>

@@ -4,6 +4,8 @@ using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using System.Text;
 
 namespace EdhDeckBuilder.Web.Components.Pages;
 
@@ -11,6 +13,7 @@ public partial class CommanderBuilder
 {
     [Inject] private ICardRepository CardRepository { get; set; } = default!;
     [Inject] private IDeckBuilder DeckBuilder { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     // ── Progress stage definitions ─────────────────────────────────────────
 
@@ -41,6 +44,50 @@ public partial class CommanderBuilder
     private readonly Dictionary<Theme, double> _themeWeights = new();
     private Bracket _bracket = Bracket.Three;
 
+    // ── Export state ───────────────────────────────────────────────────────
+
+    private bool _showExport;
+    private bool _exportCopied;
+
+    private string BuildExportText()
+    {
+        if (_result is null) return "";
+        var sb = new StringBuilder();
+
+        sb.AppendLine("// Commander");
+        foreach (var c in _selectedCommanders)
+            sb.AppendLine($"1 {c.Name}");
+
+        sb.AppendLine();
+        sb.AppendLine("// Deck");
+        foreach (var s in _result.Deck.OrderBy(s => s.Roles.Primary).ThenBy(s => s.Card.Name))
+            sb.AppendLine($"1 {s.Card.Name}");
+
+        if (_result.BasicLandCounts.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("// Basic Lands");
+            foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+                sb.AppendLine($"{count} {land}");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private async Task CopyExportTextAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", BuildExportText());
+            _exportCopied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            _exportCopied = false;
+            StateHasChanged();
+        }
+        catch { /* clipboard unavailable — user can select-all from the textarea */ }
+    }
+
     // ── Build state ────────────────────────────────────────────────────────
 
     private bool _isBuilding;
@@ -63,6 +110,13 @@ public partial class CommanderBuilder
             await SearchAsync();
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _isSearching = false;
+            _showDropdown = false;
+            _errorMessage = $"Search failed: {ex.Message}";
+            StateHasChanged();
+        }
     }
 
     private async Task SearchAsync()
@@ -159,7 +213,7 @@ public partial class CommanderBuilder
 
         try
         {
-            _result = await DeckBuilder.BuildAsync(
+            var buildResult = await DeckBuilder.BuildAsync(
                 [.. _selectedCommanders],
                 DeckTemplate.Balanced,
                 archetypes,
@@ -171,6 +225,7 @@ public partial class CommanderBuilder
 
             await InvokeAsync(() =>
             {
+                _result = buildResult;
                 if (_currentStage is not null) _completedStages.Add(_currentStage);
                 _currentStage = null;
                 _isBuilding = false;
@@ -216,6 +271,8 @@ public partial class CommanderBuilder
     {
         _result = null;
         _errorMessage = null;
+        _showExport = false;
+        _exportCopied = false;
         _selectedCommanders.Clear();
         _commanderQuery = "";
         _searchResults.Clear();

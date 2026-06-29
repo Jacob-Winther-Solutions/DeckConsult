@@ -1,28 +1,43 @@
 using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Core.Cards;
 using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EdhDeckBuilder.Agent.Llm;
 
 /// <summary>
-/// In-memory cache for classification results, keyed by OracleId.
-///
-/// Plan and Synergy roles are commander-dependent: the same card may classify as Plan in a
-/// Spellslinger deck but as Synergy in a Tokens deck. These are never served from cache.
-/// All other roles are global-stable and safe to reuse across builds.
+/// Classification cache keyed by OracleId, persisted to disk across sessions.
+/// Plan and Synergy roles are commander-dependent and are never cached.
+/// All other roles are global-stable and reused across builds and restarts.
 /// </summary>
 public sealed class ClassificationCache
 {
-    private readonly ConcurrentDictionary<Guid, ClassificationResult> _cache = new();
+    private static readonly string DefaultCachePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "EdhDeckBuilder", "classification_cache.json");
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+        WriteIndented = false,
+    };
 
     private static readonly IReadOnlySet<CardRole> NeverCache =
-        new HashSet<CardRole> { CardRole.Plan, CardRole.Synergy };
+        new HashSet<CardRole> { CardRole.Plan, CardRole.Synergy, CardRole.Payoff };
 
-    /// <summary>
-    /// Splits <paramref name="candidates"/> into cache hits and misses.
-    /// Candidates whose cached result has a Plan or Synergy primary role always go to misses,
-    /// even if a cache entry exists.
-    /// </summary>
+    private readonly string _cachePath;
+    private readonly ConcurrentDictionary<Guid, ClassificationResult> _cache;
+    private readonly object _writeLock = new();
+
+    public ClassificationCache() : this(DefaultCachePath) { }
+
+    internal ClassificationCache(string cachePath)
+    {
+        _cachePath = cachePath;
+        _cache = LoadFromDisk(cachePath);
+    }
+
     public void Partition(
         IReadOnlyList<CardCandidate> candidates,
         out IReadOnlyList<ClassificationResult> hits,
@@ -48,16 +63,47 @@ public sealed class ClassificationCache
         misses = missList;
     }
 
-    /// <summary>
-    /// Stores results that are safe to cache (not Plan or Synergy primary roles).
-    /// Results for Plan and Synergy are silently ignored.
-    /// </summary>
     public void Store(IReadOnlyList<ClassificationResult> results)
     {
+        var added = false;
         foreach (var r in results)
         {
-            if (!NeverCache.Contains(r.PrimaryRole))
-                _cache.TryAdd(r.OracleId, r);
+            if (!NeverCache.Contains(r.PrimaryRole) && _cache.TryAdd(r.OracleId, r))
+                added = true;
         }
+
+        if (added)
+            _ = Task.Run(PersistToDisk);
+    }
+
+    private void PersistToDisk()
+    {
+        lock (_writeLock)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_cachePath)!);
+                var snapshot = _cache.Values.ToList();
+                var json = JsonSerializer.Serialize(snapshot, SerializerOptions);
+                var tmp = _cachePath + ".tmp";
+                File.WriteAllText(tmp, json);
+                File.Move(tmp, _cachePath, overwrite: true);
+            }
+            catch { /* best-effort — a failed write just means next session re-classifies */ }
+        }
+    }
+
+    private static ConcurrentDictionary<Guid, ClassificationResult> LoadFromDisk(string path)
+    {
+        if (!File.Exists(path))
+            return new();
+        try
+        {
+            var json = File.ReadAllText(path);
+            var list = JsonSerializer.Deserialize<List<ClassificationResult>>(json, SerializerOptions) ?? [];
+            return new ConcurrentDictionary<Guid, ClassificationResult>(
+                list.ToDictionary(r => r.OracleId));
+        }
+        catch { return new(); }
     }
 }

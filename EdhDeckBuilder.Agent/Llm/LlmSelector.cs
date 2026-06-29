@@ -17,9 +17,8 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// </summary>
 public sealed class LlmSelector(AnthropicClient client) : ICardSelector
 {
-    private const string Model = "claude-sonnet-4-6";
+    private const string Model = "claude-haiku-4-5-20251001";
     private const int MaxTokens = 2048;
-    private const double Temperature = 0.6;
 
     public async Task<IReadOnlyList<SelectionResult>> SelectAsync(
         CardRole role,
@@ -35,7 +34,6 @@ public sealed class LlmSelector(AnthropicClient client) : ICardSelector
         {
             Model = Model,
             MaxTokens = MaxTokens,
-            Temperature = Temperature,
             System = new MessageCreateParamsSystem(SelectionPrompt.SystemPrompt),
             Tools = [SelectionPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = SelectionPrompt.ToolName },

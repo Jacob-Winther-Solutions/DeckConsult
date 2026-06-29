@@ -25,7 +25,7 @@ public static class ClassificationPrompt
 
         **Ramp** — Cards that accelerate mana production beyond one land per turn: mana rocks, land ramp spells, mana dorks, rituals.
 
-        **CardAdvantage** — Cards that generate card equity: draw spells, impulse draw, looting, wheels, Rhystic Study effects.
+        **CardAdvantage** — Cards that generate net card equity: you must end up with more cards in hand or exile than you started with. A card qualifies if it draws 2+ cards, creates multiple impulse-draw effects, or replaces itself and does something else relevant. Cantrips (draw exactly 1), looting (draw X discard X), and rummaging (discard X draw X) do not qualify — they trade one card for one card and belong in Synergy or another more specific role.
 
         **TargetedDisruption** — Spot removal, counterspells, bounce, and exile targeting one permanent or spell.
 
@@ -104,11 +104,13 @@ public static class ClassificationPrompt
         var json = $$"""
             {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "classifications": {
                   "type": "array",
                   "items": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                       "oracle_id":    { "type": "string" },
                       "primary_role": { "type": "string", "enum": {{roleEnum}} },
@@ -116,15 +118,16 @@ public static class ClassificationPrompt
                         "type": "array",
                         "items": {
                           "type": "object",
+                          "additionalProperties": false,
                           "properties": {
                             "role":     { "type": "string", "enum": {{roleEnum}} },
                             "relation": { "type": "string", "enum": ["Always","Modal","Transform"] },
-                            "weight":   { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+                            "weight":   { "type": "number" }
                           },
                           "required": ["role","relation","weight"]
                         }
                       },
-                      "land_credit": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+                      "land_credit": { "type": "number" }
                     },
                     "required": ["oracle_id","primary_role","secondary","land_credit"]
                   }
