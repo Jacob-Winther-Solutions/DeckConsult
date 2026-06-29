@@ -30,7 +30,8 @@ public static class SelectionPrompt
         ## Output rules
         - Rank every candidate provided — do not omit any.
         - Rank 1 is the best, rank N (the total count) is the worst.
-        - The rationale should be 1–2 sentences explaining the key consideration for this card's position. Focus on why this card fits THIS specific deck — the commanders, the archetype, the synergies. Do not mention EDHREC, Scryfall, Archidekt, or any other external tool or data source.
+        - The rationale must be 1–2 sentences explaining why this card earns its position in THIS specific deck. Mention the commander by name, a concrete mechanical interaction, or a specific synergy with the archetype or theme. Every rationale must be deck-specific — a rationale that could be copy-pasted unchanged to a different deck is wrong.
+        - FORBIDDEN rationale patterns (do not use these or any paraphrase of them): "top recommendation", "highly recommended", "popular choice", "community staple", "widely played", "selected from", "one of the best", "commonly seen", or any reference to EDHREC, Scryfall, Archidekt, or any other external tool or data source. If you cannot find a deck-specific reason, explain what the card does and why that effect is valuable at this power level in this commander's colours.
         - Return the oracle_id values exactly as provided — do not invent or modify any.
         """;
 

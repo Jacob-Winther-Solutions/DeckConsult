@@ -122,10 +122,10 @@ a parse**. Code that trusts model card names directly is a bug even if the happy
   mocks and zero API calls**. Most of the real logic lives here and deserves fast tests.
 - **Cache classification — global-stable only.** Most roles are stable across commanders: Sol
   Ring is always Ramp, Path to Exile is always TargetedDisruption. Cache by `OracleId`.
-- **Do not cache `Plan` and `Synergy` per-commander.** These roles are inherently context-
-  dependent ("is this equipment the plan *for this commander*?"). Re-classify them per build
-  rather than risking a stale global cache. The cost is acceptable since the candidate pool is
-  small relative to all Scryfall cards.
+- **Do not cache `Plan`, `Synergy`, or `Payoff` per-commander.** These roles are inherently
+  context-dependent ("is this card the plan *for this commander*?", "does this pay off the
+  strategy?"). Re-classify them per build rather than risking a stale global cache. The cost
+  is acceptable since the candidate pool is small relative to all Scryfall cards.
 
 ---
 
@@ -377,8 +377,8 @@ All decisions listed here are now **closed**. The implementation is in `EdhDeckB
   categories is credited by `FillCandidate.Roles` automatically.
 - ~~Commander coverage weight multiplier~~ → **1.5×**, decided and implemented in
   `DeckBuilder.ComputeNetTargets`. For a partner pair, both commanders contribute at 1.5×.
-- ~~Classification cache key~~ → global-stable (OracleId) for most roles; Plan and Synergy not
-  cached (§7).
+- ~~Classification cache key~~ → global-stable (OracleId) for most roles; Plan, Synergy, and
+  Payoff not cached (§7).
 - ~~Core's overlap support for Always/Modal/Transform~~ → `RoleProfile`, `RoleContribution`,
   `RoleRelation` with `CoverageFor(role)` already exist in Core; defaults (Always=1.0, Modal=0.5,
   Transform=0.75) are set; classifier provides actual weights.

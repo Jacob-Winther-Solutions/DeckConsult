@@ -41,7 +41,19 @@ public partial class CommanderBuilder
     private CancellationTokenSource? _searchCts;
 
     private readonly Dictionary<Archetype, double> _archetypeWeights = new();
-    private readonly Dictionary<Theme, double> _themeWeights = new();
+
+    // Theme state — list-based so preset and custom themes share the same collection
+    private readonly List<WeightedTheme> _selectedThemes = new();
+    private string _themeFilter = "";
+
+    // Shared tune/custom theme form state
+    private bool _showThemeForm;
+    private Theme? _tuningPreset;
+    private int _editingCustomIndex = -1;
+    private string _formThemeName = string.Empty;
+    private string _formThemeDesc = string.Empty;
+    private Dictionary<CardRole, int> _formEffectiveValues = new();
+
     private Bracket _bracket = Bracket.Three;
 
     // ── Export state ───────────────────────────────────────────────────────
@@ -157,7 +169,7 @@ public partial class CommanderBuilder
 
     private void RemoveCommander(Card card) => _selectedCommanders.Remove(card);
 
-    // ── Archetype / theme toggles ──────────────────────────────────────────
+    // ── Archetype toggles ──────────────────────────────────────────────────
 
     private void ToggleArchetype(Archetype a)
     {
@@ -167,13 +179,146 @@ public partial class CommanderBuilder
 
     private void SetArchetypeWeight(Archetype a, double w) => _archetypeWeights[a] = w;
 
-    private void ToggleTheme(Theme t)
+    // ── Theme helpers ──────────────────────────────────────────────────────
+
+    private bool IsPresetSelected(Theme t) =>
+        _selectedThemes.Any(wt => wt.Profile.Theme == t);
+
+    private double GetPresetWeight(Theme t) =>
+        _selectedThemes.FirstOrDefault(wt => wt.Profile.Theme == t).Weight;
+
+    private void TogglePreset(Theme t)
     {
-        if (_themeWeights.ContainsKey(t)) _themeWeights.Remove(t);
-        else _themeWeights[t] = 1.0;
+        var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == t);
+        if (i >= 0) _selectedThemes.RemoveAt(i);
+        else _selectedThemes.Add(new WeightedTheme(ThemeLibrary.All[t], 1.0));
     }
 
-    private void SetThemeWeight(Theme t, double w) => _themeWeights[t] = w;
+    private void SetPresetWeight(Theme t, double w)
+    {
+        var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == t);
+        if (i >= 0) _selectedThemes[i] = _selectedThemes[i] with { Weight = w };
+    }
+
+    private void SetCustomThemeWeight(int index, double w)
+    {
+        if (index >= 0 && index < _selectedThemes.Count)
+            _selectedThemes[index] = _selectedThemes[index] with { Weight = w };
+    }
+
+    private IEnumerable<(int Index, WeightedTheme Wt)> CustomThemes =>
+        _selectedThemes
+            .Select((wt, i) => (i, wt))
+            .Where(x => x.wt.Profile.Theme is null);
+
+    // ── Theme form baseline ────────────────────────────────────────────────
+
+    private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
+        DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);
+
+    private static readonly CardRole[] FormRoles =
+        Enum.GetValues<CardRole>().Where(r => r != CardRole.Unclassified).ToArray();
+
+    private static int EffectiveValue(CardRole role, int delta) =>
+        (BaselineIdeals.TryGetValue(role, out var b) ? b : 0) + delta;
+
+    internal static string RoleLabel(CardRole role) => role switch
+    {
+        CardRole.Land               => "Lands",
+        CardRole.Ramp               => "Ramp",
+        CardRole.CardAdvantage      => "Card Advantage",
+        CardRole.TargetedDisruption => "Targeted Disruption",
+        CardRole.MassDisruption     => "Mass Disruption",
+        CardRole.Tutor              => "Tutors",
+        CardRole.Protection         => "Protection",
+        CardRole.Recursion          => "Recursion",
+        CardRole.Plan               => "Plan",
+        CardRole.Payoff             => "Payoff",
+        CardRole.Synergy            => "Synergy",
+        _                           => role.ToString(),
+    };
+
+    // ── Theme form open/apply/cancel ───────────────────────────────────────
+
+    private void OpenTuneForm(Theme t)
+    {
+        var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == t);
+        var profile = i >= 0 ? _selectedThemes[i].Profile : ThemeLibrary.All[t];
+        _tuningPreset       = t;
+        _editingCustomIndex = -1;
+        _formThemeName      = profile.Name;
+        _formThemeDesc      = profile.Description;
+        _formEffectiveValues = FormRoles.ToDictionary(r => r,
+            r => EffectiveValue(r, profile.Adjustments.TryGetValue(r, out var d) ? d : 0));
+        _showThemeForm = true;
+    }
+
+    private void OpenCustomForm()
+    {
+        _tuningPreset       = null;
+        _editingCustomIndex = -1;
+        _formThemeName      = string.Empty;
+        _formThemeDesc      = string.Empty;
+        _formEffectiveValues = FormRoles.ToDictionary(r => r,
+            r => BaselineIdeals.TryGetValue(r, out var b) ? b : 0);
+        _showThemeForm = true;
+    }
+
+    private void OpenEditCustomForm(int index)
+    {
+        var wt = _selectedThemes[index];
+        _tuningPreset       = null;
+        _editingCustomIndex = index;
+        _formThemeName      = wt.Profile.Name;
+        _formThemeDesc      = wt.Profile.Description;
+        _formEffectiveValues = FormRoles.ToDictionary(r => r,
+            r => EffectiveValue(r, wt.Profile.Adjustments.TryGetValue(r, out var d) ? d : 0));
+        _showThemeForm = true;
+    }
+
+    private void ApplyThemeForm()
+    {
+        if (string.IsNullOrWhiteSpace(_formThemeName)) return;
+
+        var adjustments = FormRoles
+            .Select(r => (Role: r, Delta: _formEffectiveValues[r] - (BaselineIdeals.TryGetValue(r, out var b) ? b : 0)))
+            .Where(x => x.Delta != 0)
+            .ToDictionary(x => x.Role, x => x.Delta);
+
+        var profile = new ThemeProfile
+        {
+            Theme       = _tuningPreset,
+            Name        = _formThemeName.Trim(),
+            Description = _formThemeDesc.Trim(),
+            Adjustments = adjustments,
+        };
+
+        if (_tuningPreset.HasValue)
+        {
+            var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == _tuningPreset);
+            var weight = i >= 0 ? _selectedThemes[i].Weight : 1.0;
+            if (i >= 0) _selectedThemes[i] = new WeightedTheme(profile, weight);
+            else _selectedThemes.Add(new WeightedTheme(profile, 1.0));
+        }
+        else if (_editingCustomIndex >= 0)
+        {
+            _selectedThemes[_editingCustomIndex] =
+                new WeightedTheme(profile, _selectedThemes[_editingCustomIndex].Weight);
+        }
+        else
+        {
+            _selectedThemes.Add(new WeightedTheme(profile, 1.0));
+        }
+
+        _showThemeForm      = false;
+        _editingCustomIndex = -1;
+    }
+
+    private void CancelThemeForm()
+    {
+        _showThemeForm      = false;
+        _editingCustomIndex = -1;
+    }
 
     // ── Build ──────────────────────────────────────────────────────────────
 
@@ -191,10 +336,8 @@ public partial class CommanderBuilder
             .Select(kv => new WeightedArchetype(ArchetypeLibrary.All[kv.Key], kv.Value))
             .ToList();
 
-        var themes = _themeWeights.Count > 0
-            ? _themeWeights
-                .Select(kv => new WeightedTheme(ThemeLibrary.All[kv.Key], kv.Value))
-                .ToList()
+        var themes = _selectedThemes.Count > 0
+            ? (IReadOnlyList<WeightedTheme>)_selectedThemes
             : null;
 
         var bracketProfile = BracketLibrary.All[_bracket];
@@ -203,10 +346,16 @@ public partial class CommanderBuilder
             ? "Strongly favor threats with mana value ≤3."
             : "";
 
+        var hints = _selectedThemes
+            .Where(wt => !string.IsNullOrWhiteSpace(wt.Profile.Description))
+            .Select(wt => $"Theme: {wt.Profile.Name} — {wt.Profile.Description}")
+            .ToList();
+
         var constraints = new SoftConstraints
         {
-            Bracket = _bracket,
-            CurveNote = curveNote,
+            Bracket         = _bracket,
+            CurveNote       = curveNote,
+            AdditionalHints = hints,
         };
 
         var progress = new Progress<string>(OnStageReport);
@@ -277,7 +426,10 @@ public partial class CommanderBuilder
         _commanderQuery = "";
         _searchResults.Clear();
         _archetypeWeights.Clear();
-        _themeWeights.Clear();
+        _selectedThemes.Clear();
+        _themeFilter = "";
+        _showThemeForm = false;
+        _editingCustomIndex = -1;
         _bracket = Bracket.Three;
     }
 

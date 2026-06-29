@@ -79,7 +79,7 @@ RepairEngine.Assemble → DeckBuildResult
 **Classification** (`LlmClassifier` — `claude-haiku-4-5-20251001`, temperature 0.1)  
 Input: a batch of `CardCandidate`s + commander context.  
 Output: `[{oracleId, primaryRole, secondaryRoles, landCredit}]`.  
-Results are cached globally by `OracleId` except for `Plan` and `Synergy`, which are
+Results are cached globally by `OracleId` except for `Plan`, `Synergy`, and `Payoff`, which are
 commander-dependent and re-classified per build.
 
 **Selection** (`LlmSelector` — `claude-sonnet-4-6`, temperature 0.6)  

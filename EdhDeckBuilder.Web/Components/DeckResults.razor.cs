@@ -11,16 +11,25 @@ public partial class DeckResults
     [Parameter, EditorRequired] public required IReadOnlyList<Card> Commanders { get; set; }
     [Parameter] public Bracket Bracket { get; set; } = Bracket.Three;
 
-    // ── Collapse state ─────────────────────────────────────────────────────
+    // ── View state ─────────────────────────────────────────────────────────
+
+    private enum DeckView { ByRole, AllCards, ByType }
+    private DeckView _view = DeckView.ByRole;
 
     private bool _showCoverage  = true;
     private bool _showBasics    = true;
     private bool _showRunnerUps = false;
-    private readonly HashSet<CardRole> _collapsedBuckets = [];
+    private readonly HashSet<CardRole>  _collapsedBuckets     = [];
+    private readonly HashSet<string>    _collapsedTypeBuckets = [];
 
     private void ToggleBucket(CardRole role)
     {
         if (!_collapsedBuckets.Add(role)) _collapsedBuckets.Remove(role);
+    }
+
+    private void ToggleTypeBucket(string typeName)
+    {
+        if (!_collapsedTypeBuckets.Add(typeName)) _collapsedTypeBuckets.Remove(typeName);
     }
 
     // ── Display order ──────────────────────────────────────────────────────
@@ -41,6 +50,12 @@ public partial class DeckResults
         CardRole.Unclassified,
     ];
 
+    private static readonly string[] TypeOrder =
+    [
+        "Creature", "Planeswalker", "Instant", "Sorcery",
+        "Artifact", "Enchantment", "Battle", "Land", "Other",
+    ];
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     internal static string RoleName(CardRole role) => role switch
@@ -59,6 +74,36 @@ public partial class DeckResults
         CardRole.Unclassified       => "Unclassified",
         _                           => role.ToString(),
     };
+
+    internal static string PrimaryRoleBadgeClass(CardRole role) => role switch
+    {
+        CardRole.Plan               => "bg-primary",
+        CardRole.Ramp               => "bg-success",
+        CardRole.CardAdvantage      => "bg-info text-dark",
+        CardRole.TargetedDisruption => "bg-danger",
+        CardRole.MassDisruption     => "bg-warning text-dark",
+        CardRole.Protection         => "bg-secondary",
+        CardRole.Tutor              => "bg-dark",
+        CardRole.Recursion          => "bg-success bg-opacity-50 text-dark",
+        CardRole.Payoff             => "bg-primary bg-opacity-50 text-dark",
+        CardRole.Synergy            => "bg-info bg-opacity-50 text-dark",
+        CardRole.Land               => "bg-success bg-opacity-75",
+        _                           => "bg-secondary",
+    };
+
+    internal static string CardTypeBucket(Card card)
+    {
+        var tl = card.TypeLine;
+        if (tl.Contains("Creature",     StringComparison.OrdinalIgnoreCase)) return "Creature";
+        if (tl.Contains("Planeswalker", StringComparison.OrdinalIgnoreCase)) return "Planeswalker";
+        if (tl.Contains("Instant",      StringComparison.OrdinalIgnoreCase)) return "Instant";
+        if (tl.Contains("Sorcery",      StringComparison.OrdinalIgnoreCase)) return "Sorcery";
+        if (tl.Contains("Artifact",     StringComparison.OrdinalIgnoreCase)) return "Artifact";
+        if (tl.Contains("Enchantment",  StringComparison.OrdinalIgnoreCase)) return "Enchantment";
+        if (tl.Contains("Battle",       StringComparison.OrdinalIgnoreCase)) return "Battle";
+        if (tl.Contains("Land",         StringComparison.OrdinalIgnoreCase)) return "Land";
+        return "Other";
+    }
 
     private static BadgeInfo SecondaryBadge(RoleContribution contrib)
     {

@@ -8,7 +8,7 @@ namespace EdhDeckBuilder.Agent.Llm;
 
 /// <summary>
 /// Classification cache keyed by OracleId, persisted to disk across sessions.
-/// Plan and Synergy roles are commander-dependent and are never cached.
+/// Plan, Synergy, and Payoff roles are commander-dependent and are never cached.
 /// All other roles are global-stable and reused across builds and restarts.
 /// </summary>
 public sealed class ClassificationCache

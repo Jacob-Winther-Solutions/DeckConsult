@@ -35,7 +35,7 @@ staged pipeline; the LLM is consulted at exactly two fixed points:
 
 1. **Classification** — `LlmClassifier` (`claude-haiku-4-5-20251001`, temperature 0.1, batched,
    forced tool call). Assigns `CardRole` + secondary overlaps. Results cached globally by
-   `OracleId` except `Plan` and `Synergy`, which are re-classified per build.
+   `OracleId` except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
 2. **Selection** — `LlmSelector` (`claude-sonnet-4-6`, temperature 0.6, per-role call, forced
    tool call). Returns a ranked list with per-card rationale. The fill engine decides count;
    the model never outputs counts.
@@ -76,8 +76,8 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   Filter before returning to callers. Code that trusts model-returned card names directly is a bug.
 - **Forced tool call only:** both LLM calls use `ToolChoiceTool { Name = "..." }` with
   `Tool.Strict = true`. Don't switch to plain-text parsing.
-- **Classification cache:** `ClassificationCache` is a singleton; Plan and Synergy are never
-  served from it. Don't cache them.
+- **Classification cache:** `ClassificationCache` is a singleton; Plan, Synergy, and Payoff are
+  never served from it. Don't cache them.
 - **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
   after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
   backward compatibility.
@@ -91,3 +91,5 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
 - Tests live in `Tests/`. No mocking libraries — manual mocks only (the project has no Moq/NSubstitute
   reference). Keep tests fast: LLM calls must be behind the `ILlmClassifier`/`ICardSelector`
   interfaces and replaced with mocks in tests.
+- **Before returning control to the user:** always run `dotnet test Tests` (which also builds).
+  All tests must pass and the build must be error-free. Fix any failures before responding.

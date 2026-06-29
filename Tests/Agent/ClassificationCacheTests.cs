@@ -47,7 +47,6 @@ public class ClassificationCacheTests
     [InlineData(CardRole.Tutor)]
     [InlineData(CardRole.Protection)]
     [InlineData(CardRole.Recursion)]
-    [InlineData(CardRole.Payoff)]
     public void Partition_returns_cached_result_for_global_stable_role(CardRole role)
     {
         var cache = new ClassificationCache();
@@ -62,7 +61,21 @@ public class ClassificationCacheTests
         Assert.Equal(role, hits[0].PrimaryRole);
     }
 
-    // ── Partition — Plan and Synergy are never served from cache ─────────────
+    // ── Partition — Plan, Synergy, and Payoff are never served from cache ────
+
+    [Fact]
+    public void Partition_never_returns_Payoff_from_cache()
+    {
+        var cache = new ClassificationCache();
+        var card = MakeCard("Exsanguinate");
+        var candidate = MakeCandidate(card);
+
+        cache.Store([MakeResult(card.OracleId, CardRole.Payoff)]);
+        cache.Partition([candidate], out var hits, out var misses);
+
+        Assert.Empty(hits);
+        Assert.Single(misses);
+    }
 
     [Fact]
     public void Partition_never_returns_Plan_from_cache()

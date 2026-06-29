@@ -4,22 +4,21 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## Web UI  (not started — pick up after Agent is wired end-to-end)
+## Web UI  (core done — two items deferred)
 
-The `EdhDeckBuilder.Web` Blazor project is scaffolded but contains only boilerplate.
-
-- [ ] Wire `IDeckBuilder` into a Blazor page / component tree.
-- [ ] Role-grouped deck view: display the final 99 as expandable role buckets, each card
-      showing its `CardSuggestion.Reason`.
-- [ ] Basic land section: display `DeckBuildResult.BasicLandCounts` (e.g. "20× Forest,
-      11× Mountain").
-- [ ] Runner-up panel: show `DeckBuildResult.RunnerUps` so the user can drag-and-swap cards
-      without triggering a full rebuild.
-- [ ] Coverage summary: bar or table comparing `DeckBuildResult.ActualCoverage` against
-      `DeckBuildResult.PlannedTemplate` targets.
-- [ ] Cut suggestions: surface `DeckBuildResult.CutSuggestions` for over-covered roles.
-- [ ] Commander input: search box (Scryfall autocomplete) → select one or two commanders.
-- [ ] Archetype / theme picker: let the user weight archetypes and themes before building.
+- [x] Wire `IDeckBuilder` into a Blazor page / component tree.
+- [x] Role-grouped deck view: expandable role buckets, each card showing `CardSuggestion.Reason`;
+      secondary-role contributions shown in an "Also contributes" strip per bucket.
+- [x] Basic land section: display `DeckBuildResult.BasicLandCounts`.
+- [x] Runner-up panel: show `DeckBuildResult.RunnerUps` (collapsed by default).
+- [x] Coverage summary: table comparing `DeckBuildResult.ActualCoverage` against
+      `DeckBuildResult.PlannedTemplate` targets with a progress bar per role.
+- [x] Cut suggestions: surfaced inline in role buckets (warning badge + "consider cutting").
+- [x] Commander input: debounced search box with Scryfall autocomplete, supports partner pairs.
+- [x] Archetype / theme picker: weight sliders for archetypes; 29 preset themes with weight,
+      tune-preset form (absolute slot values), and custom-theme escape hatch.
+- [x] Three deck views: By Role (role buckets), By Type (card-type buckets, priority-ordered),
+      All Cards (alphabetical table with role badges).
 - [ ] Budget input in the UI (see Budget section below).
 - [ ] Deck persistence (save/load to local storage or a backend store).
 
@@ -161,8 +160,8 @@ rules, and card ingestion need format-specific variants.
       the commander on board; depends on commander castability and deck context.
 - [ ] Tune default coverage weights (Always=1.0, Modal=0.5, Transform=0.75 are currently
       baked into Core defaults; may need per-commander calibration once real builds are tested).
-- [ ] Coverage-gap report / template-adherence warnings in the UI (data is in
-      `DeckBuildResult.CoverageWarnings`; rendering is deferred to the Web layer).
+- [x] Coverage-gap report / template-adherence warnings in the UI — rendered in the By Role
+      view as an alert above the role buckets.
 
 ---
 
@@ -198,7 +197,7 @@ rules, and card ingestion need format-specific variants.
       swap loop, max 50 iterations), `ColorFixingPass` (Pass C: pip-demand scoring, 8-basic
       floor, 50% non-basic cap), 31 unit tests.
 - [x] **Agent — LLM seam** — `LlmClassifier` (Haiku, forced tool call, batched, globally
-      cached except Plan/Synergy), `LlmSelector` (Sonnet, forced tool call, per-build rationale
+      cached except Plan/Synergy/Payoff), `LlmSelector` (Sonnet, forced tool call, per-build rationale
       capture), `ClassificationCache`, `ClassificationPrompt`, `SelectionPrompt`.
 - [x] **Agent — pipeline** — `RepairEngine` (deterministic CI-violation repair + result
       assembly), `DeckBuilder` (10-stage orchestration), 5 integration tests.
