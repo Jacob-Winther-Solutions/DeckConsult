@@ -98,15 +98,62 @@ public sealed class ColorFixingPassTests
     }
 
     [Fact]
-    public void Apply_skips_colorless_lands()
+    public void Apply_adds_colorless_land_as_fallback_when_no_colored_options()
     {
+        // Colorless lands score 0 on pip demand but are still eligible.
+        // When no colored fixing lands are available, colorless utility lands get through.
         var state = new BuildState(38);
         var context = MakeContext(Color.Blue | Color.Black);
         var pool = new[] { MakeLand("Ancient Tomb", Color.None) };
 
         ColorFixingPass.Apply(context, state, pool);
 
-        Assert.Empty(state.Committed);
+        Assert.Single(state.Committed);
+        Assert.Equal("Ancient Tomb", state.Committed[0].Card.Name);
+    }
+
+    [Fact]
+    public void Apply_prefers_colored_lands_over_colorless_for_colored_commander()
+    {
+        // Colored land covers demanded pips → higher score than colorless (0).
+        // With only 1 swap available, the colored land should win.
+        var state = new BuildState(9);
+        var context = MakeContext(Color.Blue | Color.Black);
+        state.Commit(MakeSpell("Blue Spell", Color.Blue));
+        state.Commit(MakeSpell("Black Spell", Color.Black));
+
+        var coloredLand   = MakeLand("Underground Sea", Color.Blue | Color.Black, inclusion: 0.5);
+        var colorlessLand = MakeLand("Ancient Tomb",    Color.None,                inclusion: 0.9);
+
+        ColorFixingPass.Apply(context, state, [coloredLand, colorlessLand]);
+
+        var landsCommitted = state.Committed
+            .Where(s => s.Card.Types.HasFlag(CardType.Land))
+            .ToList();
+
+        Assert.Single(landsCommitted);
+        Assert.Equal("Underground Sea", landsCommitted[0].Card.Name);
+    }
+
+    [Fact]
+    public void Apply_adds_colorless_utility_lands_for_colorless_commander()
+    {
+        // For a colorless commander, all non-basic lands are colorless.
+        // They all score 0 on pip demand; order is by EDHREC inclusion.
+        var state = new BuildState(20);
+        var context = MakeContext(Color.None);
+        var pool = Enumerable.Range(1, 5)
+            .Select(i => MakeLand($"Utility {i}", Color.None, inclusion: 1.0 / i))
+            .ToList();
+
+        ColorFixingPass.Apply(context, state, pool);
+
+        var landsCommitted = state.Committed
+            .Where(s => s.Card.Types.HasFlag(CardType.Land))
+            .ToList();
+
+        Assert.Equal(5, landsCommitted.Count);
+        Assert.Equal("Utility 1", landsCommitted[0].Card.Name); // highest inclusion first
     }
 
     [Fact]

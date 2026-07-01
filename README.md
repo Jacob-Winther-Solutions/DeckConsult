@@ -82,7 +82,7 @@ Output: `[{oracleId, primaryRole, secondaryRoles, landCredit}]`.
 Results are cached globally by `OracleId` except for `Plan`, `Synergy`, and `Payoff`, which are
 commander-dependent and re-classified per build.
 
-**Selection** (`LlmSelector` — `claude-sonnet-4-6`, temperature 0.6)  
+**Selection** (`LlmSelector` — `claude-haiku-4-5-20251001`, temperature 0.6)  
 Input: role-filtered classified pool + current build state + soft constraints.  
 Output: `[{oracleId, rank, rationale}]` — ranked picks only; the fill engine decides count.
 
@@ -126,4 +126,4 @@ See `HOW_IT_WORKS.md` for a plain-language explanation of what the tool does for
 need to provide, and where your judgment still matters — written for someone using the deck builder,
 not someone building it.
 
-See `TODO.md` for deferred work and `AGENT_PRINCIPLES.md` for the design rationale behind the agent layer.
+See `TODO/TODO.md` for deferred work and `TODO/AGENT_PRINCIPLES.md` for the design rationale behind the agent layer.

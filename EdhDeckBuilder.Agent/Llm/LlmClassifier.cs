@@ -81,6 +81,7 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
 
         // Whitelist: only accept oracle IDs that were in the input batch.
         var batchIds = candidates.Select(c => c.Card.OracleId).ToHashSet();
+        var cardTypeById = candidates.ToDictionary(c => c.Card.OracleId, c => c.Card.Types);
         var results = new List<ClassificationResult>(dtos.Count);
 
         foreach (var dto in dtos)
@@ -88,7 +89,7 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
             if (!Guid.TryParse(dto.OracleId, out var id) || !batchIds.Contains(id))
                 continue;
 
-            results.Add(new ClassificationResult
+            var raw = new ClassificationResult
             {
                 OracleId = id,
                 PrimaryRole = ParseRole(dto.PrimaryRole),
@@ -99,7 +100,9 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
                         Math.Clamp(s.Weight, 0.0, 1.0)))
                     .ToArray(),
                 LandCredit = Math.Clamp(dto.LandCredit, 0.0, 1.0),
-            });
+            };
+
+            results.Add(ClassificationSanitizer.SanitizeLandRole(raw, cardTypeById[id]));
         }
 
         return results;

@@ -225,8 +225,7 @@ public sealed class DeckBuilder(
             .Where(c => c != Color.None && commanderIdentity.HasFlag(c))
             .ToList();
 
-        // Colorless commanders (e.g. Kozilek) run Wastes — not handled here.
-        if (colors.Count == 0) return new Dictionary<string, int>();
+        if (colors.Count == 0) return new Dictionary<string, int> { ["Wastes"] = basicCount };
 
         // Pip demand: how many committed non-land cards need each color.
         var demand = colors.ToDictionary(c => c, _ => 0);

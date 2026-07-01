@@ -234,6 +234,33 @@ public sealed class DeckBuilderTests
     }
 
     [Fact]
+    public async Task BuildAsync_colorless_commander_uses_wastes_as_basic_land()
+    {
+        var kozilek = MakeCommander("Plan_Commander", Color.None);
+        var pool    = CreatePool(Color.None);
+        var result  = await MakeBuilder(pool).BuildAsync(
+            [kozilek], DeckTemplate.Balanced,
+            [new WeightedArchetype(ArchetypeLibrary.All[Archetype.Midrange], 1.0)]);
+
+        Assert.True(result.BasicLandCounts.ContainsKey("Wastes"),
+            "Colorless commander should use Wastes as basic land.");
+        Assert.Single(result.BasicLandCounts);
+    }
+
+    [Fact]
+    public async Task BuildAsync_colorless_commander_fills_all_99_slots()
+    {
+        var kozilek = MakeCommander("Plan_Commander", Color.None);
+        var pool    = CreatePool(Color.None);
+        var result  = await MakeBuilder(pool).BuildAsync(
+            [kozilek], DeckTemplate.Balanced,
+            [new WeightedArchetype(ArchetypeLibrary.All[Archetype.Midrange], 1.0)]);
+
+        int total = result.Deck.Count + result.BasicLandCounts.Values.Sum();
+        Assert.Equal(99, total);
+    }
+
+    [Fact]
     public async Task BuildAsync_partner_pair_fills_98_non_commander_slots()
     {
         var partner1 = MakeCommander("Plan_Commander1", Color.Red | Color.Green);

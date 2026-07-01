@@ -20,8 +20,9 @@ A living list of deferred work. Check items off as they land.
 - [x] Three deck views: By Role (role buckets), By Type (card-type buckets, priority-ordered),
       All Cards (alphabetical table with role badges).
 - [x] Budget input in the UI (see Budget section below).
-- [ ] Deck persistence (save/load to local storage or a backend store).
-- [ ] Refactor UI to make components resusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
+- [ ] Deck download: "Export deck" button generates a `.md` file and streams it as a browser download
+      (see Deck Download section below).
+- [ ] Refactor UI to make components reusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
 
 ---
 
@@ -175,7 +176,7 @@ rules, and card ingestion need format-specific variants.
 - [x] `CanBeCommander` logic at Scryfall ingestion — extended to catch legendary creatures
       AND any card whose oracle text contains "can be your commander" (planeswalkers with the
       RC ruling, special cases). `ScryfallMapper.IsCommanderEligible`. 4 new tests.
-- [ ] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
+- [x] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
       `DeckBuilder.DistributeBasics` returns an empty dict when `ColorIdentity == Color.None`.
       Wastes handling needs to be added before colorless commanders are supported.
 - [ ] **MDFC land credit assignment.** The `LandCredit` field on `FillCandidate` exists and is
@@ -191,6 +192,159 @@ rules, and card ingestion need format-specific variants.
 
 ---
 
+## Deck Download — Markdown export
+
+No server-side deck storage. Instead, a finished deck can be exported as a self-contained
+`.md` file the user saves locally. The file is generated server-side from `DeckBuildResult`
+and streamed as a browser download — pure Web layer concern, no Core changes.
+
+**File contents (in order):**
+- Header: commander(s), archetype/theme weights, bracket, budget constraints, build date.
+- Role buckets: one section per `CardRole`, each card on its own line with the
+  `CardSuggestion.Reason` inline — same structure as the By Role view.
+- Runner-ups: collapsed appendix listing `DeckBuildResult.RunnerUps` by role.
+- Coverage summary: planned vs. actual counts per role.
+- Raw decklist: plain `1 Card Name` lines (basic lands with their counts), ready to paste
+  into Moxfield, Archidekt, or any other deck builder that accepts text import.
+
+**Implementation tasks:**
+- [ ] `DeckMarkdownExporter` service in the Web project: accepts `DeckBuildResult` +
+      `BuildContext`, returns a `string` (the markdown). No infrastructure dependencies.
+- [ ] Blazor "Export deck" button: calls the exporter, then uses JS interop
+      (`saveAs` / `URL.createObjectURL`) or a controller endpoint to trigger the download.
+      Filename: `<commander-name>-deck.md` (slugified).
+- [ ] Tests: snapshot-style unit test — given a known `DeckBuildResult`, assert the
+      markdown output contains the expected sections and raw decklist lines.
+
+---
+
+## BYOK — Per-user Anthropic API keys
+
+Users supply their own Anthropic API key (created at console.anthropic.com). Usage bills
+to their account at pay-per-token rates. This is the only sanctioned model for a public
+app — Anthropic's terms prohibit routing all users through a single company key.
+
+See `TODO/BYOK_API_KEY.md` for the full design spec.
+
+**Key decisions (already made):**
+- Blazor Server hosting: the key lives server-side in a scoped service (one per circuit),
+  never sent to the browser.
+- Persistence: encrypted HttpOnly cookie via ASP.NET Core Data Protection. The user pastes
+  once, checks "remember my key", and never sees the prompt again until the key expires or
+  they explicitly disconnect.
+- Data Protection keyring persisted via a named Docker volume (see Deployment section).
+
+**Implementation tasks:**
+- [ ] `IClaudeApiKeyProvider` + `SessionApiKeyProvider` (scoped) in the Agent project.
+      `SessionApiKeyProvider` holds the in-memory key for the circuit; exposes `Set` / `Clear`.
+- [ ] `IClaudeClientFactory` + `ClaudeClientFactory` (scoped): builds an `AnthropicClient`
+      per call from the provider. This is the sole seam touching the SDK constructor. Update
+      `LlmClassifier` and `LlmSelector` to accept the factory instead of a singleton client.
+      Remove the existing singleton `ANTHROPIC_API_KEY` client construction from DI.
+- [ ] `IClaudeKeyTester` + `ClaudeKeyTester`: fires a minimal 1-token Haiku call to validate
+      a key before accepting it. Used by the settings UI.
+- [ ] **Cookie persistence**: on `Set(key)`, write an encrypted HttpOnly cookie (ASP.NET Core
+      Data Protection). On circuit `OnInitializedAsync`, read and decrypt the cookie and
+      call `Set` if present. On `Clear()`, expire the cookie. Wrap this in a
+      `CookieApiKeyPersistence` service (or inline in `SessionApiKeyProvider`).
+- [ ] `ApiKeySettings.razor` component: password input + "Connect" / "Test key" / "Disconnect"
+      buttons, "Remember my key" checkbox (default on). Shows connected/disconnected state.
+      Gates the build button: if no key is connected, show "Connect your Anthropic key to build"
+      instead of the build form.
+- [ ] Handle HTTP 401 from Anthropic at the agent boundary: catch, call `Clear()`, surface
+      "Your API key was rejected — please reconnect" rather than a generic build failure.
+- [ ] DI registration: `SessionApiKeyProvider` as Scoped (registered twice — as itself and
+      as `IClaudeApiKeyProvider` — so the settings page and the agent share one instance per
+      circuit).
+- [ ] **Model picker**: let the user choose which Claude model is used for selection
+      (`LlmSelector`) from the settings UI. Since users pay with their own key, a user who
+      wants better rationale quality can opt into a more expensive model (e.g. Sonnet or Opus)
+      without affecting other users. Classification (`LlmClassifier`) stays on Haiku — it is
+      a structured extraction task where model size matters less. Suggested approach: a
+      `SelectedModel` field on `SessionApiKeyProvider` (or a parallel scoped service); the
+      model string is injected into `LlmSelector` at call time via `IClaudeClientFactory` or
+      a new `IModelPreferences` abstraction. Expose a dropdown in the settings component next
+      to the key input: "Haiku (fast, cheap — default)", "Sonnet (better reasoning)",
+      "Opus (highest quality)". Default to Haiku so the experience is unchanged for users
+      who don't change anything.
+- [ ] (Stretch) Approximate token/cost estimate displayed after each build, since users now
+      pay directly and will want visibility.
+
+---
+
+## TCGPlayer affiliate linking
+
+A "Buy this deck on TCGplayer" action on a finished deck. Sends the full decklist into
+TCGplayer's Mass Entry cart tool, tagged with an affiliate code so referred purchases earn
+commission (~3.5%, first-click 48-hour window). No TCGplayer API account required — this
+is a URL/form builder only.
+
+See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
+
+**Prerequisites (non-code actions — must happen before commission tracking works):**
+- [ ] **WotC Fan Content Policy check**: confirm the policy permits monetization for a tool
+      like this before enabling any affiliate links. Legal/product decision — do not assume.
+- [ ] **Apply to TCGplayer's affiliate program** via Impact (impact.com). The affiliate code
+      comes from the Impact dashboard after acceptance. Commission: ~3.5% per sale.
+
+**Implementation tasks:**
+- [ ] `TcgPlayerLinkOptions` (singleton from config): holds `AffiliateCode` and `Medium`.
+      Pull from configuration/secrets — never hardcode.
+- [ ] `TcgPlayerMassEntryLinkBuilder` (scoped): `BuildGetUrl` for single-card/preview links;
+      `BuildPostForm` (returns action URL + raw card list value) for full decks. POST is
+      preferred for 100-card Commander lists to avoid URL length limits.
+- [ ] Map `DeckBuildResult` → `IReadOnlyList<CartLine>` at the call site in the Web layer:
+      commanders at qty 1, all nonland spells at qty 1 (singleton), basics at their real counts.
+      Keep Core pure — no TCGplayer types in the domain.
+- [ ] `BuyDeckButton.razor`: renders a native `<form method="post">` with hidden `productline`
+      and `c` inputs. `data-enhance="false"` to prevent Blazor enhanced-nav from intercepting.
+      `target="_blank"` to open the cart in a new tab. Do not use `fetch` — CORS blocks
+      cross-origin POST and prevents following the 303 redirect to the cart.
+- [ ] DI registration: `TcgPlayerLinkOptions` as singleton; `TcgPlayerMassEntryLinkBuilder`
+      as scoped.
+- [ ] (Future) Plain text decklist export for users who prefer to paste into Mass Entry
+      themselves — shares the `CartLine` mapping with the buy button.
+- [ ] (Future) Multi-retailer support (Card Kingdom etc.) — keep the builder interface shaped
+      so a second provider can slot in without redesign.
+
+---
+
+## Deployment
+
+Plan and execute the first production deployment of the app to a public host.
+
+**Hosting decision (already made):** Single Hetzner VPS (EU data centers — GDPR-respecting,
+cheap). Start on CX22 (~€4/month); scale vertically by resizing the VM if needed. Horizontal
+scaling (multiple instances + sticky sessions + shared Data Protection keyring via managed
+PostgreSQL) is a future concern only if the single VM proves insufficient.
+
+**Hosting model:** Blazor Server. Confirmed — BYOK key lives in a scoped server-side service
+and never reaches the browser. If the project ever moves to Blazor WASM, the BYOK design
+must change (key would be browser-side).
+
+**Tasks:**
+- [ ] **Containerise the app**: write `Dockerfile` (multi-stage: SDK image to build, ASP.NET
+      runtime image to serve) and `docker-compose.yml`. Mount a named volume for the ASP.NET
+      Core Data Protection keyring so it survives container restarts and redeployments.
+- [ ] **TLS termination**: run Caddy (or Nginx + Certbot) as a reverse proxy in the same
+      Compose stack. Caddy handles Let's Encrypt certificate renewal automatically.
+- [ ] **Secrets / config in production**: pass `Anthropic:ApiKey` (the fallback dev key, if
+      kept), `TcgPlayer:AffiliateCode`, and Data Protection configuration via environment
+      variables or a `.env` file excluded from source control. Document required env vars in
+      `README.md`.
+- [ ] **CI/CD**: GitHub Actions workflow — on push to `main`, build + test, build Docker image,
+      push to a registry (GitHub Container Registry is free), SSH into the Hetzner VM and
+      run `docker-compose pull && docker-compose up -d`.
+- [ ] **Domain + DNS**: point a domain at the Hetzner IP. Caddy picks it up automatically
+      for certificate issuance.
+- [ ] **Scaling plan (document, don't implement yet)**: if load outgrows the single VM,
+      the path is: (1) resize VM vertically, (2) add a second instance with sticky sessions
+      and a managed Hetzner PostgreSQL for the shared Data Protection keyring
+      (`PersistKeysToDbContext`). Document this in `README.md` so future-us doesn't have to
+      rediscover it.
+
+---
+
 ## Done
 
 - [x] **Core** — domain model, rules, templates, archetypes, themes, bracket system.
@@ -202,7 +356,7 @@ rules, and card ingestion need format-specific variants.
       swap loop, max 50 iterations), `ColorFixingPass` (Pass C: pip-demand scoring, 8-basic
       floor, 50% non-basic cap), 31 unit tests.
 - [x] **Agent — LLM seam** — `LlmClassifier` (Haiku, forced tool call, batched, globally
-      cached except Plan/Synergy/Payoff), `LlmSelector` (Sonnet, forced tool call, per-build rationale
+      cached except Plan/Synergy/Payoff), `LlmSelector` (Haiku, forced tool call, per-build rationale
       capture), `ClassificationCache`, `ClassificationPrompt`, `SelectionPrompt`.
 - [x] **Agent — pipeline** — `RepairEngine` (deterministic CI-violation repair + result
       assembly), `DeckBuilder` (10-stage orchestration), 5 integration tests.

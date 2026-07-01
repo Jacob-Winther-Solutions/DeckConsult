@@ -10,7 +10,7 @@ using System.Text.Json;
 namespace EdhDeckBuilder.Agent.Llm;
 
 /// <summary>
-/// Ranks candidate cards for a specific role using Claude Sonnet (moderate temperature for
+/// Ranks candidate cards for a specific role using Claude Haiku (moderate temperature for
 /// creative judgment). Uses a forced tool call so output is always structured JSON.
 /// Selection is always context-dependent (deck state changes with each role filled), so
 /// results are never cached.

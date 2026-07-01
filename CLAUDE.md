@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Project context and working instructions for Claude Code. Read this, `README.md`, and
-`AGENT_PRINCIPLES.md` before doing anything in the Agent layer.
+`TODO/AGENT_PRINCIPLES.md` before doing anything in the Agent layer.
 
 **Document maintenance:** when `README.md` is updated (new capabilities, changed limitations,
 new pipeline stages), also review `HOW_IT_WORKS.md` and keep it in sync. `HOW_IT_WORKS.md`
@@ -12,8 +12,8 @@ perspective of someone using the deck builder rather than building it.
 
 An LLM-assisted Magic: the Gathering Commander (EDH) deck builder in C#/.NET 10, with a Blazor
 front end. The user drives it in natural language; an agent (Anthropic C# SDK) builds and validates
-decks using a pure domain core. `README.md` documents the architecture; `TODO.md` tracks deferred
-work; `AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
+decks using a pure domain core. `README.md` documents the architecture; `TODO/TODO.md` tracks deferred
+work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
 
 ## Current state
 
@@ -26,7 +26,7 @@ All four projects exist and compile. Run `dotnet test Tests` — 225 tests, all 
 | `EdhDeckBuilder.Agent` | Done — fill engine, LLM seam, pipeline, DI registration |
 | `EdhDeckBuilder.Web` | Scaffolded only — boilerplate Blazor Web App, no real UI yet |
 
-The next meaningful work is the Web UI — see `TODO.md`.
+The next meaningful work is the Web UI — see `TODO/TODO.md`.
 
 ## Agent layer — how it works
 
@@ -36,14 +36,14 @@ staged pipeline; the LLM is consulted at exactly two fixed points:
 1. **Classification** — `LlmClassifier` (`claude-haiku-4-5-20251001`, temperature 0.1, batched,
    forced tool call). Assigns `CardRole` + secondary overlaps. Results cached globally by
    `OracleId` except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
-2. **Selection** — `LlmSelector` (`claude-sonnet-4-6`, temperature 0.6, per-role call, forced
-   tool call). Returns a ranked list with per-card rationale. The fill engine decides count;
-   the model never outputs counts.
+2. **Selection** — `LlmSelector` (`claude-haiku-4-5-20251001`, temperature 0.6, per-role call,
+   forced tool call). Returns a ranked list with per-card rationale. The fill engine decides
+   count; the model never outputs counts.
 
 Everything else — fill order, reconciliation, color-fixing, repair, basic distribution — is
 deterministic code in `Fill/` and `Pipeline/`.
 
-All open design decisions from `AGENT_PRINCIPLES.md` are now closed. Do not reopen them
+All open design decisions from `TODO/AGENT_PRINCIPLES.md` are now closed. Do not reopen them
 without an explicit user request.
 
 ## Guardrails — do not redesign Core

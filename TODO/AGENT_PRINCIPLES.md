@@ -363,7 +363,7 @@ All decisions listed here are now **closed**. The implementation is in `EdhDeckB
   exposed in the C# SDK (v12.30.0). Both calls use `ToolChoiceTool { Name = "..." }` with
   `Tool.Strict = true`. Response parsed from `ToolUseBlock.Input`.
 - ~~Per-call model + temperature~~ → classification: `claude-haiku-4-5-20251001`, temperature
-  0.1; selection: `claude-sonnet-4-6`, temperature 0.6. Note: `Temperature` is deprecated for
+  0.1; selection: `claude-haiku-4-5-20251001`, temperature 0.6. Note: `Temperature` is deprecated for
   models after Claude Opus 4.6 — expect a `CS0618` warning at build time; value 1.0 is accepted
   for backward compatibility, other values raise a 400 in future API versions.
 - ~~Weighted-deviation metric + iteration bound~~ → `Σ|coverage − ideal|`, uniform role weights.

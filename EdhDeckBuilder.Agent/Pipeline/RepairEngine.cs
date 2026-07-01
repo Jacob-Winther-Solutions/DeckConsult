@@ -127,7 +127,8 @@ internal static class RepairEngine
         var state = fillResult.State;
         var committedIds = state.CommittedCandidates.Keys.ToHashSet();
 
-        var deck = BuildCardSuggestions(state.Committed, fillResult.SelectionRationales);
+        var commanderNames = string.Join(" / ", context.Commanders.Select(c => c.Name));
+        var deck = BuildCardSuggestions(state.Committed, fillResult.SelectionRationales, commanderNames);
 
         var runnerUps = pool
             .Where(fc => !committedIds.Contains(fc.Card.OracleId)
@@ -190,7 +191,8 @@ internal static class RepairEngine
 
     private static IReadOnlyList<CardSuggestion> BuildCardSuggestions(
         IReadOnlyList<DeckSlot> committed,
-        IReadOnlyDictionary<Guid, string> rationales)
+        IReadOnlyDictionary<Guid, string> rationales,
+        string commanderNames)
     {
         var result = new List<CardSuggestion>(committed.Count);
 
@@ -211,7 +213,7 @@ internal static class RepairEngine
                     Roles  = slot.Roles,
                     Reason = rationales.TryGetValue(slot.Card.OracleId, out var reason)
                         ? reason
-                        : $"Selected from the top EDHREC recommendations for {slot.PrimaryRole}.",
+                        : $"Fills the {slot.PrimaryRole} role for {commanderNames}.",
                     Rank = i + 1,
                 });
             }

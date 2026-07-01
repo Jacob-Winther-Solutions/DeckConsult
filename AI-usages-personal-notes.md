@@ -1,0 +1,24 @@
+API usage:
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 5,00 -> 4,83 = 0,17 (1st try)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 4,83 -> 4,42 = 0,41 (2nd try)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 4,42 -> 4,20 = 0,22 (3rd try) (After this, classifications of non-plan cards are cached and saved to storage)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 4,20 -> 4,05 = 0,15 (4th try)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 4,05 -> 3,90 = 0,15 (5th try) (custom adjustment of theme)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 3,90 -> 3,68 = 0,22 (6th try) (classification cache reset)
+- Sephiroth, Aggro, Aristocrats, Bracket 3:                                                 3,68 -> 3,46 = 0,42 (7th try) (Test new result view)
+- Esika, Control, Superfriends, Bracket 4:                                                  3,68 -> 3,22 = 0,46 (8th try) (Added extra tab view)
+- Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    3,22 -> 3,05 = 0,17 (9th try) (Test of budget feature)
+- Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 10 pr card 300 total:                    3,05 -> 2,92 = 0,13 (10th try) (Re test of budget feature)
+- Kozilek, the Great Distortion, Aggro, Big-Mana, Bracket 3, Budget 15 pr card 300 total:   2,92 -> 2,74 = 0,18 (11th try) (Test of Colorless & Wastes support)
+- Kozilek, the Great Distortion, Aggro, Big-Mana, Bracket 3, Budget 15 pr card 300 total:   2,74 -> 2,54 = 0,20 (12th try) (Test of Utility Lands include for colorless decks)
+- Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    2,54 -> 2,37 = 0,17 (13th try) (Test of Utility Lands include for mono-colored decks)
+- Esika, Control, Superfriends, Bracket 3, Budget 15 pr card 300 total:                     2,37 -> 2,17 = 0,20 (14th try) (Test of Utility Lands include for many-colored decks)
+- Esika, Control, Superfriends, Bracket 3, Budget 15 pr card 300 total:                     2,17 -> 2,03 = 0,14 (15th try) (Test of EDHREC specific reasoning is removed from spilovers, color fixings and repairs)
+
+
+Bad classifications:
+Sephiroth (third try):
+- "Takenuma, Abondonded Mire" is not card advantage, you discard the land and gets one creature or planeswalker back, so you net zero cards. It is indeed recursion.
+
+UI:
+- Coverages are shown as decimals, which can be confusing.

@@ -41,7 +41,6 @@ public static class ColorFixingPass
                 !committed.Contains(c.Card.OracleId) &&
                 c.Card.Types.HasFlag(CardType.Land) &&
                 !c.Card.IsBasicLand &&
-                c.Card.ColorIdentity != Color.None &&
                 c.Card.ColorIdentity.IsWithin(context.ColorIdentity))
             .OrderByDescending(c => ColorScore(c.Card.ColorIdentity, pipDemand))
             .ThenByDescending(c => c.Candidate.Inclusion)
