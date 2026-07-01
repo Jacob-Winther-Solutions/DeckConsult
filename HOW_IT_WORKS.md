@@ -7,6 +7,18 @@ and where your judgment still matters.
 
 ## What you provide
 
+### Before you start
+
+**An Anthropic API key.** The builder runs on your own key, billed to your account at
+pay-per-token rates. Create one at [console.anthropic.com](https://console.anthropic.com/settings/keys)
+(free to create, you only pay for usage). Paste it into the "Connect your Anthropic API key" card
+at the top of the builder. Check "Remember my key" and it will be saved as an encrypted cookie
+for 30 days so you only need to do this once. You can disconnect at any time.
+
+You can also pick which Claude model is used for card selection once connected — Haiku is the
+default (fast and cheap); Sonnet and Opus give better rationale quality at higher cost. The
+initial classification step always uses Haiku regardless.
+
 ### Required
 
 **A commander (or a partner pair).** This is the single most important input — it determines
@@ -186,5 +198,3 @@ you can make:
 - **Output varies.** The LLM is non-deterministic — the same inputs will not always produce
   the same deck. Classification results are cached within a session to reduce variation, but
   two separate runs are not guaranteed to agree.
-- **Bring your own API key.** You need an Anthropic API key to run the builder. Key management
-  in the UI (enter once, persist across sessions) is not yet implemented.

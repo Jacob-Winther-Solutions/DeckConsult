@@ -1,3 +1,4 @@
+using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
@@ -12,9 +13,10 @@ namespace EdhDeckBuilder.Web.Components.Pages;
 
 public partial class CommanderBuilder
 {
-    [Inject] private ICardRepository CardRepository { get; set; } = default!;
-    [Inject] private IDeckBuilder DeckBuilder { get; set; } = default!;
-    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private ICardRepository    CardRepository { get; set; } = default!;
+    [Inject] private IDeckBuilder       DeckBuilder    { get; set; } = default!;
+    [Inject] private SessionApiKeyProvider Keys        { get; set; } = default!;
+    [Inject] private IJSRuntime         JS             { get; set; } = default!;
 
     // ── Progress stage definitions ─────────────────────────────────────────
 
@@ -398,6 +400,18 @@ public partial class CommanderBuilder
                 StateHasChanged();
             });
         }
+        catch (ApiKeyRejectedException)
+        {
+            await InvokeAsync(() =>
+            {
+                Keys.Clear();
+                _isBuilding = false;
+                _currentStage = null;
+                _completedStages.Clear();
+                _errorMessage = "Your API key was rejected — please reconnect.";
+                StateHasChanged();
+            });
+        }
         catch (Exception ex)
         {
             await InvokeAsync(() =>
@@ -410,6 +424,8 @@ public partial class CommanderBuilder
             });
         }
     }
+
+    private void OnKeyStateChanged() => StateHasChanged();
 
     private void OnStageReport(string stage)
     {

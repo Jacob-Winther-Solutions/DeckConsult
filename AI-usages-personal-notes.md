@@ -16,6 +16,7 @@ API usage:
 - Esika, Control, Superfriends, Bracket 3, Budget 15 pr card 300 total:                     2,17 -> 2,03 = 0,14 (15th try) (Test of EDHREC specific reasoning is removed from spilovers, color fixings and repairs)
 - Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    2,03 -> 1,91 = 0,12 (16th try) (Test of export results feature)
 - Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    1,91 -> 1,78 = 0,13 (17th try) (Re-test of export results feature)
+- Haiku, Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:             1,78 -> 1,66 = 0,12 (18th try) (BYOK + choose model test)
 
 
 Bad classifications:

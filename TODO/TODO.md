@@ -214,7 +214,7 @@ rules, and card ingestion need format-specific variants.
 
 ---
 
-## Deck Download — Markdown export
+## Deck Download — Markdown export (done)
 
 No server-side deck storage. Instead, a finished deck can be exported as a self-contained
 `.md` file the user saves locally. The file is generated server-side from `DeckBuildResult`
@@ -257,38 +257,29 @@ See `TODO/BYOK_API_KEY.md` for the full design spec.
 - Data Protection keyring persisted via a named Docker volume (see Deployment section).
 
 **Implementation tasks:**
-- [ ] `IClaudeApiKeyProvider` + `SessionApiKeyProvider` (scoped) in the Agent project.
+- [x] `IClaudeApiKeyProvider` + `SessionApiKeyProvider` (scoped) in the Agent project.
       `SessionApiKeyProvider` holds the in-memory key for the circuit; exposes `Set` / `Clear`.
-- [ ] `IClaudeClientFactory` + `ClaudeClientFactory` (scoped): builds an `AnthropicClient`
-      per call from the provider. This is the sole seam touching the SDK constructor. Update
+- [x] `IClaudeClientFactory` + `ClaudeClientFactory` (scoped): builds an `AnthropicClient`
+      per call from the provider. This is the sole seam touching the SDK constructor. Updated
       `LlmClassifier` and `LlmSelector` to accept the factory instead of a singleton client.
-      Remove the existing singleton `ANTHROPIC_API_KEY` client construction from DI.
-- [ ] `IClaudeKeyTester` + `ClaudeKeyTester`: fires a minimal 1-token Haiku call to validate
+      Removed the singleton `ANTHROPIC_API_KEY` client construction from DI.
+- [x] `IClaudeKeyTester` + `ClaudeKeyTester`: fires a minimal 1-token Haiku call to validate
       a key before accepting it. Used by the settings UI.
-- [ ] **Cookie persistence**: on `Set(key)`, write an encrypted HttpOnly cookie (ASP.NET Core
-      Data Protection). On circuit `OnInitializedAsync`, read and decrypt the cookie and
-      call `Set` if present. On `Clear()`, expire the cookie. Wrap this in a
-      `CookieApiKeyPersistence` service (or inline in `SessionApiKeyProvider`).
-- [ ] `ApiKeySettings.razor` component: password input + "Connect" / "Test key" / "Disconnect"
+- [x] **Cookie persistence**: encrypted value written via JS interop using ASP.NET Core Data
+      Protection. Read back in `OnAfterRenderAsync` after the circuit connects. "Remember my
+      key" checkbox defaults on. Cookie is not HttpOnly (written from JS) but payload is opaque.
+- [x] `ApiKeySettings.razor` component: password input + "Connect" / "Test key" / "Disconnect"
       buttons, "Remember my key" checkbox (default on). Shows connected/disconnected state.
-      Gates the build button: if no key is connected, show "Connect your Anthropic key to build"
-      instead of the build form.
-- [ ] Handle HTTP 401 from Anthropic at the agent boundary: catch, call `Clear()`, surface
-      "Your API key was rejected — please reconnect" rather than a generic build failure.
-- [ ] DI registration: `SessionApiKeyProvider` as Scoped (registered twice — as itself and
-      as `IClaudeApiKeyProvider` — so the settings page and the agent share one instance per
-      circuit).
-- [ ] **Model picker**: let the user choose which Claude model is used for selection
-      (`LlmSelector`) from the settings UI. Since users pay with their own key, a user who
-      wants better rationale quality can opt into a more expensive model (e.g. Sonnet or Opus)
-      without affecting other users. Classification (`LlmClassifier`) stays on Haiku — it is
-      a structured extraction task where model size matters less. Suggested approach: a
-      `SelectedModel` field on `SessionApiKeyProvider` (or a parallel scoped service); the
-      model string is injected into `LlmSelector` at call time via `IClaudeClientFactory` or
-      a new `IModelPreferences` abstraction. Expose a dropdown in the settings component next
-      to the key input: "Haiku (fast, cheap — default)", "Sonnet (better reasoning)",
-      "Opus (highest quality)". Default to Haiku so the experience is unchanged for users
-      who don't change anything.
+      Gates the build form: shows info alert instead of form sections when no key is connected.
+- [x] Handle HTTP 401 from Anthropic at the agent boundary: `AnthropicUnauthorizedException`
+      caught in `LlmClassifier`/`LlmSelector`, rethrown as `ApiKeyRejectedException`.
+      `CommanderBuilder` catches it, calls `Keys.Clear()`, shows reconnect message.
+- [x] DI registration: `SessionApiKeyProvider` as Scoped (twice — concrete + interface).
+      All LLM-dependent services (`ILlmClassifier`, `ICardSelector`, `IDeckBuilder`) changed
+      from Singleton to Scoped. `ClassificationCache` stays Singleton.
+- [x] **Model picker**: `SelectedModel` on `SessionApiKeyProvider`; exposed via
+      `IClaudeClientFactory.SelectionModel`; `LlmSelector` uses it at call time.
+      Classification always uses Haiku. Dropdown: Haiku 4.5 / Sonnet 5 / Opus 4.8.
 - [ ] (Stretch) Approximate token/cost estimate displayed after each build, since users now
       pay directly and will want visibility.
 
@@ -378,8 +369,26 @@ must change (key would be browser-side).
       swap loop, max 50 iterations), `ColorFixingPass` (Pass C: pip-demand scoring, 8-basic
       floor, 50% non-basic cap), 31 unit tests.
 - [x] **Agent — LLM seam** — `LlmClassifier` (Haiku, forced tool call, batched, globally
-      cached except Plan/Synergy/Payoff), `LlmSelector` (Haiku, forced tool call, per-build rationale
-      capture), `ClassificationCache`, `ClassificationPrompt`, `SelectionPrompt`.
+      cached except Plan/Synergy/Payoff), `LlmSelector` (user-selected model via `IClaudeClientFactory`,
+      forced tool call, per-build rationale capture), `ClassificationCache`, `ClassificationPrompt`,
+      `SelectionPrompt`.
 - [x] **Agent — pipeline** — `RepairEngine` (deterministic CI-violation repair + result
       assembly), `DeckBuilder` (10-stage orchestration), 5 integration tests.
-- [x] **Agent — DI** — `ServiceCollectionExtensions.AddAgent(configuration)`.
+- [x] **Agent — BYOK** — `Authentication/` folder: `SessionApiKeyProvider` (scoped per-circuit,
+      pre-populates from `Anthropic:ApiKey` config for dev), `IClaudeClientFactory` /
+      `ClaudeClientFactory` (sole SDK-constructor seam), `IClaudeKeyTester` / `ClaudeKeyTester`
+      (1-token probe), `MissingApiKeyException`, `ApiKeyRejectedException`, `ClaudeModels`
+      (Haiku/Sonnet/Opus constants). `LlmClassifier` and `LlmSelector` updated to use factory;
+      401 responses wrapped as `ApiKeyRejectedException`. All LLM-dependent services changed
+      to Scoped; `ClassificationCache` remains Singleton.
+- [x] **Agent — DI** — `ServiceCollectionExtensions.AddAgent()` (no longer takes `IConfiguration`
+      — key comes from `SessionApiKeyProvider` which injects `IConfiguration` directly).
+- [x] **Web — BYOK UI** — `ApiKeySettings.razor` component: connect / test key / disconnect,
+      "Remember my key" checkbox (Data Protection-encrypted cookie, 30-day expiry), model picker
+      (Haiku / Sonnet 5 / Opus 4.8 dropdown). `CommanderBuilder` gates the build form on key
+      presence and handles `ApiKeyRejectedException` with a reconnect prompt. Cookie helpers
+      (`setCookie`, `getCookie`, `deleteCookie`) added to `app.js`.
+- [x] **Web — UI** — full Blazor UI: commander search, deck views (by role / by type / all cards),
+      budget input & enforcement, export build report (`.md` download), raw decklist copy.
+      Role buckets with coverage summary, runner-up panel, cut suggestions, archetype/theme picker
+      with weight sliders, tune/custom theme form, bracket picker, color identity pips.

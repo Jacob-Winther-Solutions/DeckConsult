@@ -82,9 +82,10 @@ Output: `[{oracleId, primaryRole, secondaryRoles, landCredit}]`.
 Results are cached globally by `OracleId` except for `Plan`, `Synergy`, and `Payoff`, which are
 commander-dependent and re-classified per build.
 
-**Selection** (`LlmSelector` — `claude-haiku-4-5-20251001`, temperature 0.6)  
+**Selection** (`LlmSelector` — user-selected model, default `claude-haiku-4-5-20251001`, temperature 0.6)  
 Input: role-filtered classified pool + current build state + soft constraints.  
-Output: `[{oracleId, rank, rationale}]` — ranked picks only; the fill engine decides count.
+Output: `[{oracleId, rank, rationale}]` — ranked picks only; the fill engine decides count.  
+The model is configurable per session via the settings UI (Haiku / Sonnet 5 / Opus 4.8).
 
 Both calls use a forced tool call (`ToolChoiceTool`, `Tool.Strict = true`) for guaranteed
 structured output. The model can never emit a card name not in the input batch; all responses
@@ -100,11 +101,13 @@ per iteration, so the total stays constant.
 ### DI registration
 
 ```csharp
-// In Program.cs / Startup.cs (after AddInfrastructure):
-builder.Services.AddAgent(builder.Configuration);
+// In Program.cs / Startup.cs (after AddDataProtection and AddInfrastructure):
+builder.Services.AddAgent();
 ```
 
-Requires `Anthropic:ApiKey` in configuration (user-secrets or `ANTHROPIC_API_KEY` env var).
+The API key is supplied per-user via the settings UI (BYOK). In development, you can pre-populate
+it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` environment variable —
+`SessionApiKeyProvider` reads it on construction so the UI shows "Connected" automatically.
 
 ## Getting it running
 
@@ -116,7 +119,16 @@ dotnet build
 # Run all 254 tests:
 dotnet test Tests
 
-# Supply the API key via user-secrets:
+# Run the app:
+dotnet run --project EdhDeckBuilder.Web
+```
+
+On first launch, paste your Anthropic API key in the "Connect your Anthropic API key" card.
+The key is held server-side for the session and optionally saved as an encrypted browser cookie.
+
+For development, skip the UI step by setting the key in user-secrets:
+
+```bash
 dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-..." --project EdhDeckBuilder.Web
 ```
 

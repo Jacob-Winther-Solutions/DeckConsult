@@ -1,0 +1,74 @@
+@using EdhDeckBuilder.Agent.Authentication
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <span>0 &mdash; Your Anthropic API Key</span>
+        @if (_connected)
+        {
+            <span class="badge bg-success ms-auto">Connected</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary ms-auto">Not connected</span>
+        }
+    </div>
+    <div class="card-body">
+        @if (_connected)
+        {
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <span class="text-success small">&#10003; A key is connected for this session.</span>
+
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <label class="form-label small fw-semibold mb-0" for="model-select">Model for card selection:</label>
+                    <select id="model-select" class="form-select form-select-sm" style="width:auto;"
+                            value="@_selectedModel"
+                            @onchange="OnModelChanged">
+                        @foreach (var (id, label) in ClaudeModels.SelectionModels)
+                        {
+                            <option value="@id" selected="@(_selectedModel == id)">@label</option>
+                        }
+                    </select>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="DisconnectAsync">Disconnect</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="small text-muted mb-3">
+                Builds run on your own Anthropic API key, billed directly to your account.
+                Create a key at
+                <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>
+                and paste it below.
+            </p>
+
+            <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
+                <input type="password" class="form-control form-control-sm" style="max-width:340px;"
+                       placeholder="sk-ant-..." autocomplete="off"
+                       @bind="_keyInput" @bind:event="oninput" />
+
+                <button class="btn btn-primary btn-sm"
+                        disabled="@(_busy || string.IsNullOrWhiteSpace(_keyInput))"
+                        @onclick="ConnectAsync">
+                    @if (_busy) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+                    Connect
+                </button>
+
+                <button class="btn btn-outline-secondary btn-sm"
+                        disabled="@(_busy || string.IsNullOrWhiteSpace(_keyInput))"
+                        @onclick="TestAsync">
+                    Test key
+                </button>
+            </div>
+
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="remember-key" @bind="_remember" />
+                <label class="form-check-label small" for="remember-key">Remember my key (stored encrypted in browser cookie, 30 days)</label>
+            </div>
+
+            @if (_message is { } msg)
+            {
+                <p class="small @(_error ? "text-danger" : "text-success") mb-0">@msg</p>
+            }
+        }
+    </div>
+</div>

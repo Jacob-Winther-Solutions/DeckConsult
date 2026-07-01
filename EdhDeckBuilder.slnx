@@ -1,4 +1,16 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="AI-usages-personal-notes.md" />
+    <File Path="CLAUDE.md" />
+    <File Path="HOW_IT_WORKS.md" />
+    <File Path="README.md" />
+    <File Path="TODO/AGENT_PRINCIPLES.md" />
+    <File Path="TODO/BYOK_API_KEY.md" />
+    <File Path="TODO/DATA_SOURCES.md" />
+    <File Path="TODO/mtga_brawl_ai_agent_guide.txt" />
+    <File Path="TODO/TCGPLAYER_AFFILIATE_LINKING.md" />
+    <File Path="TODO/TODO.md" />
+  </Folder>
   <Folder Name="/Tests/">
     <Project Path="Tests/EdhDeckBuilder.Tests.csproj" />
   </Folder>

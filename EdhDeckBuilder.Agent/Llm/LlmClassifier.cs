@@ -1,5 +1,6 @@
-using Anthropic;
+using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Prompts;
@@ -14,9 +15,8 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// Results for non-commander-dependent roles (anything except Plan and Synergy) are cached in
 /// <see cref="ClassificationCache"/> across multiple builds in the same session.
 /// </summary>
-public sealed class LlmClassifier(AnthropicClient client, ClassificationCache cache) : ILlmClassifier
+public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCache cache) : ILlmClassifier
 {
-    private const string Model = "claude-haiku-4-5-20251001";
     private const int MaxTokens = 4096;
 
     public async Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
@@ -40,21 +40,30 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
         IReadOnlyList<Card> commanders,
         CancellationToken ct)
     {
+        var client = factory.CreateForCurrentUser();
+
         var request = new MessageCreateParams
         {
-            Model = Model,
+            Model     = ClaudeModels.Haiku,   // classification always uses Haiku
             MaxTokens = MaxTokens,
-            System = new MessageCreateParamsSystem(ClassificationPrompt.SystemPrompt),
-            Tools = [ClassificationPrompt.Tool],
+            System    = new MessageCreateParamsSystem(ClassificationPrompt.SystemPrompt),
+            Tools     = [ClassificationPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = ClassificationPrompt.ToolName },
-            Messages =
+            Messages  =
             [
                 new() { Role = Role.User, Content = ClassificationPrompt.FormatUserMessage(candidates, commanders) },
             ],
         };
 
-        var response = await client.Messages.Create(request, ct);
-        return ParseResponse(response.Content, candidates);
+        try
+        {
+            var response = await client.Messages.Create(request, ct);
+            return ParseResponse(response.Content, candidates);
+        }
+        catch (AnthropicUnauthorizedException ex)
+        {
+            throw new ApiKeyRejectedException(ex);
+        }
     }
 
     private static IReadOnlyList<ClassificationResult> ParseResponse(
@@ -91,15 +100,15 @@ public sealed class LlmClassifier(AnthropicClient client, ClassificationCache ca
 
             var raw = new ClassificationResult
             {
-                OracleId = id,
+                OracleId    = id,
                 PrimaryRole = ParseRole(dto.PrimaryRole),
-                Secondary = dto.Secondary
+                Secondary   = dto.Secondary
                     .Select(s => new RoleContribution(
                         ParseRole(s.Role),
                         ParseRelation(s.Relation),
                         Math.Clamp(s.Weight, 0.0, 1.0)))
                     .ToArray(),
-                LandCredit = Math.Clamp(dto.LandCredit, 0.0, 1.0),
+                LandCredit  = Math.Clamp(dto.LandCredit, 0.0, 1.0),
             };
 
             results.Add(ClassificationSanitizer.SanitizeLandRole(raw, cardTypeById[id]));

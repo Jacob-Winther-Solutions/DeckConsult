@@ -1,5 +1,6 @@
-using Anthropic;
+using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Agent.Prompts;
@@ -10,14 +11,12 @@ using System.Text.Json;
 namespace EdhDeckBuilder.Agent.Llm;
 
 /// <summary>
-/// Ranks candidate cards for a specific role using Claude Haiku (moderate temperature for
-/// creative judgment). Uses a forced tool call so output is always structured JSON.
-/// Selection is always context-dependent (deck state changes with each role filled), so
-/// results are never cached.
+/// Ranks candidate cards for a specific role using the user's selected Claude model
+/// (moderate temperature for creative judgment). Uses a forced tool call so output is
+/// always structured JSON. Selection is always context-dependent, so results are never cached.
 /// </summary>
-public sealed class LlmSelector(AnthropicClient client) : ICardSelector
+public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
 {
-    private const string Model = "claude-haiku-4-5-20251001";
     private const int MaxTokens = 2048;
 
     public async Task<IReadOnlyList<SelectionResult>> SelectAsync(
@@ -30,21 +29,30 @@ public sealed class LlmSelector(AnthropicClient client) : ICardSelector
         if (candidates.Count == 0)
             return [];
 
+        var client = factory.CreateForCurrentUser();
+
         var request = new MessageCreateParams
         {
-            Model = Model,
-            MaxTokens = MaxTokens,
-            System = new MessageCreateParamsSystem(SelectionPrompt.SystemPrompt),
-            Tools = [SelectionPrompt.Tool],
+            Model      = factory.SelectionModel,
+            MaxTokens  = MaxTokens,
+            System     = new MessageCreateParamsSystem(SelectionPrompt.SystemPrompt),
+            Tools      = [SelectionPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = SelectionPrompt.ToolName },
-            Messages =
+            Messages   =
             [
                 new() { Role = Role.User, Content = SelectionPrompt.FormatUserMessage(role, candidates, context, state) },
             ],
         };
 
-        var response = await client.Messages.Create(request, ct);
-        return ParseResponse(response.Content, candidates);
+        try
+        {
+            var response = await client.Messages.Create(request, ct);
+            return ParseResponse(response.Content, candidates);
+        }
+        catch (AnthropicUnauthorizedException ex)
+        {
+            throw new ApiKeyRejectedException(ex);
+        }
     }
 
     private static IReadOnlyList<SelectionResult> ParseResponse(
@@ -71,7 +79,7 @@ public sealed class LlmSelector(AnthropicClient client) : ICardSelector
 
         // Whitelist: only accept oracle IDs that were in the input batch.
         var batchIds = candidates.Select(c => c.Card.OracleId).ToHashSet();
-        var results = new List<SelectionResult>(dtos.Count);
+        var results  = new List<SelectionResult>(dtos.Count);
 
         foreach (var dto in dtos)
         {
@@ -80,8 +88,8 @@ public sealed class LlmSelector(AnthropicClient client) : ICardSelector
 
             results.Add(new SelectionResult
             {
-                OracleId = id,
-                Rank = dto.Rank,
+                OracleId  = id,
+                Rank      = dto.Rank,
                 Rationale = dto.Rationale,
             });
         }

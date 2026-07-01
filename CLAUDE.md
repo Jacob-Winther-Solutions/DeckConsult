@@ -23,10 +23,10 @@ All four projects exist and compile. Run `dotnet test Tests` — 254 tests, all 
 |---|---|
 | `EdhDeckBuilder.Core` | Done — domain model, rules, templates, archetypes, themes, brackets |
 | `EdhDeckBuilder.Infrastructure` | Done — Scryfall bulk client, EDHREC client, `SuggestionSource` |
-| `EdhDeckBuilder.Agent` | Done — fill engine, LLM seam, pipeline, DI registration |
-| `EdhDeckBuilder.Web` | Done — full Blazor UI: commander search, deck views, budget, export |
+| `EdhDeckBuilder.Agent` | Done — fill engine, LLM seam, pipeline, BYOK (`Authentication/`), DI |
+| `EdhDeckBuilder.Web` | Done — full Blazor UI: commander search, deck views, budget, export, BYOK UI |
 
-See `TODO/TODO.md` for remaining work (Commander Discovery, BYOK, Deployment, etc.).
+See `TODO/TODO.md` for remaining work (Commander Discovery, Deployment, etc.).
 
 ## Agent layer — how it works
 
@@ -36,9 +36,11 @@ staged pipeline; the LLM is consulted at exactly two fixed points:
 1. **Classification** — `LlmClassifier` (`claude-haiku-4-5-20251001`, temperature 0.1, batched,
    forced tool call). Assigns `CardRole` + secondary overlaps. Results cached globally by
    `OracleId` except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
-2. **Selection** — `LlmSelector` (`claude-haiku-4-5-20251001`, temperature 0.6, per-role call,
-   forced tool call). Returns a ranked list with per-card rationale. The fill engine decides
-   count; the model never outputs counts.
+   Always uses Haiku regardless of the user's model selection.
+2. **Selection** — `LlmSelector` (user-selected model via `IClaudeClientFactory.SelectionModel`,
+   default `claude-haiku-4-5-20251001`, temperature 0.6, per-role call, forced tool call).
+   Returns a ranked list with per-card rationale. The fill engine decides count; the model never
+   outputs counts.
 
 Everything else — fill order, reconciliation, color-fixing, repair, basic distribution — is
 deterministic code in `Fill/` and `Pipeline/`.
@@ -78,6 +80,15 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   `Tool.Strict = true`. Don't switch to plain-text parsing.
 - **Classification cache:** `ClassificationCache` is a singleton; Plan, Synergy, and Payoff are
   never served from it. Don't cache them.
+- **BYOK — scoped services:** `SessionApiKeyProvider`, `IClaudeClientFactory`, `IClaudeKeyTester`,
+  `ILlmClassifier`, `ICardSelector`, and `IDeckBuilder` are all Scoped (per Blazor Server circuit).
+  `ClassificationCache` is the only Singleton in the Agent layer. Never register a Scoped LLM
+  service as Singleton — it would capture the per-circuit key.
+- **BYOK — SDK seam:** `ClaudeClientFactory` is the only place that calls `new AnthropicClient(...)`.
+  `LlmClassifier` and `LlmSelector` receive it via `IClaudeClientFactory`. Keep it that way.
+- **BYOK — 401 handling:** `AnthropicUnauthorizedException` is caught in the LLM callers and
+  rethrown as `ApiKeyRejectedException`. The UI catches this, calls `Keys.Clear()`, and shows a
+  reconnect prompt. Don't swallow it or convert it to a generic build failure.
 - **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
   after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
   backward compatibility.

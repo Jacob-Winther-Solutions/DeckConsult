@@ -87,6 +87,18 @@
             </div>
         }
 
+        <!-- ── Section 0: API Key ────────────────────────────────────────── -->
+        <ApiKeySettings OnKeyStateChanged="OnKeyStateChanged" />
+
+        @if (Keys.GetApiKey() is null)
+        {
+            <div class="alert alert-info">
+                Connect your Anthropic API key above to start building.
+            </div>
+        }
+        else
+        {
+
         <!-- ── Section 1: Commander ──────────────────────────────────────── -->
         <div class="card mb-4">
             <div class="card-header fw-semibold">1 &mdash; Choose Commander(s)</div>
@@ -414,6 +426,8 @@
                 <span class="align-self-center text-muted small">Select a commander to continue.</span>
             }
         </div>
+
+        } @* end @if (Keys.GetApiKey() is not null) *@
         </div>
     }
 
