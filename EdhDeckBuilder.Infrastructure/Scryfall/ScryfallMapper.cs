@@ -9,9 +9,10 @@ internal static class ScryfallMapper
     public static Card ToCard(ScryfallCard dto)
     {
         var face0 = dto.CardFaces?.Count > 0 ? dto.CardFaces[0] : null;
-        var frontTypeLine = face0?.TypeLine ?? dto.TypeLine;
+        var face1 = dto.CardFaces?.Count > 1 ? dto.CardFaces[1] : null;
 
-        var oracleText = dto.OracleText ?? face0?.OracleText ?? string.Empty;
+        var frontTypeLine = face0?.TypeLine ?? dto.TypeLine;
+        var oracleText    = dto.OracleText ?? face0?.OracleText ?? string.Empty;
 
         return new Card
         {
@@ -32,6 +33,8 @@ internal static class ScryfallMapper
             CanBeCommander    = IsCommanderEligible(dto.Legalities.Commander, frontTypeLine, oracleText),
             Images            = MapImages(dto.ImageUris ?? face0?.ImageUris),
             PriceUsd          = decimal.TryParse(dto.Prices?.Usd, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : null,
+            BackFaceTypeLine  = face1?.TypeLine,
+            BackFaceText      = face1?.OracleText,
         };
     }
 

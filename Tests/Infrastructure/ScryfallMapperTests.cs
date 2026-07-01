@@ -232,6 +232,63 @@ public sealed class ScryfallMapperTests
         Assert.True(card.CanBeCommander);
     }
 
+    // --- MDFC back face text ------------------------------------------------
+
+    [Fact]
+    public void MDFC_with_land_back_populates_BackFaceText()
+    {
+        var dto = Make(
+            typeLine: "Sorcery // Land",
+            oracleText: null,
+            faces:
+            [
+                new ScryfallCardFace { TypeLine = "Sorcery", OracleText = "Return X creatures from your graveyard." },
+                new ScryfallCardFace { TypeLine = "Land — Swamp", OracleText = "({T}: Add {B}.)" },
+            ]);
+
+        var card = ScryfallMapper.ToCard(dto);
+        Assert.Equal("({T}: Add {B}.)", card.BackFaceText);
+    }
+
+    [Fact]
+    public void MDFC_without_land_back_populates_BackFaceText()
+    {
+        var dto = Make(
+            typeLine: "Creature // Sorcery",
+            faces:
+            [
+                new ScryfallCardFace { TypeLine = "Creature — Human Wizard", OracleText = "Flying." },
+                new ScryfallCardFace { TypeLine = "Sorcery", OracleText = "Deal 3 damage." },
+            ]);
+
+        var card = ScryfallMapper.ToCard(dto);
+        Assert.Equal("Deal 3 damage.", card.BackFaceText);
+    }
+
+    [Fact]
+    public void MDFC_populates_BackFaceTypeLine()
+    {
+        var dto = Make(
+            typeLine: "Instant // Land",
+            faces:
+            [
+                new ScryfallCardFace { TypeLine = "Instant", OracleText = "Counter target spell." },
+                new ScryfallCardFace { TypeLine = "Land — Island", OracleText = "({T}: Add {U}.)" },
+            ]);
+
+        var card = ScryfallMapper.ToCard(dto);
+        Assert.Equal("Land — Island", card.BackFaceTypeLine);
+        Assert.Equal("({T}: Add {U}.)", card.BackFaceText);
+    }
+
+    [Fact]
+    public void Single_face_card_leaves_BackFaceText_null()
+    {
+        var card = ScryfallMapper.ToCard(Make(typeLine: "Instant", oracleText: "Counter target spell."));
+        Assert.Null(card.BackFaceText);
+        Assert.Null(card.BackFaceTypeLine);
+    }
+
     // --- color identity -----------------------------------------------------
 
     [Fact]

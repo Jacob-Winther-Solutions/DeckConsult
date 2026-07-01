@@ -187,9 +187,6 @@ you can make:
 
 ## Current limitations
 
-- **MDFC land credit** is not yet assigned by the classifier. Cards like Agadeem's Awakening
-  are treated as pure spells rather than partial land contributions. This means the land count
-  may be slightly conservative in MDFC-heavy pools.
 - **Context-aware classification** is not implemented. Some cards (e.g. Jeska's Will) behave
   very differently depending on whether the commander is on the board. Classification currently
   treats them as global-stable rather than commander-specific.

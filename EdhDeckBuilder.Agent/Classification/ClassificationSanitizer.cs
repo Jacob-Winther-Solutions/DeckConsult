@@ -29,4 +29,18 @@ public static class ClassificationSanitizer
 
         return result with { PrimaryRole = correctedPrimary, Secondary = correctedSecondary };
     }
+
+    /// <summary>
+    /// Zeroes out <see cref="ClassificationResult.LandCredit"/> for any card whose back face
+    /// is not a Land type. Catches the case where the model assigns land credit to a DFC whose
+    /// back face is a creature, planeswalker, or other non-land card type.
+    /// </summary>
+    public static ClassificationResult SanitizeLandCredit(ClassificationResult result, string? backFaceTypeLine)
+    {
+        if (result.LandCredit == 0)
+            return result;
+
+        var backFaceIsLand = backFaceTypeLine?.Contains("Land", StringComparison.OrdinalIgnoreCase) == true;
+        return backFaceIsLand ? result : result with { LandCredit = 0 };
+    }
 }

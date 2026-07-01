@@ -116,7 +116,7 @@ it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` envi
 dotnet restore
 dotnet build
 
-# Run all 254 tests:
+# Run all 266 tests:
 dotnet test Tests
 
 # Run the app:

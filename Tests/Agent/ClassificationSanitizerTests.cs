@@ -55,4 +55,59 @@ public sealed class ClassificationSanitizerTests
 
         Assert.Same(result, corrected);
     }
+
+    // --- SanitizeLandCredit -------------------------------------------------
+
+    private static ClassificationResult MakeWithCredit(double landCredit) => new()
+    {
+        OracleId    = Guid.NewGuid(),
+        PrimaryRole = CardRole.Synergy,
+        Secondary   = [],
+        LandCredit  = landCredit,
+    };
+
+    [Fact]
+    public void SanitizeLandCredit_preserves_credit_when_back_face_is_land()
+    {
+        var result    = MakeWithCredit(0.5);
+        var corrected = ClassificationSanitizer.SanitizeLandCredit(result, "Land — Swamp");
+
+        Assert.Equal(0.5, corrected.LandCredit);
+    }
+
+    [Fact]
+    public void SanitizeLandCredit_preserves_credit_when_back_face_type_contains_Land_mixed_case()
+    {
+        var result    = MakeWithCredit(0.8);
+        var corrected = ClassificationSanitizer.SanitizeLandCredit(result, "Basic land — Forest");
+
+        Assert.Equal(0.8, corrected.LandCredit);
+    }
+
+    [Fact]
+    public void SanitizeLandCredit_zeroes_credit_when_back_face_is_non_land()
+    {
+        var result    = MakeWithCredit(0.4);
+        var corrected = ClassificationSanitizer.SanitizeLandCredit(result, "Creature — Insect");
+
+        Assert.Equal(0.0, corrected.LandCredit);
+    }
+
+    [Fact]
+    public void SanitizeLandCredit_zeroes_credit_when_back_face_type_is_null()
+    {
+        var result    = MakeWithCredit(0.3);
+        var corrected = ClassificationSanitizer.SanitizeLandCredit(result, null);
+
+        Assert.Equal(0.0, corrected.LandCredit);
+    }
+
+    [Fact]
+    public void SanitizeLandCredit_returns_same_instance_when_credit_is_already_zero()
+    {
+        var result    = MakeWithCredit(0.0);
+        var corrected = ClassificationSanitizer.SanitizeLandCredit(result, "Creature — Insect");
+
+        Assert.Same(result, corrected);
+    }
 }

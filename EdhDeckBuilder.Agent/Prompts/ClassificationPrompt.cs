@@ -48,9 +48,10 @@ public static class ClassificationPrompt
         - **Modal**: The player chooses between roles when the card is played (e.g. Jeska's Will without commander gives mana OR draws — not both).
         - **Transform**: The card transitions from one role to another over the course of a game (e.g. Hedron Archive ramps first, then sacrifices to draw).
 
-        ## Land Credit (MDFCs with a land on the back face)
-        Set land_credit on the 0–1 scale. Zero for all non-MDFC cards.
-        - 0.0: No meaningful land mode
+        ## Land Credit (back face land quality)
+        Assign a non-zero land_credit ONLY when the back face is a Land type (check the TypeLine for "// Land").
+        Zero for all other cards — including DFCs whose back face is not a land.
+        - 0.0: No land back face (use for all non-DFCs and DFCs with non-land back faces)
         - 0.1–0.3: Strong spell, weak land back (e.g. Agadeem's Awakening ≈ 0.3)
         - 0.4–0.6: Both sides viable — you would genuinely consider playing it as a land
         - 0.7–0.9: Land side is often the better choice
@@ -90,6 +91,12 @@ public static class ClassificationPrompt
             sb.AppendLine($"Type: {c.Card.TypeLine}");
             if (!string.IsNullOrWhiteSpace(c.Card.OracleText))
                 sb.AppendLine($"Text: {c.Card.OracleText}");
+            if (!string.IsNullOrWhiteSpace(c.Card.BackFaceTypeLine))
+            {
+                sb.AppendLine($"Back face type: {c.Card.BackFaceTypeLine}");
+                if (!string.IsNullOrWhiteSpace(c.Card.BackFaceText))
+                    sb.AppendLine($"Back face text: {c.Card.BackFaceText}");
+            }
             sb.AppendLine($"EDHREC Inclusion: {c.Inclusion:P0}");
             if (!string.IsNullOrWhiteSpace(c.Section))
                 sb.AppendLine($"Section: {c.Section}");

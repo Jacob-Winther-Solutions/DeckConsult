@@ -201,9 +201,13 @@ rules, and card ingestion need format-specific variants.
 - [x] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
       `DeckBuilder.DistributeBasics` returns an empty dict when `ColorIdentity == Color.None`.
       Wastes handling needs to be added before colorless commanders are supported.
-- [ ] **MDFC land credit assignment.** The `LandCredit` field on `FillCandidate` exists and is
-      plumbed through; `LlmClassifier` needs to assign non-zero values based on how playable the
-      land face is for the given commander (currently defaults to 0 for all cards).
+- [x] **MDFC / DFC back-face data and land credit assignment.** `Card.BackFaceTypeLine` and
+      `Card.BackFaceText` are now populated at ingestion for **all** double-faced cards (MDFCs,
+      transform, creature//planeswalker, etc.), not just land-backed ones. The classifier prompt
+      includes both lines so the LLM can evaluate any DFC by both faces. Land credit is only
+      non-zero when the back face is a Land type — enforced deterministically by
+      `ClassificationSanitizer.SanitizeLandCredit`, which `LlmClassifier` chains after the
+      existing role sanitizer using the full `Card` object (not just `CardType`). 12 new tests.
 - [x] Power-bracket integration into selector prompt — `SelectionPrompt.AppendBracketGuidance`
       emits bracket number, name, and description; Brackets 1–2 list all Game Changers to avoid;
       Brackets 4–5 encourage Game Changers. 7 new tests.

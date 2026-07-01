@@ -17,7 +17,7 @@ work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent 
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 254 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 266 tests, all green.
 
 | Project | Status |
 |---|---|

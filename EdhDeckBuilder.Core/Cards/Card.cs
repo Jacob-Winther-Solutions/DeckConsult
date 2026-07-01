@@ -77,4 +77,19 @@ public sealed record Card
 
     /// <summary>Non-foil USD price from Scryfall at ingestion time. Null when Scryfall has no price data.</summary>
     public decimal? PriceUsd { get; init; }
+
+    /// <summary>
+    /// Type line of the back face for any double-faced card (MDFC, transform, etc.).
+    /// Null for single-faced cards. Used by the classifier prompt and by
+    /// <c>ClassificationSanitizer</c> to identify land-backed MDFCs for land credit zeroing.
+    /// </summary>
+    public string? BackFaceTypeLine { get; init; }
+
+    /// <summary>
+    /// Oracle text of the back face for any double-faced card. Null for single-faced cards.
+    /// Shown to the classifier so it can evaluate cards that transform or be played as either face
+    /// (e.g. the flying ability of Insectile Aberration, the planeswalker abilities of Tibalt,
+    /// or the land quality of a modal land back).
+    /// </summary>
+    public string? BackFaceText { get; init; }
 }
