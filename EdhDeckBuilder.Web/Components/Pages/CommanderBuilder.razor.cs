@@ -3,6 +3,7 @@ using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Text;
@@ -76,22 +77,16 @@ public partial class CommanderBuilder
         if (_result is null) return "";
         var sb = new StringBuilder();
 
-        sb.AppendLine("// Commander");
         foreach (var c in _selectedCommanders)
             sb.AppendLine($"1 {c.Name}");
 
         sb.AppendLine();
-        sb.AppendLine("// Deck");
-        foreach (var s in _result.Deck.OrderBy(s => s.Roles.Primary).ThenBy(s => s.Card.Name))
+
+        foreach (var s in _result.Deck.OrderBy(s => s.Card.Name))
             sb.AppendLine($"1 {s.Card.Name}");
 
-        if (_result.BasicLandCounts.Count > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("// Basic Lands");
-            foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
-                sb.AppendLine($"{count} {land}");
-        }
+        foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+            sb.AppendLine($"{count} {land}");
 
         return sb.ToString().TrimEnd();
     }
@@ -427,6 +422,22 @@ public partial class CommanderBuilder
     }
 
     private void CancelBuild() => _buildCts?.Cancel();
+
+    private async Task DownloadBuildReportAsync()
+    {
+        if (_result is null) return;
+        var content = DeckReportExporter.Export(
+            _result,
+            _selectedCommanders,
+            _archetypeWeights,
+            _selectedThemes,
+            _bracket,
+            ParsedMaxCardPrice,
+            ParsedTotalBudget,
+            DateOnly.FromDateTime(DateTime.Today));
+        var filename = DeckReportExporter.SlugifyFilename(_selectedCommanders) + "-build-report.md";
+        await JS.InvokeVoidAsync("downloadTextFile", filename, content);
+    }
 
     private void ResetForm()
     {

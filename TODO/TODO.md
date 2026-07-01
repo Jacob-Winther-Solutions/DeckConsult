@@ -20,7 +20,7 @@ A living list of deferred work. Check items off as they land.
 - [x] Three deck views: By Role (role buckets), By Type (card-type buckets, priority-ordered),
       All Cards (alphabetical table with role badges).
 - [x] Budget input in the UI (see Budget section below).
-- [ ] Deck download: "Export deck" button generates a `.md` file and streams it as a browser download
+- [x] Deck download: "Export Build Report" button generates a `.md` file and streams it as a browser download
       (see Deck Download section below).
 - [ ] Refactor UI to make components reusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
 
@@ -208,12 +208,12 @@ and streamed as a browser download — pure Web layer concern, no Core changes.
   into Moxfield, Archidekt, or any other deck builder that accepts text import.
 
 **Implementation tasks:**
-- [ ] `DeckMarkdownExporter` service in the Web project: accepts `DeckBuildResult` +
+- [x] `DeckMarkdownExporter` service in the Web project: accepts `DeckBuildResult` +
       `BuildContext`, returns a `string` (the markdown). No infrastructure dependencies.
-- [ ] Blazor "Export deck" button: calls the exporter, then uses JS interop
-      (`saveAs` / `URL.createObjectURL`) or a controller endpoint to trigger the download.
-      Filename: `<commander-name>-deck.md` (slugified).
-- [ ] Tests: snapshot-style unit test — given a known `DeckBuildResult`, assert the
+- [x] Blazor "Export Build Report" button: calls the exporter, then uses JS interop
+      (`URL.createObjectURL`) to trigger a `.md` file download.
+      Filename: `<commander-name>-build-report.md` (slugified).
+- [x] Tests: snapshot-style unit test — given a known `DeckBuildResult`, assert the
       markdown output contains the expected sections and raw decklist lines.
 
 ---

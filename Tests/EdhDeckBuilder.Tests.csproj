@@ -23,6 +23,7 @@
     <ProjectReference Include="..\EdhDeckBuilder.Core\EdhDeckBuilder.Core.csproj" />
     <ProjectReference Include="..\EdhDeckBuilder.Infrastructure\EdhDeckBuilder.Infrastructure.csproj" />
     <ProjectReference Include="..\EdhDeckBuilder.Agent\EdhDeckBuilder.Agent.csproj" />
+    <ProjectReference Include="..\EdhDeckBuilder.Web\EdhDeckBuilder.Web.csproj" />
   </ItemGroup>
 
 </Project>

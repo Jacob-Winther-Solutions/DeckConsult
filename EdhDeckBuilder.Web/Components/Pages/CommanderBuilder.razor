@@ -41,7 +41,10 @@
         <div class="d-flex align-items-center gap-2 px-3 pt-4 pb-2">
             <button class="btn btn-outline-secondary btn-sm" @onclick="ResetForm">&#8592; Build another</button>
             <button class="btn btn-outline-primary btn-sm" @onclick="() => _showExport = !_showExport">
-                @(_showExport ? "Hide Export" : "Export Deck")
+                @(_showExport ? "Hide Decklist" : "Copy Decklist")
+            </button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="DownloadBuildReportAsync">
+                Export Build Report
             </button>
         </div>
 
@@ -50,7 +53,7 @@
             <div class="mx-3 mb-3">
                 <div class="card">
                     <div class="card-header d-flex align-items-center gap-2">
-                        <span class="fw-semibold me-auto">Export — paste into Archidekt, Moxfield, or any deck site</span>
+                        <span class="fw-semibold me-auto">Raw decklist — paste into your favorite deck site</span>
                         <button class="btn btn-sm @(_exportCopied ? "btn-success" : "btn-primary")"
                                 @onclick="CopyExportTextAsync">
                             @(_exportCopied ? "Copied!" : "Copy to clipboard")

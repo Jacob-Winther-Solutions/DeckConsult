@@ -142,6 +142,13 @@ achieved. If a role is short (thin pool for this commander) or over-served, it's
 **Cut suggestions** — if any role is over-covered, the tool surfaces the weakest cards in
 that role so you know what to cut first if you want to tighten the list.
 
+**Export Build Report** — the "Export Build Report" button downloads the full result as a
+self-contained `.md` file. It contains the build metadata (commander, archetype/theme
+weights, bracket, budget, date), every card with its rationale organized by role, the
+coverage summary, the runner-up list, and a plain `1 Card Name` raw decklist at the bottom
+ready to paste into Moxfield, Archidekt, or any other deck builder. A separate "Copy
+Decklist" button copies just the raw card list to the clipboard for quick import.
+
 ---
 
 ## What you still decide
@@ -152,9 +159,9 @@ you can make:
 
 - **Is this commander the right choice?** The tool builds the best deck it can for whoever
   you give it, but picking a commander that fits your playstyle is your call.
-- **Budget.** The tool has no knowledge of card prices. It will happily include Mana Crypt,
-  Dual Lands, or other expensive staples if its sources recommends them and they fit the strategy.
-  You'll need to review and swap to budget alternatives manually (runner-ups help here).
+- **Final card choices.** The tool makes informed picks but reasonable people disagree. If a
+  card the tool chose feels wrong for your table, swap it with a runner-up — that list exists
+  precisely for this.
 - **Table politics and personal preference.** Cards that are technically correct but feel bad
   at your specific table — stax pieces, land destruction, infinite combos — are not filtered
   out unless your bracket choice discourages them. You decide what's appropriate.
@@ -168,17 +175,16 @@ you can make:
 
 ## Current limitations
 
-- **No Web UI yet.** The builder engine is complete but the Blazor front end is scaffolded
-  only. To use it today you need to call `IDeckBuilder.BuildAsync` directly from code.
-- **Colorless commanders** (e.g. Kozilek, Emrakul) are not supported — basic land distribution
-  requires at least one color. Wastes handling is a known gap.
 - **MDFC land credit** is not yet assigned by the classifier. Cards like Agadeem's Awakening
   are treated as pure spells rather than partial land contributions. This means the land count
   may be slightly conservative in MDFC-heavy pools.
 - **Context-aware classification** is not implemented. Some cards (e.g. Jeska's Will) behave
   very differently depending on whether the commander is on the board. Classification currently
   treats them as global-stable rather than commander-specific.
-- **No deck persistence.** Results are returned in memory; there is no save/load yet.
+- **No deck persistence.** Results live in memory for the current session. Use "Export Build
+  Report" to save a finished deck locally.
 - **Output varies.** The LLM is non-deterministic — the same inputs will not always produce
   the same deck. Classification results are cached within a session to reduce variation, but
   two separate runs are not guaranteed to agree.
+- **Bring your own API key.** You need an Anthropic API key to run the builder. Key management
+  in the UI (enter once, persist across sessions) is not yet implemented.

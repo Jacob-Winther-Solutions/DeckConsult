@@ -17,16 +17,16 @@ work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent 
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 225 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 254 tests, all green.
 
 | Project | Status |
 |---|---|
 | `EdhDeckBuilder.Core` | Done — domain model, rules, templates, archetypes, themes, brackets |
 | `EdhDeckBuilder.Infrastructure` | Done — Scryfall bulk client, EDHREC client, `SuggestionSource` |
 | `EdhDeckBuilder.Agent` | Done — fill engine, LLM seam, pipeline, DI registration |
-| `EdhDeckBuilder.Web` | Scaffolded only — boilerplate Blazor Web App, no real UI yet |
+| `EdhDeckBuilder.Web` | Done — full Blazor UI: commander search, deck views, budget, export |
 
-The next meaningful work is the Web UI — see `TODO/TODO.md`.
+See `TODO/TODO.md` for remaining work (Commander Discovery, BYOK, Deployment, etc.).
 
 ## Agent layer — how it works
 

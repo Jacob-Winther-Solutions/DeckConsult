@@ -9,7 +9,7 @@ EdhDeckBuilder.slnx
 ├── EdhDeckBuilder.Core            # domain model + rules + templates (no external deps)  ← done
 ├── EdhDeckBuilder.Infrastructure  # Scryfall + EDHREC clients, local card store         ← done
 ├── EdhDeckBuilder.Agent           # Anthropic SDK, fill engine, LLM seam, pipeline      ← done
-└── EdhDeckBuilder.Web             # Blazor Web App (the visual, grouped deck view)       ← scaffolded
+└── EdhDeckBuilder.Web             # Blazor Web App (the visual, grouped deck view)       ← done
 ```
 
 Dependency direction points inward: everything references `Core`, `Core` references nothing.
@@ -113,7 +113,7 @@ Requires `Anthropic:ApiKey` in configuration (user-secrets or `ANTHROPIC_API_KEY
 dotnet restore
 dotnet build
 
-# Run all 215 tests:
+# Run all 254 tests:
 dotnet test Tests
 
 # Supply the API key via user-secrets:
