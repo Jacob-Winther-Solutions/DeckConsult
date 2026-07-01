@@ -59,6 +59,7 @@ public static class SelectionPrompt
 
         sb.AppendLine($"Role needed: {role}");
         AppendBracketGuidance(sb, context.Constraints.Bracket);
+        AppendBudgetGuidance(sb, context.Constraints);
 
         if (!string.IsNullOrWhiteSpace(context.Constraints.CurveNote))
             sb.AppendLine($"Curve note: {context.Constraints.CurveNote}");
@@ -94,6 +95,9 @@ public static class SelectionPrompt
             if (!string.IsNullOrWhiteSpace(c.OracleText))
                 sb.AppendLine($"Text: {c.OracleText}");
             sb.AppendLine($"EDHREC Inclusion: {fc.Candidate.Inclusion:P0}");
+            sb.AppendLine(c.PriceUsd.HasValue
+                ? $"Price (USD): ${c.PriceUsd:F2}"
+                : "Price (USD): no data");
 
             // Show secondary roles so the model can judge flexibility
             if (fc.Roles.Secondary.Count > 0)
@@ -106,6 +110,20 @@ public static class SelectionPrompt
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendBudgetGuidance(StringBuilder sb, SoftConstraints constraints)
+    {
+        if (constraints.MaxCardPriceUsd.HasValue)
+            sb.AppendLine(
+                $"Budget: max ${constraints.MaxCardPriceUsd:F2} per card. " +
+                "Strongly deprioritize cards above this price and prefer affordable alternatives. " +
+                "If no affordable card can fill the role well, pick the best available — it will be flagged as over budget.");
+
+        if (constraints.TotalBudgetUsd.HasValue)
+            sb.AppendLine(
+                $"Total deck budget: ${constraints.TotalBudgetUsd:F2}. " +
+                "Favor lower-cost cards to stay within the total spend.");
     }
 
     private static void AppendBracketGuidance(StringBuilder sb, Bracket bracket)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Infrastructure.Scryfall.Dto;
 
@@ -30,6 +31,7 @@ internal static class ScryfallMapper
             CommanderLegality = ParseLegality(dto.Legalities.Commander),
             CanBeCommander    = IsCommanderEligible(dto.Legalities.Commander, frontTypeLine, oracleText),
             Images            = MapImages(dto.ImageUris ?? face0?.ImageUris),
+            PriceUsd          = decimal.TryParse(dto.Prices?.Usd, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : null,
         };
     }
 

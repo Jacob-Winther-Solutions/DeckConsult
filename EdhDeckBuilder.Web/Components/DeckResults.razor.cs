@@ -10,6 +10,14 @@ public partial class DeckResults
     [Parameter, EditorRequired] public required DeckBuildResult Result { get; set; }
     [Parameter, EditorRequired] public required IReadOnlyList<Card> Commanders { get; set; }
     [Parameter] public Bracket Bracket { get; set; } = Bracket.Three;
+    [Parameter] public decimal? MaxCardPriceUsd { get; set; }
+    [Parameter] public decimal? TotalBudgetUsd { get; set; }
+
+    private bool IsOverBudget(Card card) =>
+        MaxCardPriceUsd.HasValue && card.PriceUsd.HasValue && card.PriceUsd > MaxCardPriceUsd;
+
+    private static string FormatPrice(decimal? price) =>
+        price.HasValue ? $"${price:F2}" : "—";
 
     // ── View state ─────────────────────────────────────────────────────────
 

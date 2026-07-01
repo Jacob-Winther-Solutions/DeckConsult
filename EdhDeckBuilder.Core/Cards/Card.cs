@@ -74,4 +74,7 @@ public sealed record Card
     public bool CanBeCommander { get; init; }
 
     public CardImages? Images { get; init; }
+
+    /// <summary>Non-foil USD price from Scryfall at ingestion time. Null when Scryfall has no price data.</summary>
+    public decimal? PriceUsd { get; init; }
 }

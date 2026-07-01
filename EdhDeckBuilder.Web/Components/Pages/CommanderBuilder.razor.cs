@@ -55,6 +55,16 @@ public partial class CommanderBuilder
     private Dictionary<CardRole, int> _formEffectiveValues = new();
 
     private Bracket _bracket = Bracket.Three;
+    private string _maxCardPriceText = "";
+    private string _totalBudgetText  = "";
+
+    private decimal? ParsedMaxCardPrice =>
+        decimal.TryParse(_maxCardPriceText, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+
+    private decimal? ParsedTotalBudget =>
+        decimal.TryParse(_totalBudgetText, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
 
     // ── Export state ───────────────────────────────────────────────────────
 
@@ -353,9 +363,11 @@ public partial class CommanderBuilder
 
         var constraints = new SoftConstraints
         {
-            Bracket         = _bracket,
-            CurveNote       = curveNote,
-            AdditionalHints = hints,
+            Bracket           = _bracket,
+            CurveNote         = curveNote,
+            AdditionalHints   = hints,
+            MaxCardPriceUsd   = ParsedMaxCardPrice,
+            TotalBudgetUsd    = ParsedTotalBudget,
         };
 
         var progress = new Progress<string>(OnStageReport);
@@ -431,6 +443,8 @@ public partial class CommanderBuilder
         _showThemeForm = false;
         _editingCustomIndex = -1;
         _bracket = Bracket.Three;
+        _maxCardPriceText = "";
+        _totalBudgetText  = "";
     }
 
     // ── Color identity display ─────────────────────────────────────────────

@@ -23,4 +23,17 @@ public sealed record SoftConstraints
 
     /// <summary>Additional context hints forwarded verbatim to the LLM selector prompt.</summary>
     public IReadOnlyList<string> AdditionalHints { get; init; } = [];
+
+    /// <summary>
+    /// No single card in the deck may cost more than this amount. Cards above this threshold
+    /// are deprioritized by the selector; if no affordable card fills a role well, the best
+    /// available is selected and flagged in <see cref="DeckBuildResult.BudgetWarnings"/>.
+    /// </summary>
+    public decimal? MaxCardPriceUsd { get; init; }
+
+    /// <summary>
+    /// The sum of all 99 non-basic cards must stay within this amount. Useful when a player
+    /// is fine with one or two expensive pieces but wants to control total spend.
+    /// </summary>
+    public decimal? TotalBudgetUsd { get; init; }
 }

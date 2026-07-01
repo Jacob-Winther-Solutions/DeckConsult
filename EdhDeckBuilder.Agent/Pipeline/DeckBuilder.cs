@@ -48,11 +48,12 @@ public sealed class DeckBuilder(
         progress?.Report("Gathering card pool");
         var rawPool = await GatherPoolAsync(commanders, ct);
 
-        // 3. Filter pool: legal, CI ⊆ commander CI, not a commander card.
+        // 3. Filter pool: legal, CI ⊆ commander CI, not a commander card, within budget.
         progress?.Report("Filtering pool");
-        var colorIdentity = commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
-        var commanderIds  = commanders.Select(c => c.OracleId).ToHashSet();
-        var filteredPool  = FilterPool(rawPool, commanderIds, colorIdentity);
+        var colorIdentity   = commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
+        var commanderIds    = commanders.Select(c => c.OracleId).ToHashSet();
+        var softConstraints = constraints ?? new SoftConstraints { Bracket = bracket?.Bracket ?? Bracket.Three };
+        var filteredPool    = FilterPool(rawPool, commanderIds, colorIdentity, softConstraints);
 
         // 4. Classify commanders → profiles → net targets.
         progress?.Report("Classifying commanders");
@@ -66,7 +67,6 @@ public sealed class DeckBuilder(
         // 5. Build context.
         int reservedLandCount  = resolved.Targets.TryGetValue(CardRole.Land, out var lt) ? lt.Ideal : 38;
         int nonCommanderCount  = 100 - commanders.Count;
-        var softConstraints    = constraints ?? new SoftConstraints { Bracket = bracket?.Bracket ?? Bracket.Three };
 
         var context = new BuildContext
         {
@@ -96,6 +96,7 @@ public sealed class DeckBuilder(
         // 9. Repair illegal cards (post-fill safety net).
         progress?.Report("Repairing illegal cards");
         RepairEngine.RepairIllegalCards(context, fillResult.State, fillPool);
+        RepairEngine.RepairBudgetExcess(context, fillResult.State, fillPool);
 
         // 10. Distribute basic lands proportionally by pip demand.
         progress?.Report("Distributing basic lands");
@@ -133,12 +134,16 @@ public sealed class DeckBuilder(
     private static IReadOnlyList<CardCandidate> FilterPool(
         IReadOnlyList<CardCandidate> pool,
         HashSet<Guid> commanderIds,
-        Color colorIdentity)
+        Color colorIdentity,
+        SoftConstraints constraints)
     {
         return pool
             .Where(c => !commanderIds.Contains(c.Card.OracleId)
                      && c.Card.CommanderLegality == Legality.Legal
-                     && c.Card.ColorIdentity.IsWithin(colorIdentity))
+                     && c.Card.ColorIdentity.IsWithin(colorIdentity)
+                     && !(constraints.MaxCardPriceUsd.HasValue
+                          && c.Card.PriceUsd.HasValue
+                          && c.Card.PriceUsd > constraints.MaxCardPriceUsd))
             .ToList();
     }
 

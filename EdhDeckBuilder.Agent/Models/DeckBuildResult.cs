@@ -55,4 +55,16 @@ public sealed record DeckBuildResult
     /// confidence rather than having to evaluate the full list themselves.
     /// </summary>
     public required IReadOnlyDictionary<CardRole, IReadOnlyList<CardSuggestion>> CutSuggestions { get; init; }
+
+    /// <summary>
+    /// Sum of <see cref="Card.PriceUsd"/> for all committed non-basic cards. Cards with no
+    /// price data contribute $0. Does not include basic lands (essentially free).
+    /// </summary>
+    public required decimal TotalPriceUsd { get; init; }
+
+    /// <summary>
+    /// Budget constraint violations: per-card overages and total-budget excess.
+    /// Empty when no budget was set or all cards are within budget.
+    /// </summary>
+    public required IReadOnlyList<string> BudgetWarnings { get; init; }
 }

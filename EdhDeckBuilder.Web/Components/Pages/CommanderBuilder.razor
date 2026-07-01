@@ -66,7 +66,9 @@
 
         <DeckResults Result="_result"
                      Commanders="_selectedCommanders"
-                     Bracket="_bracket" />
+                     Bracket="_bracket"
+                     MaxCardPriceUsd="ParsedMaxCardPrice"
+                     TotalBudgetUsd="ParsedTotalBudget" />
     }
     else
     {
@@ -367,6 +369,33 @@
                     }
                 </div>
                 <p class="text-muted small mb-0">@BracketLibrary.All[_bracket].Description</p>
+            </div>
+        </div>
+
+        <!-- ── Section 5: Budget ────────────────────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">5 &mdash; Budget <span class="text-muted fw-normal small ms-1">optional</span></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">Max per card (USD)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" @bind="_maxCardPriceText"
+                                   placeholder="e.g. 5.00" min="0" step="0.01" />
+                        </div>
+                        <div class="text-muted small mt-1">No single card may cost more than this.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">Total deck budget (USD)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" @bind="_totalBudgetText"
+                                   placeholder="e.g. 200.00" min="0" step="1" />
+                        </div>
+                        <div class="text-muted small mt-1">Sum of all 99 non-basic cards must stay within this.</div>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -17,6 +17,14 @@
             <span class="badge bg-light text-dark border">
                 @(Result.Deck.Count + Result.BasicLandCounts.Values.Sum()) / 99 cards
             </span>
+            @if (Result.TotalPriceUsd > 0)
+            {
+                var overTotal = TotalBudgetUsd.HasValue && Result.TotalPriceUsd > TotalBudgetUsd;
+                <span class="badge @(overTotal ? "bg-danger" : "bg-light text-dark border")"
+                      title="@(TotalBudgetUsd.HasValue ? $"Budget: ${TotalBudgetUsd:F2}" : "Total non-basic card price")">
+                    $@Result.TotalPriceUsd.ToString("F2")
+                </span>
+            }
         </div>
     </div>
 
@@ -104,6 +112,20 @@
             </div>
         }
 
+        <!-- ── Budget warnings ───────────────────────────────────────────── -->
+        @if (Result.BudgetWarnings.Count > 0)
+        {
+            <div class="alert alert-danger mx-3 mb-3">
+                <strong>Budget warnings</strong>
+                <ul class="mb-0 mt-1 small">
+                    @foreach (var warning in Result.BudgetWarnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </div>
+        }
+
         <!-- ── Role buckets ───────────────────────────────────────────────── -->
         @foreach (var role in RoleDisplayOrder)
         {
@@ -155,6 +177,7 @@
                         @foreach (var suggestion in primaryCards)
                         {
                             var isCut = cutIds.Contains(suggestion.Card.OracleId);
+                            var isOver = IsOverBudget(suggestion.Card);
                             <div class="list-group-item @(isCut ? "list-group-item-warning" : "") py-2">
                                 <div class="d-flex gap-3 align-items-start">
                                     <span class="text-muted small mt-1" style="min-width:1.8rem; text-align:right;">
@@ -171,6 +194,14 @@
                                                     @suggestion.Card.ManaValue.ToString("0.#")
                                                 </span>
                                             }
+                                            @if (suggestion.Card.PriceUsd.HasValue)
+                                            {
+                                                <span class="badge @(isOver ? "bg-danger" : "bg-light text-dark border")"
+                                                      style="font-size: 0.7rem;"
+                                                      title="@(isOver ? $"Over budget (limit: ${MaxCardPriceUsd:F2})" : "Price")">
+                                                    $@suggestion.Card.PriceUsd.Value.ToString("F2")
+                                                </span>
+                                            }
                                             <span class="text-muted small">@suggestion.Card.TypeLine</span>
                                             @foreach (var contrib in suggestion.Roles.Secondary)
                                             {
@@ -180,6 +211,10 @@
                                             @if (isCut)
                                             {
                                                 <span class="badge bg-warning text-dark">consider cutting</span>
+                                            }
+                                            @if (isOver)
+                                            {
+                                                <span class="badge bg-danger">over budget</span>
                                             }
                                         </div>
                                         <p class="mb-0 text-muted fst-italic" style="font-size: 0.82rem;">
@@ -329,6 +364,7 @@
                     <div class="list-group list-group-flush">
                         @foreach (var suggestion in cards)
                         {
+                            var isOverType = IsOverBudget(suggestion.Card);
                             <div class="list-group-item py-2">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="fw-semibold me-1">@suggestion.Card.Name</span>
@@ -338,6 +374,14 @@
                                               style="font-size: 0.7rem;"
                                               title="Mana value">
                                             @suggestion.Card.ManaValue.ToString("0.#")
+                                        </span>
+                                    }
+                                    @if (suggestion.Card.PriceUsd.HasValue)
+                                    {
+                                        <span class="badge @(isOverType ? "bg-danger" : "bg-light text-dark border")"
+                                              style="font-size: 0.7rem;"
+                                              title="@(isOverType ? $"Over budget (limit: ${MaxCardPriceUsd:F2})" : "Price")">
+                                            $@suggestion.Card.PriceUsd.Value.ToString("F2")
                                         </span>
                                     }
                                     <span class="text-muted small">@suggestion.Card.TypeLine</span>
@@ -390,6 +434,7 @@
                         <tr>
                             <th class="ps-3 fw-normal">Card</th>
                             <th class="fw-normal text-center" style="width: 48px;">MV</th>
+                            <th class="fw-normal text-center" style="width: 64px;">Price</th>
                             <th class="fw-normal">Type</th>
                             <th class="fw-normal">Roles</th>
                         </tr>
@@ -397,7 +442,8 @@
                     <tbody>
                         @foreach (var suggestion in Result.Deck.OrderBy(s => s.Card.Name))
                         {
-                            <tr>
+                            var isOverAll = IsOverBudget(suggestion.Card);
+                            <tr class="@(isOverAll ? "table-danger" : "")">
                                 <td class="ps-3 fw-semibold">@suggestion.Card.Name</td>
                                 <td class="text-center">
                                     @if (suggestion.Card.ManaValue > 0)
@@ -406,6 +452,9 @@
                                             @suggestion.Card.ManaValue.ToString("0.#")
                                         </span>
                                     }
+                                </td>
+                                <td class="text-center small @(isOverAll ? "fw-semibold" : "text-muted")">
+                                    @FormatPrice(suggestion.Card.PriceUsd)
                                 </td>
                                 <td class="text-muted small">@suggestion.Card.TypeLine</td>
                                 <td>

@@ -25,8 +25,14 @@ internal sealed class ScryfallCard
     public string? Power { get; init; }
     public string? Toughness { get; init; }
     public ScryfallLegalities Legalities { get; init; } = new();
+    public ScryfallPrices? Prices { get; init; }
     public ScryfallImageUris? ImageUris { get; init; }
     public List<ScryfallCardFace>? CardFaces { get; init; }
+}
+
+internal sealed class ScryfallPrices
+{
+    public string? Usd { get; init; }
 }
 
 internal sealed class ScryfallLegalities

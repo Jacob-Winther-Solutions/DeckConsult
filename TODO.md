@@ -19,12 +19,13 @@ A living list of deferred work. Check items off as they land.
       tune-preset form (absolute slot values), and custom-theme escape hatch.
 - [x] Three deck views: By Role (role buckets), By Type (card-type buckets, priority-ordered),
       All Cards (alphabetical table with role badges).
-- [ ] Budget input in the UI (see Budget section below).
+- [x] Budget input in the UI (see Budget section below).
 - [ ] Deck persistence (save/load to local storage or a backend store).
+- [ ] Refactor UI to make components resusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
 
 ---
 
-## Budget-aware card selection  (new feature)
+## Budget-aware card selection  (done)
 
 Players on tight budgets should get a competitive deck within their price range rather than
 a list full of expensive staples they have to manually replace. Two independent budget axes:
@@ -35,21 +36,25 @@ a list full of expensive staples they have to manually replace. Two independent 
   amount. Useful when a player is fine with one or two expensive pieces but wants to stay
   under a total spend. Both fields are nullable/optional and can be combined.
 
-- [ ] **Add both budget fields to `SoftConstraints`** — `decimal? MaxCardPriceUsd` and
+- [x] **Add both budget fields to `SoftConstraints`** — `decimal? MaxCardPriceUsd` and
       `decimal? TotalBudgetUsd`. The builder already passes `SoftConstraints` to the selector
       prompt, so this is the natural place to carry them.
-- [ ] **Fetch card prices.** Scryfall bulk card data includes `prices.usd` and `prices.usd_foil`.
+- [x] **Fetch card prices.** Scryfall bulk card data includes `prices.usd` and `prices.usd_foil`.
       Store the non-foil price on `Card` at ingestion time. Scryfall bulk data is already cached
       locally, so no extra network call is needed.
-- [ ] **Pass budget to the selector prompt.** The selection prompt should instruct the LLM to
+- [x] **Pass budget to the selector prompt.** The selection prompt should instruct the LLM to
       deprioritize cards that would breach either threshold and prefer affordable alternatives.
       Budget is a soft preference — if no affordable card can fill a role, pick the best
       available and flag it in the result.
-- [ ] **Surface budget violations in the result.** Add a `BudgetWarnings` field (or reuse
+- [x] **Surface budget violations in the result.** Add a `BudgetWarnings` field (or reuse
       `CoverageWarnings`) listing any cards that exceeded `MaxCardPriceUsd`, plus the total
       deck price so the user can see at a glance whether they are within `TotalBudgetUsd`.
-- [ ] **UI:** Two budget fields on the deck-build form ("max per card" and "total deck");
+- [x] **UI:** Two budget fields on the deck-build form ("max per card" and "total deck");
       highlight over-budget cards in the deck view; show running total price in the header.
+- [x] **Tests:** Unit tests for `FilterPool` (per-card pre-filter drops known over-budget cards,
+      keeps null-price cards), `RepairBudgetExcess` (swaps costliest card for cheapest same-role
+      alternative, stops when within budget, marks cards as tried when no replacement exists),
+      and `BuildBudgetWarnings` (per-card and total violations reported correctly).
 
 ---
 
