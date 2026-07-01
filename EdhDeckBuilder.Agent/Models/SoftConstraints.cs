@@ -21,6 +21,12 @@ public sealed record SoftConstraints
     /// </summary>
     public string CurveNote { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Free-text description of the deck's intent, forwarded verbatim to the LLM selector.
+    /// Used by the Custom builder path in place of archetypes and themes.
+    /// </summary>
+    public string? DeckDescription { get; init; }
+
     /// <summary>Additional context hints forwarded verbatim to the LLM selector prompt.</summary>
     public IReadOnlyList<string> AdditionalHints { get; init; } = [];
 

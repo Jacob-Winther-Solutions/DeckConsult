@@ -17,7 +17,8 @@ API usage:
 - Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    2,03 -> 1,91 = 0,12 (16th try) (Test of export results feature)
 - Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:                    1,91 -> 1,78 = 0,13 (17th try) (Re-test of export results feature)
 - Haiku, Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:             1,78 -> 1,66 = 0,12 (18th try) (BYOK + choose model test)
-
+- Haiku, Sephiroth, Aggro, Aristocrats, No Bracket, Budget Disabled pr card 300 total:      1,66 -> 1,49 = 0,17 (19th try) (No Bracket + No pr card budget test)
+- Haiku, Sephiroth, Custom (Aggro, Aristocrats), Budget 15 pr card 300 total:               1,49 -> 1,37 = 0,12 (19th try) (Custom tab test)
 
 Bad classifications:
 Sephiroth (third try):
@@ -25,3 +26,8 @@ Sephiroth (third try):
 
 UI:
 - Coverages are shown as decimals, which can be confusing.
+
+
+Notes:
+- Check if it is possible to see how far each step has gotten when running the builder/LLM.
+- Consider adding a "must-include" feature to the builder, where the user can register cards to the 99 that must be in the deck. The LLM can suggest to cut them, but they must be classified, evaluated and included.

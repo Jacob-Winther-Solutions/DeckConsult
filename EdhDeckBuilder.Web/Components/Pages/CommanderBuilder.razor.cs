@@ -57,17 +57,50 @@ public partial class CommanderBuilder
     private string _formThemeDesc = string.Empty;
     private Dictionary<CardRole, int> _formEffectiveValues = new();
 
-    private Bracket _bracket = Bracket.Three;
-    private string _maxCardPriceText = "";
-    private string _totalBudgetText  = "";
+    private string _activeTab = "guided"; // "guided" | "custom"
+
+    private Bracket _bracket        = Bracket.Three;
+    private bool    _bracketEnabled = true;
+
+    private string _maxCardPriceText        = "";
+    private string _totalBudgetText         = "";
+    private bool   _maxPriceUnrestricted    = true;
+    private bool   _totalBudgetUnrestricted = true;
 
     private decimal? ParsedMaxCardPrice =>
+        _maxPriceUnrestricted ? null :
         decimal.TryParse(_maxCardPriceText, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
 
     private decimal? ParsedTotalBudget =>
+        _totalBudgetUnrestricted ? null :
         decimal.TryParse(_totalBudgetText, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    // ── Custom tab state ───────────────────────────────────────────────────
+
+    private string _customDescription = "";
+    private Dictionary<CardRole, int> _customTemplateValues = BuildDefaultTemplateValues();
+
+    private static Dictionary<CardRole, int> BuildDefaultTemplateValues() =>
+        FormRoles.ToDictionary(r => r,
+            r => DeckTemplate.Balanced.Targets.TryGetValue(r, out var t) ? t.Ideal : 0);
+
+    private static readonly IReadOnlyDictionary<CardRole, string> RoleDescriptions =
+        new Dictionary<CardRole, string>
+        {
+            [CardRole.Land]               = "Lands and mana-producing permanents",
+            [CardRole.Ramp]               = "Accelerants — rocks, dorks, rituals, land-fetch spells",
+            [CardRole.CardAdvantage]      = "Draw, impulse draw, and hand-refill effects",
+            [CardRole.TargetedDisruption] = "Single-target removal for creatures, artifacts, enchantments",
+            [CardRole.MassDisruption]     = "Board wipes and mass-bounce effects",
+            [CardRole.Protection]         = "Counterspells, hexproof, indestructibility",
+            [CardRole.Tutor]              = "Search effects that find specific cards",
+            [CardRole.Recursion]          = "Graveyard recursion and reanimation effects",
+            [CardRole.Plan]               = "Engines and threats that execute your core strategy",
+            [CardRole.Payoff]             = "Cards that close out or greatly accelerate a win",
+            [CardRole.Synergy]            = "Pieces that interact favorably with your commander or strategy",
+        };
 
     // ── Export state ───────────────────────────────────────────────────────
 
@@ -332,6 +365,7 @@ public partial class CommanderBuilder
     private async Task StartBuildAsync()
     {
         if (_selectedCommanders.Count == 0) return;
+        if (_activeTab == "custom" && string.IsNullOrWhiteSpace(_customDescription)) return;
 
         _isBuilding = true;
         _currentStage = null;
@@ -339,41 +373,61 @@ public partial class CommanderBuilder
         _errorMessage = null;
         _buildCts = new CancellationTokenSource();
 
-        var archetypes = _archetypeWeights
-            .Select(kv => new WeightedArchetype(ArchetypeLibrary.All[kv.Key], kv.Value))
-            .ToList();
-
-        var themes = _selectedThemes.Count > 0
-            ? (IReadOnlyList<WeightedTheme>)_selectedThemes
-            : null;
-
-        var bracketProfile = BracketLibrary.All[_bracket];
-
-        var curveNote = _archetypeWeights.ContainsKey(Archetype.Aggro) && _archetypeWeights[Archetype.Aggro] >= 0.5
-            ? "Strongly favor threats with mana value ≤3."
-            : "";
-
-        var hints = _selectedThemes
-            .Where(wt => !string.IsNullOrWhiteSpace(wt.Profile.Description))
-            .Select(wt => $"Theme: {wt.Profile.Name} — {wt.Profile.Description}")
-            .ToList();
-
-        var constraints = new SoftConstraints
-        {
-            Bracket           = _bracket,
-            CurveNote         = curveNote,
-            AdditionalHints   = hints,
-            MaxCardPriceUsd   = ParsedMaxCardPrice,
-            TotalBudgetUsd    = ParsedTotalBudget,
-        };
-
         var progress = new Progress<string>(OnStageReport);
+
+        DeckTemplate template;
+        SoftConstraints constraints;
+        IReadOnlyList<WeightedArchetype> archetypes;
+        IReadOnlyList<WeightedTheme>? themes;
+        BracketProfile? bracketProfile;
+
+        if (_activeTab == "custom")
+        {
+            template      = TemplateResolver.FromIdeals("Custom", _customTemplateValues);
+            archetypes    = [];
+            themes        = null;
+            bracketProfile = null;
+            constraints   = new SoftConstraints
+            {
+                Bracket         = Bracket.Three,
+                DeckDescription = _customDescription.Trim(),
+                MaxCardPriceUsd = ParsedMaxCardPrice,
+                TotalBudgetUsd  = ParsedTotalBudget,
+            };
+        }
+        else
+        {
+            template      = DeckTemplate.Balanced;
+            archetypes    = _archetypeWeights
+                .Select(kv => new WeightedArchetype(ArchetypeLibrary.All[kv.Key], kv.Value))
+                .ToList();
+            themes        = _selectedThemes.Count > 0 ? _selectedThemes : null;
+            bracketProfile = _bracketEnabled ? BracketLibrary.All[_bracket] : null;
+
+            var curveNote = _archetypeWeights.ContainsKey(Archetype.Aggro) && _archetypeWeights[Archetype.Aggro] >= 0.5
+                ? "Strongly favor threats with mana value ≤3."
+                : "";
+
+            var hints = _selectedThemes
+                .Where(wt => !string.IsNullOrWhiteSpace(wt.Profile.Description))
+                .Select(wt => $"Theme: {wt.Profile.Name} — {wt.Profile.Description}")
+                .ToList();
+
+            constraints = new SoftConstraints
+            {
+                Bracket         = _bracketEnabled ? _bracket : Bracket.Three,
+                CurveNote       = curveNote,
+                AdditionalHints = hints,
+                MaxCardPriceUsd = ParsedMaxCardPrice,
+                TotalBudgetUsd  = ParsedTotalBudget,
+            };
+        }
 
         try
         {
             var buildResult = await DeckBuilder.BuildAsync(
                 [.. _selectedCommanders],
-                DeckTemplate.Balanced,
+                template,
                 archetypes,
                 themes,
                 bracketProfile,
@@ -442,12 +496,15 @@ public partial class CommanderBuilder
     private async Task DownloadBuildReportAsync()
     {
         if (_result is null) return;
+        var effectiveBracket = (_activeTab == "custom" || !_bracketEnabled) ? Bracket.Three : _bracket;
+        var exportArchetypes = _activeTab == "custom" ? new Dictionary<Archetype, double>() : _archetypeWeights;
+        var exportThemes     = _activeTab == "custom" ? null : (IReadOnlyList<WeightedTheme>?)_selectedThemes;
         var content = DeckReportExporter.Export(
             _result,
             _selectedCommanders,
-            _archetypeWeights,
-            _selectedThemes,
-            _bracket,
+            exportArchetypes,
+            exportThemes,
+            effectiveBracket,
             ParsedMaxCardPrice,
             ParsedTotalBudget,
             DateOnly.FromDateTime(DateTime.Today));
@@ -470,8 +527,13 @@ public partial class CommanderBuilder
         _showThemeForm = false;
         _editingCustomIndex = -1;
         _bracket = Bracket.Three;
+        _bracketEnabled = true;
         _maxCardPriceText = "";
         _totalBudgetText  = "";
+        _maxPriceUnrestricted    = true;
+        _totalBudgetUnrestricted = true;
+        _customDescription = "";
+        _customTemplateValues = BuildDefaultTemplateValues();
     }
 
     // ── Color identity display ─────────────────────────────────────────────

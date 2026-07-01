@@ -99,9 +99,9 @@
         else
         {
 
-        <!-- ── Section 1: Commander ──────────────────────────────────────── -->
+        <!-- ── Commander (shared) ───────────────────────────────────────── -->
         <div class="card mb-4">
-            <div class="card-header fw-semibold">1 &mdash; Choose Commander(s)</div>
+            <div class="card-header fw-semibold">Choose Commander(s)</div>
             <div class="card-body">
 
                 @if (_selectedCommanders.Count < 2)
@@ -172,6 +172,21 @@
 
             </div>
         </div>
+
+        <!-- ── Tab bar ───────────────────────────────────────────────────── -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == "guided" ? "active" : "")"
+                        @onclick='() => _activeTab = "guided"'>Guided</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == "custom" ? "active" : "")"
+                        @onclick='() => _activeTab = "custom"'>Custom</button>
+            </li>
+        </ul>
+
+        @if (_activeTab == "guided")
+        {
 
         <!-- ── Section 2: Archetype ──────────────────────────────────────── -->
         <div class="card mb-4">
@@ -384,31 +399,127 @@
                     }
                 </div>
                 <p class="text-muted small mb-0">@BracketLibrary.All[_bracket].Description</p>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="bracketEnabled"
+                           checked="@_bracketEnabled"
+                           @onchange="e => _bracketEnabled = (bool)(e.Value ?? true)" />
+                    <label class="form-check-label small" for="bracketEnabled">
+                        Apply bracket filter
+                        <span class="text-muted fw-normal">(uncheck to skip bracket restrictions — card selection defaults to mid-power guidance)</span>
+                    </label>
+                </div>
             </div>
         </div>
 
-        <!-- ── Section 5: Budget ────────────────────────────────────────── -->
+        } @* end @if (_activeTab == "guided") *@
+
+        <!-- ── Custom tab ────────────────────────────────────────────────── -->
+        @if (_activeTab == "custom")
+        {
+
+        <!-- ── Section A: Deck Description ──────────────────────────────── -->
         <div class="card mb-4">
-            <div class="card-header fw-semibold">5 &mdash; Budget <span class="text-muted fw-normal small ms-1">optional</span></div>
+            <div class="card-header fw-semibold">1 &mdash; Deck Description <span class="text-danger small ms-1">required</span></div>
+            <div class="card-body">
+                <label class="form-label small fw-semibold mb-1">Describe the deck you want to build</label>
+                <textarea class="form-control" rows="4" @bind="_customDescription"
+                          placeholder="e.g. A fast combo deck that wins with Thassa's Oracle by milling itself out using Hermit Druid, with backup lines through Laboratory Maniac. Prioritise speed and redundancy over resilience."></textarea>
+                <div class="text-muted small mt-1">Used as direct guidance for card selection — be specific about your win condition, play style, and any must-include interactions.</div>
+            </div>
+        </div>
+
+        <!-- ── Section B: Role targets ──────────────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">2 &mdash; Role Targets</div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">Coverage targets, not physical slot counts — cards fulfilling multiple roles satisfy multiple targets simultaneously, so ideals may exceed 99. The fill engine enforces the physical 99-card constraint.</p>
+                <div class="row g-2">
+                    @foreach (var role in FormRoles)
+                    {
+                        var r        = role;
+                        var baseline = BaselineIdeals.TryGetValue(r, out var b) ? b : 0;
+                        <div class="col-6 col-md-4">
+                            <label class="form-label small mb-0 fw-semibold">@RoleLabel(r)</label>
+                            <div class="text-muted mb-1" style="font-size:0.7rem;">
+                                @(RoleDescriptions.TryGetValue(r, out var desc) ? desc : "")
+                                <span class="ms-1">(default&nbsp;@baseline)</span>
+                            </div>
+                            <input type="number" class="form-control form-control-sm"
+                                   value="@_customTemplateValues[r]"
+                                   min="0" max="99"
+                                   @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) _customTemplateValues[r] = Math.Max(0, v); }" />
+                        </div>
+                    }
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-outline-secondary btn-sm"
+                            @onclick="() => _customTemplateValues = BuildDefaultTemplateValues()">
+                        Reset to defaults
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        } @* end @if (_activeTab == "custom") *@
+
+        <!-- ── Budget (shared across both tabs) ─────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">Budget</div>
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold mb-1">Max per card (USD)</label>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Max per card (USD)</label>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="maxPriceUnrestricted"
+                                       checked="@_maxPriceUnrestricted"
+                                       @onchange="e => _maxPriceUnrestricted = (bool)(e.Value ?? true)" />
+                                <label class="form-check-label small text-muted" for="maxPriceUnrestricted">No restriction</label>
+                            </div>
+                        </div>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text">$</span>
                             <input type="number" class="form-control" @bind="_maxCardPriceText"
-                                   placeholder="e.g. 5.00" min="0" step="0.01" />
+                                   placeholder="e.g. 5.00" min="0" step="0.01"
+                                   disabled="@_maxPriceUnrestricted" />
                         </div>
-                        <div class="text-muted small mt-1">No single card may cost more than this.</div>
+                        <div class="text-muted small mt-1">
+                            @if (_maxPriceUnrestricted)
+                            {
+                                <span>No restriction — uncheck to set a per-card limit.</span>
+                            }
+                            else
+                            {
+                                <span>No single card may cost more than this. Note: $0.00 means exactly zero — not unlimited.</span>
+                            }
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold mb-1">Total deck budget (USD)</label>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Total deck budget (USD)</label>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="totalBudgetUnrestricted"
+                                       checked="@_totalBudgetUnrestricted"
+                                       @onchange="e => _totalBudgetUnrestricted = (bool)(e.Value ?? true)" />
+                                <label class="form-check-label small text-muted" for="totalBudgetUnrestricted">No restriction</label>
+                            </div>
+                        </div>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text">$</span>
                             <input type="number" class="form-control" @bind="_totalBudgetText"
-                                   placeholder="e.g. 200.00" min="0" step="1" />
+                                   placeholder="e.g. 200.00" min="0" step="1"
+                                   disabled="@_totalBudgetUnrestricted" />
                         </div>
-                        <div class="text-muted small mt-1">Sum of all 99 non-basic cards must stay within this.</div>
+                        <div class="text-muted small mt-1">
+                            @if (_totalBudgetUnrestricted)
+                            {
+                                <span>No restriction — uncheck to set a total budget.</span>
+                            }
+                            else
+                            {
+                                <span>Sum of all 99 non-basic cards must stay within this. Note: $0.00 means exactly zero — not unlimited.</span>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -417,13 +528,17 @@
         <!-- ── Build button ──────────────────────────────────────────────── -->
         <div class="d-flex gap-2">
             <button class="btn btn-primary btn-lg px-5"
-                    disabled="@(_selectedCommanders.Count == 0)"
+                    disabled="@(_selectedCommanders.Count == 0 || (_activeTab == "custom" && string.IsNullOrWhiteSpace(_customDescription)))"
                     @onclick="StartBuildAsync">
                 Build Deck
             </button>
             @if (_selectedCommanders.Count == 0)
             {
                 <span class="align-self-center text-muted small">Select a commander to continue.</span>
+            }
+            else if (_activeTab == "custom" && string.IsNullOrWhiteSpace(_customDescription))
+            {
+                <span class="align-self-center text-muted small">Add a deck description to continue.</span>
             }
         </div>
 

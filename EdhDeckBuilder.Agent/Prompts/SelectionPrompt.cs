@@ -57,6 +57,9 @@ public static class SelectionPrompt
         sb.AppendJoin(", ", context.Commanders.Select(c => c.Name));
         sb.AppendLine();
 
+        if (!string.IsNullOrWhiteSpace(context.Constraints.DeckDescription))
+            sb.AppendLine($"Deck intent: {context.Constraints.DeckDescription}");
+
         sb.AppendLine($"Role needed: {role}");
         AppendBracketGuidance(sb, context.Constraints.Bracket);
         AppendBudgetGuidance(sb, context.Constraints);

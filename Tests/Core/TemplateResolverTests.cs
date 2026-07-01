@@ -164,4 +164,66 @@ public sealed class TemplateResolverTests
             maxLands: 39);
         Assert.True(result.Targets[CardRole.Land].Ideal <= 39);
     }
+
+    // --- FromIdeals ---------------------------------------------------------
+
+    [Fact]
+    public void FromIdeals_ideals_are_preserved_as_ideal_of_each_target()
+    {
+        var ideals = new Dictionary<CardRole, int>
+        {
+            [CardRole.Land]  = 36,
+            [CardRole.Ramp]  = 5,
+            [CardRole.Plan]  = 20,
+        };
+        var template = TemplateResolver.FromIdeals("Test", ideals);
+
+        Assert.Equal(36, template.Targets[CardRole.Land].Ideal);
+        Assert.Equal(5,  template.Targets[CardRole.Ramp].Ideal);
+        Assert.Equal(20, template.Targets[CardRole.Plan].Ideal);
+    }
+
+    [Fact]
+    public void FromIdeals_land_gets_tight_band()
+    {
+        var template = TemplateResolver.FromIdeals("Test",
+            new Dictionary<CardRole, int> { [CardRole.Land] = 36 });
+
+        var t = template.Targets[CardRole.Land];
+        Assert.Equal(35, t.Min);
+        Assert.Equal(36, t.Ideal);
+        Assert.Equal(37, t.Max);
+    }
+
+    [Fact]
+    public void FromIdeals_spells_get_twenty_percent_band()
+    {
+        var template = TemplateResolver.FromIdeals("Test",
+            new Dictionary<CardRole, int> { [CardRole.Ramp] = 10 });
+
+        var t = template.Targets[CardRole.Ramp];
+        Assert.Equal(8,  t.Min);   // 10 - 20% = 8
+        Assert.Equal(10, t.Ideal);
+        Assert.Equal(12, t.Max);   // 10 + 20% = 12
+    }
+
+    [Fact]
+    public void FromIdeals_zero_ideal_produces_zero_min()
+    {
+        var template = TemplateResolver.FromIdeals("Test",
+            new Dictionary<CardRole, int> { [CardRole.Tutor] = 0 });
+
+        var t = template.Targets[CardRole.Tutor];
+        Assert.Equal(0, t.Min);
+        Assert.Equal(0, t.Ideal);
+    }
+
+    [Fact]
+    public void FromIdeals_template_name_is_preserved()
+    {
+        var template = TemplateResolver.FromIdeals("My Custom Build",
+            new Dictionary<CardRole, int> { [CardRole.Land] = 38 });
+
+        Assert.Equal("My Custom Build", template.Name);
+    }
 }

@@ -78,6 +78,18 @@ public static class TemplateResolver
         };
     }
 
+    /// <summary>
+    /// Builds a <see cref="DeckTemplate"/> directly from user-supplied ideal counts.
+    /// Each ideal is wrapped in a tolerance band using the same logic as <see cref="Resolve"/>
+    /// (Land ±1, all other roles ±20%). Use this for the Custom deck-builder path where the
+    /// caller supplies raw targets instead of archetypes and themes.
+    /// </summary>
+    public static DeckTemplate FromIdeals(string name, IReadOnlyDictionary<CardRole, int> ideals)
+    {
+        var targets = ideals.ToDictionary(kv => kv.Key, kv => Band(kv.Key, Math.Max(0, kv.Value)));
+        return new DeckTemplate { Name = name, Targets = targets };
+    }
+
     /// <summary>Builds a min/ideal/max band around an ideal. Lands stay tight; spells flex more.</summary>
     private static RoleTarget Band(CardRole role, int ideal)
     {
