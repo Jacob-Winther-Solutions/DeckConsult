@@ -85,28 +85,50 @@ them describe a strategy and get back a shortlist of commanders that fit, before
 
 ---
 
-## Additional card sources — Aetherhub + mtgrocks  (prerequisite for Brawl)
+## Additional card sources — Commander Spellbook + TopDeck.gg  (prerequisite for Brawl / Duel Commander)
 
-These sources are useful for Commander too, not just Brawl. Implement them as general
-`ISuggestionSource` / supplementary data providers before building Brawl-specific support.
+See `TODO/DATA_SOURCES.md` for the full spec, verified API details, and the excluded-sources
+list. Aetherhub and mtgrocks are explicitly excluded (no sanctioned API / bot-blocked). The
+sanctioned sources to add are:
 
-- **Aetherhub** — has a Commander meta page (popular commanders and their win-rate / play-rate
-  data) and Historic Brawl deck lists. A Commander `ISuggestionSource` backed by Aetherhub
-  would complement EDHREC with meta-relevance signals.
-- **mtgrocks** — has a Commander staples page that tracks which cards appear most frequently
-  across top-performing Commander lists. Useful as a signal for cards that are strong regardless
-  of commander, supplementing EDHREC's per-commander inclusion rates.
+- **Commander Spellbook** (MIT-licensed open API) — combo detection and bracket estimation.
+  Feeds the Synergy/Plan roles and the bracket signal. Applies to Commander, Brawl, and
+  Duel Commander alike. Endpoints: `find-my-combos` (POST card list → combos present +
+  one-card-away) and `estimate-bracket`.
+- **TopDeck.gg** (free API key, attribution required) — competitive card-frequency signal
+  for Commander and Duel Commander (Brawl is not covered). A **periodic ingest job**, not a
+  live per-build call: pull tournaments, aggregate card frequency by commander, store locally.
+  Visible credit + link to TopDeck.gg must appear in the UI wherever this data is surfaced.
+- **EDHREC — extend to Brawl paths** — the existing client already handles Commander; extend
+  it to resolve the Brawl URL variants (`json.edhrec.com`) for Historic Brawl support. Note:
+  EDHREC does not model Duel Commander's banlist/metagame — do not use it as a DC source.
+- **MTGJSON** — optional; only adopt if offline bulk card data or preconstructed deck seed
+  lists become a goal. Defer until there is a concrete use case.
 
-- [ ] Investigate Aetherhub's API / scraping surface for Commander meta data and per-commander
-      card lists. Determine whether it returns JSON or requires HTML parsing.
-- [ ] Implement `AetherhubCommanderSource : ISuggestionSource` in Infrastructure. Cache
-      per-commander (alongside the existing EDHREC cache).
-- [ ] Investigate mtgrocks for Commander staples data (likely a static/semi-static list).
-      Implement `MtgrocksStaplesSource` — could be a supplementary signal rather than a full
-      `ISuggestionSource` (e.g. a weight bump on cards that appear on the staples list).
+**Owner decisions required before implementation:**
+
+- [ ] **TopDeck.gg aggregation weighting:** raw card frequency vs. standing-weighted (cards
+      in top-finishing decks count more). Determines whether the local aggregate table stores
+      standings alongside counts.
+- [ ] **Adopt MTGJSON now or defer.** Only worth adding for offline/precon support.
+- [ ] **Historic Brawl competitive popularity gap.** No sanctioned open source exists
+      (Untapped.gg is commercial with no public API). Decide whether to accept EDHREC +
+      Scryfall alone for Brawl, or leave popularity as a deferred TODO.
+
+**Implementation tasks:**
+
+- [ ] Implement `CommanderSpellbookClient` in Infrastructure: `find-my-combos` + `estimate-bracket`
+      endpoints, cached per card-list hash. Define `IComboSource` in Core Abstractions.
+- [ ] Implement `TopDeckIngestJob` in Infrastructure: periodic pull of EDH/DC tournaments,
+      aggregate `deckObj` card frequency by commander into a local store. Define
+      `ICompetitiveMetaSource` in Core Abstractions.
+- [ ] Extend `EdhrecClient` to resolve Brawl URL path variants alongside the existing
+      Commander paths.
 - [ ] Decide how multiple `ISuggestionSource` implementations are merged in `DeckBuilder`.
-      The current merge keeps the highest inclusion per card; ensure the merge strategy still
-      makes sense when sources have different inclusion scales.
+      The current merge keeps the highest inclusion per card; revisit this once sources with
+      different inclusion scales (EDHREC % vs. TopDeck.gg raw frequency) are combined.
+- [ ] Add TopDeck.gg attribution credit to the Web UI (visible link) wherever competitive
+      frequency data is surfaced.
 
 ---
 
