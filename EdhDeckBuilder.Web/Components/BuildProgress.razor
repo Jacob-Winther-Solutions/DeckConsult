@@ -1,0 +1,35 @@
+<div style="max-width: 860px; padding: 1.5rem;">
+    <h2 class="mb-4">Building your deck&hellip;</h2>
+    <div class="list-group list-group-flush mb-4">
+        @foreach (var stage in AllStages)
+        {
+            var isDone    = CompletedStages.Contains(stage);
+            var isCurrent = CurrentStage == stage;
+            <div class="list-group-item d-flex align-items-center gap-3 px-0 border-0">
+                @if (isDone)
+                {
+                    <span class="text-success fs-5">&#10003;</span>
+                }
+                else if (isCurrent)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Running</span>
+                    </div>
+                }
+                else
+                {
+                    <span class="text-muted fs-5">&#9675;</span>
+                }
+                <span class="@(isDone ? "text-success" : isCurrent ? "" : "text-muted")">@stage</span>
+            </div>
+        }
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="OnCancel">Cancel</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required IReadOnlyList<string> AllStages       { get; set; }
+    [Parameter]                 public          string?               CurrentStage    { get; set; }
+    [Parameter, EditorRequired] public required IReadOnlyList<string> CompletedStages { get; set; }
+    [Parameter]                 public          EventCallback         OnCancel        { get; set; }
+}

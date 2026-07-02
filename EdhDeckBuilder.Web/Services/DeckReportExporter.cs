@@ -204,30 +204,9 @@ public static class DeckReportExporter
         return sb.ToString().Trim('-');
     }
 
-    private static readonly CardRole[] RoleDisplayOrder =
-    [
-        CardRole.Plan, CardRole.Ramp, CardRole.CardAdvantage,
-        CardRole.TargetedDisruption, CardRole.MassDisruption, CardRole.Tutor,
-        CardRole.Protection, CardRole.Recursion, CardRole.Synergy,
-        CardRole.Payoff, CardRole.Land, CardRole.Unclassified,
-    ];
+    private static readonly CardRole[] RoleDisplayOrder = CardRoleDisplay.DisplayOrder;
 
-    private static string RoleName(CardRole role) => role switch
-    {
-        CardRole.Land               => "Lands (Utility)",
-        CardRole.Ramp               => "Ramp",
-        CardRole.CardAdvantage      => "Card Advantage",
-        CardRole.TargetedDisruption => "Targeted Disruption",
-        CardRole.MassDisruption     => "Mass Disruption",
-        CardRole.Protection         => "Protection",
-        CardRole.Tutor              => "Tutors",
-        CardRole.Recursion          => "Recursion",
-        CardRole.Plan               => "Plan",
-        CardRole.Payoff             => "Payoffs",
-        CardRole.Synergy            => "Synergy",
-        CardRole.Unclassified       => "Unclassified",
-        _                           => role.ToString(),
-    };
+    private static string RoleName(CardRole role) => CardRoleDisplay.RoleName(role);
 
     private static string RelationLabel(RoleRelation rel) => rel switch
     {

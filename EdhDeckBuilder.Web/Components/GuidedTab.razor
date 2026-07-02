@@ -1,0 +1,57 @@
+@if (_isBuilding)
+{
+    <BuildProgress AllStages="AllStages"
+                   CurrentStage="@_currentStage"
+                   CompletedStages="_completedStages"
+                   OnCancel="CancelBuild" />
+}
+else
+{
+    <div style="max-width: 860px; padding: 1.5rem;">
+
+    @if (_errorMessage is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_errorMessage
+            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+        </div>
+    }
+
+    <!-- ── Commander ────────────────────────────────────────────────────── -->
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">Choose Commander(s)</div>
+        <div class="card-body">
+            <CommanderPicker SelectedCommanders="_selectedCommanders"
+                             OnSelectionChanged="OnCommandersChanged"
+                             OnError="e => _errorMessage = e"
+                             @key="_commanderResetKey" />
+        </div>
+    </div>
+
+    <!-- ── Archetype ─────────────────────────────────────────────────────── -->
+    <ArchetypePicker OnChanged="OnArchetypesChanged" @key="(1, _archetypeResetKey)" />
+
+    <!-- ── Theme ─────────────────────────────────────────────────────────── -->
+    <ThemePicker OnChanged="OnThemesChanged" @key="(2, _themeResetKey)" />
+
+    <!-- ── Bracket ───────────────────────────────────────────────────────── -->
+    <BracketPicker OnChanged="OnBracketChanged" @key="(3, _bracketResetKey)" />
+
+    <!-- ── Budget ────────────────────────────────────────────────────────── -->
+    <BudgetPicker OnChanged="OnBudgetChanged" @key="(4, _budgetResetKey)" />
+
+    <!-- ── Build button ──────────────────────────────────────────────────── -->
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary btn-lg px-5"
+                disabled="@(_selectedCommanders.Count == 0)"
+                @onclick="StartBuildAsync">
+            Build Deck
+        </button>
+        @if (_selectedCommanders.Count == 0)
+        {
+            <span class="align-self-center text-muted small">Select a commander to continue.</span>
+        }
+    </div>
+
+    </div>
+}

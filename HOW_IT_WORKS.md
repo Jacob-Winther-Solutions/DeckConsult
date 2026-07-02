@@ -140,6 +140,11 @@ alternative available in the pool.
 
 ## What you get back
 
+When the build finishes you are taken to a dedicated results page (`/results/{id}`). The
+page is saved to your browser's local storage, so it survives a page reload and can be
+revisited later — the tool keeps your three most recent builds and automatically removes
+the oldest one when a new build is saved.
+
 **The 99 non-commander cards**, split into two parts:
 - **Deck** — every non-basic card (spells, utility lands, MDFCs), each with a role, a rank
   within that role, and the LLM's written rationale for why it's here.
@@ -190,8 +195,9 @@ you can make:
 - **Context-aware classification** is not implemented. Some cards (e.g. Jeska's Will) behave
   very differently depending on whether the commander is on the board. Classification currently
   treats them as global-stable rather than commander-specific.
-- **No deck persistence.** Results live in memory for the current session. Use "Export Build
-  Report" to save a finished deck locally.
+- **Results are browser-local.** The three most recent builds are saved to your browser's local
+  storage. Clearing your browser data removes them. Use "Export Build Report" to keep a
+  permanent copy of a finished deck.
 - **Output varies.** The LLM is non-deterministic — the same inputs will not always produce
   the same deck. Classification results are cached within a session to reduce variation, but
   two separate runs are not guaranteed to agree.

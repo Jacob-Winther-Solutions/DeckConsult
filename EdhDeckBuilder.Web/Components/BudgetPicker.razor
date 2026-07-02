@@ -1,0 +1,65 @@
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Budget</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <label class="form-label small fw-semibold mb-0">Max per card (USD)</label>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="maxPriceUnrestricted"
+                               checked="@_maxPriceUnrestricted"
+                               @onchange="e => OnMaxUnrestrictedChanged((bool)(e.Value ?? true))" />
+                        <label class="form-check-label small text-muted" for="maxPriceUnrestricted">No restriction</label>
+                    </div>
+                </div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control"
+                           value="@_maxCardPriceText"
+                           @onchange="OnMaxCardPriceChanged"
+                           placeholder="e.g. 5.00" min="0" step="0.01"
+                           disabled="@_maxPriceUnrestricted" />
+                </div>
+                <div class="text-muted small mt-1">
+                    @if (_maxPriceUnrestricted)
+                    {
+                        <span>No restriction &mdash; uncheck to set a per-card limit.</span>
+                    }
+                    else
+                    {
+                        <span>No single card may cost more than this. Note: $0.00 means exactly zero &mdash; not unlimited.</span>
+                    }
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <label class="form-label small fw-semibold mb-0">Total deck budget (USD)</label>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="totalBudgetUnrestricted"
+                               checked="@_totalBudgetUnrestricted"
+                               @onchange="e => OnTotalUnrestrictedChanged((bool)(e.Value ?? true))" />
+                        <label class="form-check-label small text-muted" for="totalBudgetUnrestricted">No restriction</label>
+                    </div>
+                </div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control"
+                           value="@_totalBudgetText"
+                           @onchange="OnTotalBudgetChanged"
+                           placeholder="e.g. 200.00" min="0" step="1"
+                           disabled="@_totalBudgetUnrestricted" />
+                </div>
+                <div class="text-muted small mt-1">
+                    @if (_totalBudgetUnrestricted)
+                    {
+                        <span>No restriction &mdash; uncheck to set a total budget.</span>
+                    }
+                    else
+                    {
+                        <span>Sum of all 99 non-basic cards must stay within this. Note: $0.00 means exactly zero &mdash; not unlimited.</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,6 +1,7 @@
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace EdhDeckBuilder.Web.Components;
@@ -42,62 +43,13 @@ public partial class DeckResults
 
     // ── Display order ──────────────────────────────────────────────────────
 
-    private static readonly CardRole[] RoleDisplayOrder =
-    [
-        CardRole.Plan,
-        CardRole.Ramp,
-        CardRole.CardAdvantage,
-        CardRole.TargetedDisruption,
-        CardRole.MassDisruption,
-        CardRole.Tutor,
-        CardRole.Protection,
-        CardRole.Recursion,
-        CardRole.Synergy,
-        CardRole.Payoff,
-        CardRole.Land,
-        CardRole.Unclassified,
-    ];
-
-    private static readonly string[] TypeOrder =
-    [
-        "Creature", "Planeswalker", "Instant", "Sorcery",
-        "Artifact", "Enchantment", "Battle", "Land", "Other",
-    ];
+    private static readonly CardRole[] RoleDisplayOrder = CardRoleDisplay.DisplayOrder;
+    private static readonly string[]   TypeOrder        = CardRoleDisplay.TypeOrder;
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    internal static string RoleName(CardRole role) => role switch
-    {
-        CardRole.Land               => "Lands (Utility)",
-        CardRole.Ramp               => "Ramp",
-        CardRole.CardAdvantage      => "Card Advantage",
-        CardRole.TargetedDisruption => "Targeted Disruption",
-        CardRole.MassDisruption     => "Mass Disruption",
-        CardRole.Protection         => "Protection",
-        CardRole.Tutor              => "Tutors",
-        CardRole.Recursion          => "Recursion",
-        CardRole.Plan               => "Plan",
-        CardRole.Payoff             => "Payoffs",
-        CardRole.Synergy            => "Synergy",
-        CardRole.Unclassified       => "Unclassified",
-        _                           => role.ToString(),
-    };
-
-    internal static string PrimaryRoleBadgeClass(CardRole role) => role switch
-    {
-        CardRole.Plan               => "bg-primary",
-        CardRole.Ramp               => "bg-success",
-        CardRole.CardAdvantage      => "bg-info text-dark",
-        CardRole.TargetedDisruption => "bg-danger",
-        CardRole.MassDisruption     => "bg-warning text-dark",
-        CardRole.Protection         => "bg-secondary",
-        CardRole.Tutor              => "bg-dark",
-        CardRole.Recursion          => "bg-success bg-opacity-50 text-dark",
-        CardRole.Payoff             => "bg-primary bg-opacity-50 text-dark",
-        CardRole.Synergy            => "bg-info bg-opacity-50 text-dark",
-        CardRole.Land               => "bg-success bg-opacity-75",
-        _                           => "bg-secondary",
-    };
+    private static string RoleName(CardRole role)            => CardRoleDisplay.RoleName(role);
+    private static string PrimaryRoleBadgeClass(CardRole role) => CardRoleDisplay.PrimaryRoleBadgeClass(role);
 
     internal static string CardTypeBucket(Card card)
     {
@@ -128,28 +80,8 @@ public partial class DeckResults
         };
     }
 
-    private IEnumerable<ColorPip> CommanderColorPips()
-    {
-        var identity = Commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
-        return GetColorPips(identity);
-    }
+    private Color CommanderColorIdentity =>
+        Commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
 
-    private static IEnumerable<ColorPip> GetColorPips(Color identity)
-    {
-        if (identity == Color.None)
-            yield return new("C", "badge bg-secondary", "");
-        if (identity.HasFlag(Color.White))
-            yield return new("W", "badge border", "background:#f9fafb;color:#555;");
-        if (identity.HasFlag(Color.Blue))
-            yield return new("U", "badge bg-primary", "");
-        if (identity.HasFlag(Color.Black))
-            yield return new("B", "badge bg-dark", "");
-        if (identity.HasFlag(Color.Red))
-            yield return new("R", "badge bg-danger", "");
-        if (identity.HasFlag(Color.Green))
-            yield return new("G", "badge bg-success", "");
-    }
-
-    private sealed record ColorPip(string Symbol, string BadgeClass, string Style);
     private sealed record BadgeInfo(string CssClass, string Label, string Tooltip);
 }

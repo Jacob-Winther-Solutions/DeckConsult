@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.JSInterop;
@@ -10,17 +11,16 @@ public partial class ApiKeySettings
     private const string CookieName = "edh_apikey";
     private const int    CookieDays = 30;
 
-    [Inject] private SessionApiKeyProvider   Keys      { get; set; } = default!;
-    [Inject] private IClaudeKeyTester        Tester    { get; set; } = default!;
+    [Inject] private SessionApiKeyProvider   Keys       { get; set; } = default!;
+    [Inject] private IClaudeKeyTester        Tester     { get; set; } = default!;
     [Inject] private IDataProtectionProvider DpProvider { get; set; } = default!;
-    [Inject] private IJSRuntime              JS        { get; set; } = default!;
+    [Inject] private IJSRuntime              JS         { get; set; } = default!;
+    [Inject] private IApiKeyStateService     ApiKeyState { get; set; } = default!;
 
-    /// <summary>Raised after the key state changes so the parent page can re-render.</summary>
-    [Parameter] public EventCallback OnKeyStateChanged { get; set; }
-
-    private string  _keyInput     = "";
+    private string  _keyInput      = "";
     private bool    _connected;
-    private bool    _remember     = true;
+    private bool    _showForm;
+    private bool    _remember      = true;
     private bool    _busy;
     private bool    _error;
     private string? _message;
@@ -51,7 +51,7 @@ public partial class ApiKeySettings
                 _connected     = true;
                 _selectedModel = Keys.SelectedModel;
                 await InvokeAsync(StateHasChanged);
-                await OnKeyStateChanged.InvokeAsync();
+                ApiKeyState.NotifyChanged();
             }
         }
         catch
@@ -68,13 +68,14 @@ public partial class ApiKeySettings
             Keys.Set(_keyInput);
             _keyInput  = "";
             _connected = true;
+            _showForm  = false;
             _error     = false;
             _message   = null;
 
             if (_remember)
                 await WriteCookieAsync(Keys.GetApiKey()!);
 
-            await OnKeyStateChanged.InvokeAsync();
+            ApiKeyState.NotifyChanged();
         }
         catch (ArgumentException ex)
         {
@@ -100,7 +101,7 @@ public partial class ApiKeySettings
         _connected = false;
         _message   = null;
         await JS.InvokeVoidAsync("deleteCookie", CookieName);
-        await OnKeyStateChanged.InvokeAsync();
+        ApiKeyState.NotifyChanged();
     }
 
     private void OnModelChanged(ChangeEventArgs e)

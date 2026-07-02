@@ -1,0 +1,26 @@
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Power Bracket</div>
+    <div class="card-body">
+        <div class="btn-group w-100 mb-3" role="group">
+            @foreach (var bracket in Enum.GetValues<Bracket>())
+            {
+                var profile = BracketLibrary.All[bracket];
+                <button type="button"
+                        class="btn @(_bracket == bracket ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick="() => OnBracketSelected(bracket)">
+                    @((int)bracket) &mdash; @profile.Name
+                </button>
+            }
+        </div>
+        <p class="text-muted small mb-0">@BracketLibrary.All[_bracket].Description</p>
+        <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="bracketEnabled"
+                   checked="@_enabled"
+                   @onchange="e => OnEnabledChanged((bool)(e.Value ?? true))" />
+            <label class="form-check-label small" for="bracketEnabled">
+                Apply bracket filter
+                <span class="text-muted fw-normal">(uncheck to skip bracket restrictions — card selection defaults to mid-power guidance)</span>
+            </label>
+        </div>
+    </div>
+</div>

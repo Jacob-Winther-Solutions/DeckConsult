@@ -1,16 +1,23 @@
 using EdhDeckBuilder.Agent;
 using EdhDeckBuilder.Infrastructure;
 using EdhDeckBuilder.Web.Components;
+using EdhDeckBuilder.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Raise SignalR receive limit so localStorage fallback (page-reload path) can transfer deck JSON.
+// Same-session navigations use DeckResultStore and skip JS interop entirely.
+builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 5 * 1024 * 1024);
+
 builder.Services.AddDataProtection();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddAgent();
+builder.Services.AddScoped<IApiKeyStateService, ApiKeyStateService>();
+builder.Services.AddSingleton<DeckResultStore>();
 
 var app = builder.Build();
 

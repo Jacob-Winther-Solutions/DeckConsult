@@ -1,0 +1,40 @@
+@page "/results/{Id}"
+
+<PageTitle>Deck Results — EDH Deck Builder</PageTitle>
+
+<div class="container-fluid">
+
+    @if (_stored is null && !_notFound)
+    {
+        <div style="padding: 1.5rem;">
+            <div class="d-flex align-items-center gap-2 text-muted">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading…</span>
+                </div>
+                <span>Loading result…</span>
+            </div>
+        </div>
+    }
+    else if (_notFound)
+    {
+        <div style="max-width: 860px; padding: 1.5rem;">
+            <div class="alert alert-warning mb-3">
+                This result could not be found. It may have been cleared from your browser's local storage.
+            </div>
+            <button class="btn btn-outline-secondary" @onclick="GoBack">← Build a new deck</button>
+        </div>
+    }
+    else
+    {
+        <DeckExportPanel Result="_stored!.Result"
+                         Commanders="_stored!.Commanders"
+                         OnReset="GoBack"
+                         OnDownloadReport="DownloadReportAsync" />
+        <DeckResults Result="_stored!.Result"
+                     Commanders="_stored!.Commanders"
+                     Bracket="_stored!.Bracket"
+                     MaxCardPriceUsd="_stored!.MaxCardPriceUsd"
+                     TotalBudgetUsd="_stored!.TotalBudgetUsd" />
+    }
+
+</div>

@@ -116,7 +116,7 @@ it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` envi
 dotnet restore
 dotnet build
 
-# Run all 266 tests:
+# Run all 271 tests:
 dotnet test Tests
 
 # Run the app:
@@ -133,6 +133,61 @@ dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-..." --project EdhDeckBuilder
 ```
 
 Requires the .NET 10 SDK.
+
+## What's in Web
+
+The Blazor front end (`EdhDeckBuilder.Web`). Pages and components aside, the non-obvious
+architectural pieces in `Services/` are:
+
+- **`DeckReportExporter`** — generates the markdown build report. Accepts the full
+  `DeckBuildResult` plus build metadata (commanders, archetype weights, themes, bracket,
+  budget, date) and returns a self-contained string ready to download.
+
+- **`DeckResultStorage`** — serializes/deserializes `StoredDeckResult` to/from JSON for
+  localStorage. Uses `JsonStringEnumConverter` so enum dictionary keys (`CardRole`,
+  `Archetype`) round-trip as strings rather than integers. Also owns the localStorage key
+  scheme (`edh-deck-{id}`) and the saved-result limit:
+
+  ```csharp
+  // EdhDeckBuilder.Web/Services/DeckResultStorage.cs
+  public const int DefaultMaxSavedResults = 3;
+  ```
+
+  To wire this to a subscription tier: resolve the limit from wherever tiers are stored
+  (e.g. `_subscriptionService.GetDeckResultLimit(userId)`) and pass it to
+  `JS.InvokeVoidAsync("saveDeckResult", key, json, resolvedLimit)` in `GuidedTab` and
+  `CustomTab`. The JavaScript function already accepts it as a parameter — no JS changes
+  needed.
+
+- **`DeckResultStore`** — a singleton in-memory cache (`ConcurrentDictionary<string, StoredDeckResult>`)
+  that lets the results page retrieve a just-built deck without any JS interop. The builder
+  tabs call `Put(id, stored)` before navigating; `DeckResultsPage` calls `Get(Id)` first and
+  only falls back to localStorage if the result is not in memory (i.e. after a page reload).
+  This avoids sending the full deck JSON back from browser to server over SignalR on the
+  normal navigation path.
+
+- **`StoredDeckResult`** — the serialization DTO. Contains `DeckBuildResult` plus the build
+  parameters needed to reproduce the report and the results page header (commanders,
+  archetype weights, themes, bracket, budget, build date).
+
+### localStorage persistence
+
+After a successful build, the tab serializes `StoredDeckResult` to JSON, writes it to
+localStorage via `saveDeckResult(key, value, maxResults)` in `app.js`, and navigates to
+`/results/{id}`. The JavaScript function maintains an ordered index (`edh-deck-index`)
+and evicts the oldest entries when the count exceeds `maxResults`, keeping localStorage
+bounded.
+
+Reading a large JSON back from browser to server over SignalR is limited by
+`MaximumReceiveMessageSize` (default: 32 KB). The app raises this to 5 MB in `Program.cs`
+so the page-reload path (which must fetch the JSON from localStorage) works for realistic
+deck sizes (~300–500 KB serialized):
+
+```csharp
+builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 5 * 1024 * 1024);
+```
+
+---
 
 See `HOW_IT_WORKS.md` for a plain-language explanation of what the tool does for you, what you
 need to provide, and where your judgment still matters — written for someone using the deck builder,

@@ -214,6 +214,13 @@ rules, and card ingestion need format-specific variants.
 - [ ] Per-call temperature audit: `Temperature` is deprecated for models after Claude Opus 4.6.
       Once the SDK removes backward-compatibility handling, update both `LlmClassifier` and
       `LlmSelector` to remove the field or replace it with the new mechanism when available.
+- [ ] **Wire saved-result limit to subscription tier.** Currently hardcoded as
+      `DeckResultStorage.DefaultMaxSavedResults = 3` in `EdhDeckBuilder.Web/Services/DeckResultStorage.cs`.
+      The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
+      as a parameter — no JS changes needed. On the C# side, resolve the limit from a subscription
+      or feature-flag service and pass it to `JS.InvokeVoidAsync("saveDeckResult", key, json,
+      resolvedLimit)` in `GuidedTab.razor.cs` and `CustomTab.razor.cs`. The two call sites are the
+      only places that need updating.
 - [ ] (Stretch) Opening-hand / curve simulation to sanity-check consistency.
 
 ---

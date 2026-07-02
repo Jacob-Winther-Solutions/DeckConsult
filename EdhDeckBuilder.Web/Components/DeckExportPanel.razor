@@ -1,0 +1,28 @@
+<div class="d-flex align-items-center gap-2 px-3 pt-4 pb-2">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="OnReset">&#8592; Build another</button>
+    <button class="btn btn-outline-primary btn-sm" @onclick="() => _showExport = !_showExport">
+        @(_showExport ? "Hide Decklist" : "Copy Decklist")
+    </button>
+    <button class="btn btn-outline-primary btn-sm" @onclick="OnDownloadReport">
+        Export Build Report
+    </button>
+</div>
+
+@if (_showExport)
+{
+    <div class="mx-3 mb-3">
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <span class="fw-semibold me-auto">Raw decklist — paste into your favorite deck site</span>
+                <button class="btn btn-sm @(_exportCopied ? "btn-success" : "btn-primary")"
+                        @onclick="CopyExportTextAsync">
+                    @(_exportCopied ? "Copied!" : "Copy to clipboard")
+                </button>
+            </div>
+            <div class="card-body p-2">
+                <textarea class="form-control font-monospace" rows="12" readonly
+                          style="font-size: 0.8rem; resize: vertical;">@BuildExportText()</textarea>
+            </div>
+        </div>
+    </div>
+}

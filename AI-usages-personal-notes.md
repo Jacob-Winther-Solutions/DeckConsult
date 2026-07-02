@@ -19,6 +19,15 @@ API usage:
 - Haiku, Sephiroth, Aggro, Aristocrats, Bracket 3, Budget 15 pr card 300 total:             1,78 -> 1,66 = 0,12 (18th try) (BYOK + choose model test)
 - Haiku, Sephiroth, Aggro, Aristocrats, No Bracket, Budget Disabled pr card 300 total:      1,66 -> 1,49 = 0,17 (19th try) (No Bracket + No pr card budget test)
 - Haiku, Sephiroth, Custom (Aggro, Aristocrats), Budget 15 pr card 300 total:               1,49 -> 1,37 = 0,12 (19th try) (Custom tab test)
+- Haiku, Tymna+Kraum, Combo, Pillowfort, No budget:                                         1,37 -> 1,00 = 0,37 (20th try) (Refactoring)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        1,00 -> 0,88 = 0,12 (21th try) (Fix of refactoring errors)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        0,88 -> 0,75 = 0,13 (22th try) (LocalStorage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        0,75 -> 0,62 = 0,13 (23th try) (LocalStorage retest)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        0,62 -> 0,51 = 0,11 (24th try) (Multi LocalStorage test)
+- Haiku, Esika, Control, Superfriends, Bracket 3, Budget 15 pr card 300 total:              0,51 -> 0,36 = 0,15 (25th try) (Another Multi LocalStorage test)
+- Haiku, Tymna+Kraum, Combo, Pillowfort, Bracket 3, Budget 15 pr card 300 total:            0,36 -> 0,14 = 0,22 (26th try) (Yet Another Multi LocalStorage test)
+--------------- Funds refill -> +5 => 5.14 ------------------------
+- Kozilek, the Great Distortion, Aggro, Big-Mana, Bracket 3, Budget 15 pr card 300 total:   5,14 -> 5,02 = 0,12 (27th try) (Final Multi LocalStorage test)
 
 Bad classifications:
 Sephiroth (third try):

@@ -1,0 +1,35 @@
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Archetype <span class="text-muted fw-normal small ms-1">how it wins</span></div>
+    <div class="card-body">
+        <div class="row g-3">
+            @foreach (var archetype in Enum.GetValues<Archetype>())
+            {
+                var profile    = ArchetypeLibrary.All[archetype];
+                var isSelected = _weights.ContainsKey(archetype);
+                <div class="col-md-3 col-sm-6">
+                    <div class="card h-100 @(isSelected ? "border-primary" : "")"
+                         style="cursor:pointer;"
+                         @onclick="() => ToggleArchetype(archetype)">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <h6 class="card-title mb-0">@profile.Name</h6>
+                                @if (isSelected) { <span class="text-primary">&#10003;</span> }
+                            </div>
+                            <p class="card-text small text-muted mb-0">@profile.Description</p>
+                            @if (isSelected)
+                            {
+                                <div class="d-flex gap-1 mt-2" @onclick:stopPropagation>
+                                    <button class="btn btn-sm @(_weights[archetype] >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="() => SetWeight(archetype, 1.0)">Full</button>
+                                    <button class="btn btn-sm @(_weights[archetype] < 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="() => SetWeight(archetype, 0.5)">Half</button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        <p class="text-muted small mt-2 mb-0">Leave blank to use the balanced baseline. Select multiple to blend styles.</p>
+    </div>
+</div>

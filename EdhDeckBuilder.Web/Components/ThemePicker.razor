@@ -1,0 +1,156 @@
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Theme <span class="text-muted fw-normal small ms-1">what it does</span></div>
+    <div class="card-body">
+
+        <!-- Filter -->
+        <div class="mb-3">
+            <input class="form-control form-control-sm" type="search" placeholder="Filter themes"
+                   value="@_themeFilter"
+                   @oninput="e => _themeFilter = e.Value?.ToString() ?? string.Empty" />
+        </div>
+
+        <!-- Custom themes -->
+        @if (CustomThemes.Any())
+        {
+            <div class="row g-2 mb-3">
+                @foreach (var (idx, wt) in CustomThemes)
+                {
+                    var i = idx;
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 border-primary">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h6 class="card-title mb-0 me-1">
+                                        @wt.Profile.Name
+                                        <span class="badge bg-secondary ms-1" style="font-size:0.6rem;vertical-align:middle;">custom</span>
+                                    </h6>
+                                    <button type="button" class="btn-close btn-sm flex-shrink-0" aria-label="Remove"
+                                            @onclick="() => RemoveCustomTheme(i)"></button>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(wt.Profile.Description))
+                                {
+                                    <p class="card-text small text-muted mb-2">@wt.Profile.Description</p>
+                                }
+                                <div class="d-flex gap-1 mt-1" @onclick:stopPropagation>
+                                    <button class="btn btn-sm @(wt.Weight >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="() => SetCustomThemeWeight(i, 1.0)">Full</button>
+                                    <button class="btn btn-sm @(wt.Weight < 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="() => SetCustomThemeWeight(i, 0.5)">Half</button>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @onclick="() => OpenEditCustomForm(i)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Preset themes grid -->
+        <div class="row g-3">
+            @foreach (var theme in Enum.GetValues<Theme>())
+            {
+                var profile    = ThemeLibrary.All[theme];
+                var isSelected = IsPresetSelected(theme);
+                if (string.IsNullOrWhiteSpace(_themeFilter) ||
+                    profile.Name.Contains(_themeFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 @(isSelected ? "border-primary" : "")"
+                             style="cursor:pointer;"
+                             @onclick="() => TogglePreset(theme)">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h6 class="card-title mb-0">@profile.Name</h6>
+                                    @if (isSelected) { <span class="text-primary">&#10003;</span> }
+                                </div>
+                                <p class="card-text small text-muted mb-0">@profile.Description</p>
+                                @if (isSelected)
+                                {
+                                    <div class="d-flex gap-1 mt-2" @onclick:stopPropagation>
+                                        <button class="btn btn-sm @(GetPresetWeight(theme) >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                                @onclick="() => SetPresetWeight(theme, 1.0)">Full</button>
+                                        <button class="btn btn-sm @(GetPresetWeight(theme) < 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                                @onclick="() => SetPresetWeight(theme, 0.5)">Half</button>
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                @onclick="() => OpenTuneForm(theme)">Tune</button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Add custom theme button -->
+        @if (!_showThemeForm)
+        {
+            <div class="mt-3">
+                <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCustomForm">+ Add custom theme</button>
+            </div>
+        }
+
+        <!-- Tune / custom theme form -->
+        @if (_showThemeForm)
+        {
+            <div class="card mt-3">
+                <div class="card-header small fw-semibold">
+                    @(_tuningPreset.HasValue
+                        ? $"Tune: {ThemeLibrary.All[_tuningPreset.Value].Name}"
+                        : _editingCustomIndex >= 0
+                            ? "Edit custom theme"
+                            : "Add custom theme")
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold mb-1">Name</label>
+                        <input class="form-control form-control-sm" @bind="_formThemeName"
+                               placeholder="Theme name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">
+                            Description
+                            <span class="text-muted fw-normal">(used as guidance for card selection)</span>
+                        </label>
+                        <input class="form-control form-control-sm" @bind="_formThemeDesc"
+                               placeholder="Describe what this theme does" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">
+                            Role slot targets
+                            <span class="text-muted fw-normal">(baseline in parentheses)</span>
+                        </label>
+                        <div class="row g-2">
+                            @foreach (var formRole in FormRoles)
+                            {
+                                var r        = formRole;
+                                var baseline = BaselineIdeals.TryGetValue(r, out var b) ? b : 0;
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label small mb-0">
+                                        @RoleLabel(r)
+                                        <span class="text-muted" style="font-size:0.7rem;">(base&nbsp;@baseline)</span>
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm"
+                                           value="@_formEffectiveValues[r]"
+                                           min="0" max="60"
+                                           @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) _formEffectiveValues[r] = Math.Max(0, v); }" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm"
+                                disabled="@string.IsNullOrWhiteSpace(_formThemeName)"
+                                @onclick="ApplyThemeForm">
+                            @(_tuningPreset.HasValue ? "Apply" : _editingCustomIndex >= 0 ? "Save" : "Add")
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="CancelThemeForm">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <p class="text-muted small mt-3 mb-0">Leave blank for the balanced baseline. Select multiple to blend styles.</p>
+    </div>
+</div>
