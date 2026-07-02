@@ -152,4 +152,16 @@ internal sealed class FakeCardRepository(params Card[] cards) : ICardRepository
     public Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Card>>(
             _byName.Values.Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList());
+
+    public Task<IReadOnlyList<Card>> GetCommandersAsync(
+        Color? colorFilter = null,
+        bool exactMatch = false,
+        CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Card>>(
+            _byOracleId.Values
+                .Where(c => c.CanBeCommander)
+                .Where(c => colorFilter is null
+                    || (exactMatch ? c.ColorIdentity == colorFilter.Value
+                                   : c.ColorIdentity.IsWithin(colorFilter.Value)))
+                .ToList());
 }

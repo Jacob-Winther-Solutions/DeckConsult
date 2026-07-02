@@ -32,11 +32,11 @@
                                     <p class="card-text small text-muted mb-2">@wt.Profile.Description</p>
                                 }
                                 <div class="d-flex gap-1 mt-1" @onclick:stopPropagation>
-                                    <button class="btn btn-sm @(wt.Weight >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                    <button type="button" class="btn btn-sm @(wt.Weight >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
                                             @onclick="() => SetCustomThemeWeight(i, 1.0)">Full</button>
-                                    <button class="btn btn-sm @(wt.Weight < 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                    <button type="button" class="btn btn-sm @(wt.Weight < 1.0 ? "btn-primary" : "btn-outline-secondary")"
                                             @onclick="() => SetCustomThemeWeight(i, 0.5)">Half</button>
-                                    <button class="btn btn-sm btn-outline-secondary"
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
                                             @onclick="() => OpenEditCustomForm(i)">Edit</button>
                                 </div>
                             </div>
@@ -68,11 +68,11 @@
                                 @if (isSelected)
                                 {
                                     <div class="d-flex gap-1 mt-2" @onclick:stopPropagation>
-                                        <button class="btn btn-sm @(GetPresetWeight(theme) >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                        <button type="button" class="btn btn-sm @(GetPresetWeight(theme) >= 1.0 ? "btn-primary" : "btn-outline-secondary")"
                                                 @onclick="() => SetPresetWeight(theme, 1.0)">Full</button>
-                                        <button class="btn btn-sm @(GetPresetWeight(theme) < 1.0 ? "btn-primary" : "btn-outline-secondary")"
+                                        <button type="button" class="btn btn-sm @(GetPresetWeight(theme) < 1.0 ? "btn-primary" : "btn-outline-secondary")"
                                                 @onclick="() => SetPresetWeight(theme, 0.5)">Half</button>
-                                        <button class="btn btn-sm btn-outline-secondary"
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
                                                 @onclick="() => OpenTuneForm(theme)">Tune</button>
                                     </div>
                                 }
@@ -87,7 +87,7 @@
         @if (!_showThemeForm)
         {
             <div class="mt-3">
-                <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCustomForm">+ Add custom theme</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="OpenCustomForm">+ Add custom theme</button>
             </div>
         }
 
@@ -140,12 +140,12 @@
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-primary btn-sm"
+                        <button type="button" class="btn btn-primary btn-sm"
                                 disabled="@string.IsNullOrWhiteSpace(_formThemeName)"
                                 @onclick="ApplyThemeForm">
                             @(_tuningPreset.HasValue ? "Apply" : _editingCustomIndex >= 0 ? "Save" : "Add")
                         </button>
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="CancelThemeForm">Cancel</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelThemeForm">Cancel</button>
                     </div>
                 </div>
             </div>

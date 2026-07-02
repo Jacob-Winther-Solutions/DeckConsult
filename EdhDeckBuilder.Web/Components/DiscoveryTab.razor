@@ -1,0 +1,78 @@
+@using EdhDeckBuilder.Agent.Models
+@using EdhDeckBuilder.Core.Cards
+@using EdhDeckBuilder.Core.Decks
+@using EdhDeckBuilder.Web.Services
+
+<div class="card">
+    <div class="card-body">
+        @if (_isRunning)
+        {
+            <div class="spinner-border mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>@_currentStage</p>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="Cancel">Cancel</button>
+        }
+        else if (_result != null && _result.Suggestions.Count > 0)
+        {
+            <h5 class="mb-3">Found @_result.Suggestions.Count commanders</h5>
+            <button class="btn btn-outline-secondary mb-3" @onclick="ResetForm">← Make new discovery</button>
+            <div class="row">
+                @foreach (var suggestion in _result.Suggestions)
+                {
+                    <div class="col-lg-6 mb-3">
+                        <CommanderSuggestionCard Suggestion="suggestion"
+                                                ArchetypeWeights="_archetypeWeights"
+                                                Themes="_themes"
+                                                BracketSelection="_bracketSelection"
+                                                Budget="_budget" />
+                    </div>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @_errorMessage
+            </div>
+        }
+        else
+        {
+            <form @onsubmit="FindCommandersAsync">
+                <div class="mb-3">
+                    <label class="form-label">Color Identity</label>
+                    <ColorIdentityPicker OnChanged="OnColorFilterChanged" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Archetypes</label>
+                    <ArchetypePicker OnChanged="OnArchetypesChanged" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Themes</label>
+                    <ThemePicker OnChanged="OnThemesChanged" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Bracket</label>
+                    <BracketPicker OnChanged="OnBracketChanged" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Budget (Optional)</label>
+                    <BudgetPicker OnChanged="OnBudgetChanged" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Additional Notes</label>
+                    <textarea class="form-control" rows="3" @bind="_description" placeholder="e.g., 'I like graveyard strategies' or 'Avoid infinite combos'"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@_isRunning">
+                    Find Commanders
+                </button>
+            </form>
+        }
+    </div>
+</div>

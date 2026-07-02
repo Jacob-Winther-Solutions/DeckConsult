@@ -1,0 +1,28 @@
+@using EdhDeckBuilder.Core.Cards
+@using EdhDeckBuilder.Web.Services
+
+<div class="mb-3">
+    <div class="btn-group mb-2" role="group">
+        <button type="button" class="btn @(_filterMode == FilterMode.Any ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SetFilterMode(FilterMode.Any)">
+            @(_filterMode == FilterMode.Any ? "✓ " : "")Any color
+        </button>
+        <button type="button" class="btn @(_filterMode == FilterMode.Colorless ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SetFilterMode(FilterMode.Colorless)">
+            @(_filterMode == FilterMode.Colorless ? "✓ " : "")Colorless
+        </button>
+        <button type="button" class="btn @GetColorButtonClass(Color.White)" @onclick="() => SelectColors(Color.White)">W</button>
+        <button type="button" class="btn @GetColorButtonClass(Color.Blue)" @onclick="() => SelectColors(Color.Blue)">U</button>
+        <button type="button" class="btn @GetColorButtonClass(Color.Black)" @onclick="() => SelectColors(Color.Black)">B</button>
+        <button type="button" class="btn @GetColorButtonClass(Color.Red)" @onclick="() => SelectColors(Color.Red)">R</button>
+        <button type="button" class="btn @GetColorButtonClass(Color.Green)" @onclick="() => SelectColors(Color.Green)">G</button>
+    </div>
+
+    @if (_filterMode == FilterMode.Specific && _selectedColors != Color.None)
+    {
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="exactMatch" checked="@_exactMatch" @onchange="OnExactMatchChanged" />
+            <label class="form-check-label" for="exactMatch">
+                Exactly this identity
+            </label>
+        </div>
+    }
+</div>

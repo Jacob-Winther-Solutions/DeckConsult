@@ -22,6 +22,12 @@ public partial class GuidedTab : IDisposable
     [Inject] private DeckResultStore       ResultStore { get; set; } = default!;
     [Inject] private IConfiguration        Config      { get; set; } = default!;
 
+    [Parameter] public Card? InitialCommander { get; set; }
+    [Parameter] public IReadOnlyDictionary<Archetype, double>? InitialArchetypeWeights { get; set; }
+    [Parameter] public IReadOnlyList<WeightedTheme>? InitialThemes { get; set; }
+    [Parameter] public BracketSelection? InitialBracket { get; set; }
+    [Parameter] public BudgetSelection? InitialBudget { get; set; }
+
     private static readonly string[] AllStages =
     [
         "Resolving template",
@@ -63,8 +69,25 @@ public partial class GuidedTab : IDisposable
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         ApiKeyState.OnChange += OnApiKeyStateChanged;
+
+        if (InitialCommander is not null)
+            _selectedCommanders = [InitialCommander];
+
+        if (InitialArchetypeWeights is not null)
+            _archetypeWeights = InitialArchetypeWeights;
+
+        if (InitialThemes is not null)
+            _themes = InitialThemes;
+
+        if (InitialBracket is not null)
+            _bracketSelection = InitialBracket;
+
+        if (InitialBudget is not null)
+            _budget = InitialBudget;
+    }
 
     private void OnApiKeyStateChanged() => InvokeAsync(StateHasChanged);
 

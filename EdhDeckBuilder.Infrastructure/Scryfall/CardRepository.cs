@@ -43,6 +43,20 @@ public sealed class CardRepository : ICardRepository
             .OrderBy(c => c.Name)];
     }
 
+    public async Task<IReadOnlyList<Card>> GetCommandersAsync(
+        Color? colorFilter = null,
+        bool exactMatch = false,
+        CancellationToken ct = default)
+    {
+        var index = await _index.Value;
+        return index.All
+            .Where(c => c.CanBeCommander)
+            .Where(c => colorFilter is null
+                || (exactMatch ? c.ColorIdentity == colorFilter.Value
+                               : c.ColorIdentity.IsWithin(colorFilter.Value)))
+            .ToList();
+    }
+
     private static async Task<CardIndex> BuildIndexAsync(ScryfallBulkClient bulkClient, ILogger logger)
     {
         var path = await bulkClient.GetOracleCardsFileAsync();
@@ -52,20 +66,25 @@ public sealed class CardRepository : ICardRepository
 
         var byName     = new Dictionary<string, Card>(30_000, StringComparer.OrdinalIgnoreCase);
         var byOracleId = new Dictionary<Guid, Card>(30_000);
+        var all        = new List<Card>(30_000);
 
         await foreach (var dto in JsonSerializer.DeserializeAsyncEnumerable<ScryfallCard>(stream, JsonOptions))
         {
             if (dto is null) continue;
             var card = ScryfallMapper.ToCard(dto);
             byName.TryAdd(card.Name, card);
-            byOracleId.TryAdd(card.OracleId, card);
+            if (byOracleId.TryAdd(card.OracleId, card))
+            {
+                all.Add(card);
+            }
         }
 
         logger.LogInformation("Card index built: {Count} cards", byOracleId.Count);
-        return new CardIndex(byName, byOracleId);
+        return new CardIndex(byName, byOracleId, all.AsReadOnly());
     }
 
     private sealed record CardIndex(
         IReadOnlyDictionary<string, Card> ByName,
-        IReadOnlyDictionary<Guid, Card> ByOracleId);
+        IReadOnlyDictionary<Guid, Card> ByOracleId,
+        IReadOnlyList<Card> All);
 }

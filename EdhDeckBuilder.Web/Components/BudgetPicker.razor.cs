@@ -6,11 +6,30 @@ namespace EdhDeckBuilder.Web.Components;
 public partial class BudgetPicker
 {
     [Parameter] public EventCallback<BudgetSelection> OnChanged { get; set; }
+    [Parameter] public BudgetSelection? InitialBudget { get; set; }
 
     private string _maxCardPriceText        = "";
     private string _totalBudgetText         = "";
     private bool   _maxPriceUnrestricted    = true;
     private bool   _totalBudgetUnrestricted = true;
+
+    protected override void OnInitialized()
+    {
+        if (InitialBudget is not null)
+        {
+            if (InitialBudget.MaxCardPriceUsd.HasValue)
+            {
+                _maxCardPriceText = InitialBudget.MaxCardPriceUsd.Value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                _maxPriceUnrestricted = false;
+            }
+
+            if (InitialBudget.TotalBudgetUsd.HasValue)
+            {
+                _totalBudgetText = InitialBudget.TotalBudgetUsd.Value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                _totalBudgetUnrestricted = false;
+            }
+        }
+    }
 
     public BudgetSelection CurrentValue =>
         new(ParsedMaxCardPrice, ParsedTotalBudget);

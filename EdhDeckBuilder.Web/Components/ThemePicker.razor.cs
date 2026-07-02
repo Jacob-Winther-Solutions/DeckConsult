@@ -8,6 +8,7 @@ namespace EdhDeckBuilder.Web.Components;
 public partial class ThemePicker
 {
     [Parameter] public EventCallback<IReadOnlyList<WeightedTheme>> OnChanged { get; set; }
+    [Parameter] public IReadOnlyList<WeightedTheme>? InitialThemes { get; set; }
 
     private readonly List<WeightedTheme> _selectedThemes = new();
     private string _themeFilter = "";
@@ -17,6 +18,17 @@ public partial class ThemePicker
     private string _formThemeName = string.Empty;
     private string _formThemeDesc = string.Empty;
     private Dictionary<CardRole, int> _formEffectiveValues = new();
+
+    protected override void OnInitialized()
+    {
+        if (InitialThemes is not null)
+        {
+            foreach (var theme in InitialThemes)
+            {
+                _selectedThemes.Add(theme);
+            }
+        }
+    }
 
     private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
         DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);

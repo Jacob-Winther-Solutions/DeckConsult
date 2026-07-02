@@ -29,16 +29,16 @@ else
     </div>
 
     <!-- ── Archetype ─────────────────────────────────────────────────────── -->
-    <ArchetypePicker OnChanged="OnArchetypesChanged" @key="(1, _archetypeResetKey)" />
+    <ArchetypePicker OnChanged="OnArchetypesChanged" InitialArchetypeWeights="InitialArchetypeWeights" @key="(1, _archetypeResetKey)" />
 
     <!-- ── Theme ─────────────────────────────────────────────────────────── -->
-    <ThemePicker OnChanged="OnThemesChanged" @key="(2, _themeResetKey)" />
+    <ThemePicker OnChanged="OnThemesChanged" InitialThemes="InitialThemes" @key="(2, _themeResetKey)" />
 
     <!-- ── Bracket ───────────────────────────────────────────────────────── -->
-    <BracketPicker OnChanged="OnBracketChanged" @key="(3, _bracketResetKey)" />
+    <BracketPicker OnChanged="OnBracketChanged" InitialBracket="InitialBracket" @key="(3, _bracketResetKey)" />
 
     <!-- ── Budget ────────────────────────────────────────────────────────── -->
-    <BudgetPicker OnChanged="OnBudgetChanged" @key="(4, _budgetResetKey)" />
+    <BudgetPicker OnChanged="OnBudgetChanged" InitialBudget="InitialBudget" @key="(4, _budgetResetKey)" />
 
     <!-- ── Build button ──────────────────────────────────────────────────── -->
     <div class="d-flex gap-2">

@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Discovery;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Pipeline;
@@ -31,8 +32,12 @@ public static class ServiceCollectionExtensions
         // because they depend on the per-circuit client factory.
         services.AddSingleton<ClassificationCache>();
         services.AddScoped<ILlmClassifier, LlmClassifier>();
-        services.AddScoped<ICardSelector,  LlmSelector>();
-        services.AddScoped<IDeckBuilder,   DeckBuilder>();
+        services.AddScoped<ICardSelector, LlmSelector>();
+        services.AddScoped<IDeckBuilder, DeckBuilder>();
+
+        // Commander discovery
+        services.AddScoped<ICommanderSelector, LlmCommanderSelector>();
+        services.AddScoped<ICommanderDiscovery, CommanderDiscovery>();
 
         return services;
     }

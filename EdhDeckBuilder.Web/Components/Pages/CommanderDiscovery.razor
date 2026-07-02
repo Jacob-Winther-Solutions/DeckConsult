@@ -1,0 +1,31 @@
+@page "/discover"
+
+<PageTitle>Commander Discovery — EDH Deck Builder</PageTitle>
+
+<div class="container-fluid">
+
+    <div style="padding: 1.5rem 1.5rem 0 1.5rem;">
+        <h2 class="mb-1">Commander Discovery</h2>
+        <p class="text-muted mb-0">Describe your strategy and find commanders that fit. Click any result to go to the builder with that commander pre-selected.</p>
+    </div>
+
+    @if (Keys.GetApiKey() is null)
+    {
+        <div style="max-width: 860px; padding: 1.5rem;">
+            <div class="alert alert-info mb-0">
+                Connect your Anthropic API key using the panel at the top of the page to start discovering.
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="padding: 1.5rem;">
+            <DiscoveryTab />
+        </div>
+    }
+
+</div>
+
+@code {
+    [Inject] private SessionApiKeyProvider Keys { get; set; } = default!;
+}

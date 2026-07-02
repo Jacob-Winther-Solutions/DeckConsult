@@ -7,9 +7,19 @@ namespace EdhDeckBuilder.Web.Components;
 public partial class BracketPicker
 {
     [Parameter] public EventCallback<BracketSelection> OnChanged { get; set; }
+    [Parameter] public BracketSelection? InitialBracket { get; set; }
 
     private Bracket _bracket = Bracket.Three;
     private bool    _enabled = true;
+
+    protected override void OnInitialized()
+    {
+        if (InitialBracket is not null)
+        {
+            _bracket = InitialBracket.Bracket;
+            _enabled = InitialBracket.Enabled;
+        }
+    }
 
     private async Task OnBracketSelected(Bracket b)
     {

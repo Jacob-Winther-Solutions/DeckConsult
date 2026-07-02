@@ -33,7 +33,12 @@
         </div>
 
         <div style="@(_activeTab != "guided" ? "display:none;" : "")">
-            <GuidedTab />
+            <GuidedTab @key="_guidedTabKey"
+                       InitialCommander="_preCommander"
+                       InitialArchetypeWeights="_preArchetypes"
+                       InitialThemes="_preThemes"
+                       InitialBracket="_preBracket"
+                       InitialBudget="_preBudget" />
         </div>
         <div style="@(_activeTab != "custom" ? "display:none;" : "")">
             <CustomTab />

@@ -1,0 +1,60 @@
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4 text-center">
+                @if (Suggestion.Commander.Images?.Normal != null)
+                {
+                    <a href="#" @onclick:preventDefault @onclick="ToggleImageZoom" style="cursor: pointer;">
+                        <img src="@Suggestion.Commander.Images.Normal" alt="@Suggestion.Commander.Name" class="img-fluid rounded" style="max-height: 400px;" />
+                    </a>
+                }
+                else
+                {
+                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 400px;">
+                        <div class="text-muted">No image</div>
+                    </div>
+                }
+            </div>
+            <div class="col-md-8">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div>
+                        <span class="badge bg-info">Rank #@Suggestion.Rank</span>
+                        <h5 class="card-title d-inline-block ms-2">@Suggestion.Commander.Name</h5>
+                    </div>
+                </div>
+
+                <p class="text-muted small">@Suggestion.Commander.TypeLine</p>
+
+                <div class="mb-2">
+                    <ColorIdentityPips Identity="@Suggestion.Commander.ColorIdentity" />
+                </div>
+
+                <p class="card-text">@Suggestion.Rationale</p>
+
+                <a href="@BuilderLink" class="btn btn-primary">
+                    Build this deck
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_showImageZoom)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Suggestion.Commander.Name</h5>
+                    <button type="button" class="btn-close" @onclick="ToggleImageZoom"></button>
+                </div>
+                <div class="modal-body text-center">
+                    @if (Suggestion.Commander.Images?.Normal != null)
+                    {
+                        <img src="@Suggestion.Commander.Images.Normal" alt="@Suggestion.Commander.Name" class="img-fluid" />
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}

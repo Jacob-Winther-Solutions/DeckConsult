@@ -104,6 +104,9 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
 ## Conventions
 
 - Modern C#: records for data, file-scoped namespaces, nullable enabled, immutability by default.
+- **Razor components use code-behind files.** All `@code` blocks in `.razor` files must be extracted
+  to corresponding `.razor.cs` files using the `public partial class` pattern. No code blocks directly
+  in Razor markup.
 - Implement interfaces from `Core/Abstractions/` in the outer layers; don't add new abstractions
   to Core without a good reason.
 - Keep secrets (the Anthropic API key) out of source — use user-secrets or environment variables.
@@ -112,3 +115,5 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   interfaces and replaced with mocks in tests.
 - **Before returning control to the user:** always run `dotnet test Tests` (which also builds).
   All tests must pass and the build must be error-free. Fix any failures before responding.
+- **Git commits are user's responsibility.** Never commit changes. Stage and test, but leave the
+  final commit decision to Jacob. Committing work is a deliberate human action, not an automation step.

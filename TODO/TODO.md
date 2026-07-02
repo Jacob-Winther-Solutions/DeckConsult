@@ -59,29 +59,36 @@ a list full of expensive staples they have to manually replace. Two independent 
 
 ---
 
-## Commander selection / discovery  (new feature)
+## Commander selection / discovery  (done — one enhancement deferred)
 
 Currently the user must already know which commander they want. A discovery mode would let
 them describe a strategy and get back a shortlist of commanders that fit, before building a deck.
 
-- [ ] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
+- [x] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
       optional colors or color identity constraints, and optionally a free-text description
       ("I want a grindy aristocrats deck that can play against Bracket 3–4").
-- [ ] **Query the commander pool.** Scryfall can return all legendary creatures legal in
+- [x] **Query the commander pool.** Scryfall can return all legendary creatures legal in
       Commander filtered by color identity. This becomes the candidate set.
-- [ ] **Score and rank commanders.** Ask the LLM to evaluate each candidate against the
+- [x] **Score and rank commanders.** Ask the LLM to evaluate each candidate against the
       stated strategy: does this commander's abilities actively support the archetype and theme,
       or is it a generic good-stuff commander? Return a ranked shortlist (top 5–10) with a
       one-paragraph explanation per candidate.
-- [ ] **Wire into the pipeline.** Selecting a commander from the shortlist should feed directly
+- [x] **Wire into the pipeline.** Selecting a commander from the shortlist should feed directly
       into the existing `IDeckBuilder.BuildAsync` flow, pre-populating the archetype/theme
       weights the discovery mode resolved.
-- [ ] **Consider a new interface `ICommanderSelector`** in the Agent layer, parallel to
+- [x] **Consider a new interface `ICommanderSelector`** in the Agent layer, parallel to
       `ILlmClassifier` and `ICardSelector`, so the LLM call is mockable and independently
       testable.
-- [ ] **UI:** A "Help me choose a commander" entry point before the deck-build form. Shows
+- [x] **UI:** A "Help me choose a commander" entry point before the deck-build form. Shows
       the shortlist with art, color identity, and the LLM's explanation; user clicks one to
       proceed to the full build.
+- [ ] **Partner and partner-with support:** Discovery currently evaluates each commander as
+      a singleton. When filtering by exact color identity with `ExactColorMatch = true`, partner
+      combinations with those colors are missed (e.g., searching for W/U/B/R/G doesn't return
+      Thrasios + Tymna, which are stored as separate cards with incomplete color identity).
+      Consider: (a) post-filtering to construct valid partner pairs, (b) storing a "partner identity"
+      field for partner creatures, or (c) a dedicated partner-combo index. Defer until partner
+      discovery is confirmed as a priority.
 
 ---
 
