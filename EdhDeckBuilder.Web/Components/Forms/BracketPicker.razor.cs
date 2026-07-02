@@ -2,9 +2,9 @@ using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Forms;
 
-public partial class BracketPicker
+public partial class BracketPicker : ComponentBase
 {
     [Parameter] public EventCallback<BracketSelection> OnChanged { get; set; }
     [Parameter] public BracketSelection? InitialBracket { get; set; }

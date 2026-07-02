@@ -1,9 +1,9 @@
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Forms;
 
-public partial class BudgetPicker
+public partial class BudgetPicker : ComponentBase
 {
     [Parameter] public EventCallback<BudgetSelection> OnChanged { get; set; }
     [Parameter] public BudgetSelection? InitialBudget { get; set; }

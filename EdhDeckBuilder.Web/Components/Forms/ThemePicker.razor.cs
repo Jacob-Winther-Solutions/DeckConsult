@@ -3,9 +3,9 @@ using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Forms;
 
-public partial class ThemePicker
+public partial class ThemePicker : ComponentBase
 {
     [Parameter] public EventCallback<IReadOnlyList<WeightedTheme>> OnChanged { get; set; }
     [Parameter] public IReadOnlyList<WeightedTheme>? InitialThemes { get; set; }

@@ -1,0 +1,4 @@
+@foreach (var pip in GetPips(Identity))
+{
+    <span class="badge @pip.BadgeClass" style="@pip.Style">@pip.Symbol</span>
+}

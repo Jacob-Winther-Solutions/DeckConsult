@@ -1,9 +1,9 @@
 using EdhDeckBuilder.Core.Decks;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Forms;
 
-public partial class ArchetypePicker
+public partial class ArchetypePicker : ComponentBase
 {
     [Parameter] public EventCallback<IReadOnlyDictionary<Archetype, double>> OnChanged { get; set; }
     [Parameter] public IReadOnlyDictionary<Archetype, double>? InitialArchetypeWeights { get; set; }

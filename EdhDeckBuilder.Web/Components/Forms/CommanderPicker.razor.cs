@@ -2,7 +2,7 @@ using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Forms;
 
 public partial class CommanderPicker
 {

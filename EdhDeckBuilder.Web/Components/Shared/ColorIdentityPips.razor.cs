@@ -1,9 +1,10 @@
-@foreach (var pip in GetPips(Identity))
-{
-    <span class="badge @pip.BadgeClass" style="@pip.Style">@pip.Symbol</span>
-}
+using EdhDeckBuilder.Core.Cards;
+using Microsoft.AspNetCore.Components;
 
-@code {
+namespace EdhDeckBuilder.Web.Components.Shared;
+
+public partial class ColorIdentityPips
+{
     [Parameter] public Color Identity { get; set; }
 
     private static IEnumerable<(string Symbol, string BadgeClass, string Style)> GetPips(Color identity)

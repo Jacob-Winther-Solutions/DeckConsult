@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.JSInterop;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Shared;
 
-public partial class ApiKeySettings
+public partial class ApiKeySettings : ComponentBase
 {
     private const string CookieName = "edh_apikey";
     private const int    CookieDays = 30;

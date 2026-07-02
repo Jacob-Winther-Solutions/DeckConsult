@@ -4,7 +4,7 @@ using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Shared;
 
 public partial class CommanderSuggestionCard
 {

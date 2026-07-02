@@ -1,6 +1,7 @@
 using EdhDeckBuilder.Agent;
 using EdhDeckBuilder.Infrastructure;
 using EdhDeckBuilder.Web.Components;
+using EdhDeckBuilder.Web.Components.Pages;
 using EdhDeckBuilder.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);

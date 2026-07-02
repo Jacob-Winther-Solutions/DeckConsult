@@ -10,9 +10,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 
-namespace EdhDeckBuilder.Web.Components;
+namespace EdhDeckBuilder.Web.Components.Tabs;
 
-public partial class GuidedTab : IDisposable
+public partial class GuidedTab : ComponentBase, IDisposable
 {
     [Inject] private IDeckBuilder          DeckBuilder { get; set; } = default!;
     [Inject] private SessionApiKeyProvider Keys        { get; set; } = default!;

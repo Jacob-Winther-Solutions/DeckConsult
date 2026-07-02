@@ -116,7 +116,7 @@ it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` envi
 dotnet restore
 dotnet build
 
-# Run all 271 tests:
+# Run all 281 tests:
 dotnet test Tests
 
 # Run the app:
@@ -186,6 +186,23 @@ deck sizes (~300–500 KB serialized):
 ```csharp
 builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 5 * 1024 * 1024);
 ```
+
+### Component organization
+
+Blazor components in `EdhDeckBuilder.Web/Components/` are organized into logical subfolders:
+
+```
+Components/
+├── Pages/              # Route-level entry points (CommanderBuilder, CommanderDiscovery, DeckResultsPage, etc.)
+├── Forms/              # Input controls & pickers (ArchetypePicker, BracketPicker, BudgetPicker, ColorIdentityPicker, CommanderPicker, ThemePicker)
+├── Shared/             # Reusable UI components (ApiKeySettings, ColorIdentityPips, CommanderSuggestionCard)
+├── Tabs/               # Tab content areas (CustomTab, DiscoveryTab, GuidedTab)
+├── Results/            # Deck display components (BuildProgress, DeckExportPanel, DeckResults)
+├── Layout/             # Navigation chrome (MainLayout, NavMenu, ReconnectModal)
+└── _Imports.razor      # Global usings for all components
+```
+
+All component code is in `.razor.cs` code-behind files using the `public partial class` pattern — no `@code` blocks in `.razor` markup. Each component inherits from `ComponentBase` (explicit in code-behind) and includes its full namespace declaration.
 
 ---
 

@@ -82,6 +82,10 @@ them describe a strategy and get back a shortlist of commanders that fit, before
 - [x] **UI:** A "Help me choose a commander" entry point before the deck-build form. Shows
       the shortlist with art, color identity, and the LLM's explanation; user clicks one to
       proceed to the full build.
+- [ ] **Custom tab for CommanderDiscovery:** The discovery page currently only has a DiscoveryTab for
+      LLM-assisted commander finding. Add a CustomTab variant (like CommanderBuilder has) allowing
+      users to manually enter a commander directly and proceed to the builder with the same
+      pre-population flow.
 - [ ] **Partner and partner-with support:** Discovery currently evaluates each commander as
       a singleton. When filtering by exact color identity with `ExactColorMatch = true`, partner
       combinations with those colors are missed (e.g., searching for W/U/B/R/G doesn't return
