@@ -30,7 +30,7 @@ public static class SelectionPrompt
         ## Output rules
         - Rank every candidate provided — do not omit any.
         - Rank 1 is the best, rank N (the total count) is the worst.
-        - The rationale must be 1–2 sentences explaining why this card earns its position in THIS specific deck. Mention the commander by name, a concrete mechanical interaction, or a specific synergy with the archetype or theme. Every rationale must be deck-specific — a rationale that could be copy-pasted unchanged to a different deck is wrong.
+        - The rationale must be a single sentence (≤15 words) explaining why this card is good for THIS specific deck. Be specific: name the commander or mention a concrete mechanic, not generic value.
         - FORBIDDEN rationale patterns (do not use these or any paraphrase of them): "top recommendation", "highly recommended", "popular choice", "community staple", "widely played", "selected from", "one of the best", "commonly seen", or any reference to EDHREC, Scryfall, Archidekt, or any other external tool or data source. If you cannot find a deck-specific reason, explain what the card does and why that effect is valuable at this power level in this commander's colours.
         - Return the oracle_id values exactly as provided — do not invent or modify any.
         """;
@@ -82,8 +82,20 @@ public static class SelectionPrompt
         sb.AppendJoin(", ", filledRoles);
         sb.AppendLine();
 
+        // Compute request count based on role target + buffer
+        var roleTarget = context.ResolvedTemplate.Targets.TryGetValue(role, out var target)
+            ? target.Ideal
+            : 10;
+        var buffer = role switch
+        {
+            CardRole.Land => 5,           // land base has more variance
+            CardRole.Ramp or CardRole.CardAdvantage => 4,
+            _ => 2
+        };
+        var requestCount = Math.Min(roleTarget + buffer, candidates.Count);
+
         sb.AppendLine();
-        sb.AppendLine($"Rank the following {candidates.Count} {role} candidates from best to worst using the {ToolName} tool:");
+        sb.AppendLine($"Identify the top {requestCount} best candidates for {role} from the following {candidates.Count} options:");
 
         foreach (var fc in candidates)
         {

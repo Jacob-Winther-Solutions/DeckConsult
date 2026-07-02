@@ -1,3 +1,4 @@
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
@@ -15,6 +16,11 @@ namespace EdhDeckBuilder.Agent.Interfaces;
 /// </remarks>
 public interface IDeckBuilder
 {
+    /// <summary>
+    /// Optional usage tracker for instrumenting token usage across the build.
+    /// Set before calling <c>BuildAsync</c> to capture per-call metrics.
+    /// </summary>
+    UsageTracker? UsageTracker { get; set; }
     /// <param name="commanders">
     /// One commander normally; two for partner / background pairings.
     /// Must be valid commanders (checked by the caller before invoking the builder).

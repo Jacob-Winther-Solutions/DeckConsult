@@ -1,6 +1,8 @@
 using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Agent.Fill;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
+using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
@@ -28,7 +30,24 @@ public sealed class DeckBuilder(
     ILlmClassifier classifier,
     ICardSelector selector) : IDeckBuilder
 {
-    private const int ClassificationBatchSize = 50;
+    private const int ClassificationBatchSize = 100;
+    private UsageTracker? _usageTracker;
+
+    public UsageTracker? UsageTracker
+    {
+        get => _usageTracker;
+        set
+        {
+            _usageTracker = value;
+            if (value != null)
+            {
+                if (classifier is LlmClassifier llmClassifier)
+                    llmClassifier.SetUsageTracker(value);
+                if (selector is LlmSelector llmSelector)
+                    llmSelector.SetUsageTracker(value);
+            }
+        }
+    }
 
     public async Task<DeckBuildResult> BuildAsync(
         IReadOnlyList<Card> commanders,

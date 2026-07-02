@@ -22,7 +22,7 @@ A living list of deferred work. Check items off as they land.
 - [x] Budget input in the UI (see Budget section below).
 - [x] Deck download: "Export Build Report" button generates a `.md` file and streams it as a browser download
       (see Deck Download section below).
-- [ ] Refactor UI to make components reusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
+- [x] Refactor UI to make components reusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
 
 ---
 

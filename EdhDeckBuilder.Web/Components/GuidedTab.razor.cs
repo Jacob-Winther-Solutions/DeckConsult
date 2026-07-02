@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
@@ -6,6 +7,7 @@ using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 
 namespace EdhDeckBuilder.Web.Components;
@@ -18,6 +20,7 @@ public partial class GuidedTab : IDisposable
     [Inject] private IApiKeyStateService   ApiKeyState { get; set; } = default!;
     [Inject] private NavigationManager     Navigation  { get; set; } = default!;
     [Inject] private DeckResultStore       ResultStore { get; set; } = default!;
+    [Inject] private IConfiguration        Config      { get; set; } = default!;
 
     private static readonly string[] AllStages =
     [
@@ -98,6 +101,14 @@ public partial class GuidedTab : IDisposable
 
         var p = BuildRequestFactory.ForGuided(_archetypeWeights, _themes, _bracketSelection, _budget);
 
+        // Enable token tracking if configured
+        var enableTracking = Config.GetValue<bool>("Features:EnableTokenUsageTracking");
+        if (enableTracking)
+        {
+            var tracker = new UsageTracker();
+            DeckBuilder.UsageTracker = tracker;
+        }
+
         try
         {
             var buildResult = await DeckBuilder.BuildAsync(
@@ -109,6 +120,15 @@ public partial class GuidedTab : IDisposable
                 p.Constraints,
                 new Progress<string>(OnStageReport),
                 _buildCts.Token);
+
+            // Log usage if tracking was enabled
+            if (enableTracking && DeckBuilder.UsageTracker != null)
+            {
+                var summary = DeckBuilder.UsageTracker.GetSummary();
+                Console.WriteLine($"=== Token Usage Summary ===");
+                Console.WriteLine(DeckBuilder.UsageTracker.FormatTable());
+                Console.WriteLine($"Total cost: ${summary.EstimatedCostUsd:F4}");
+            }
 
             await InvokeAsync(async () =>
             {

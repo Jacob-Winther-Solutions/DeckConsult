@@ -2,6 +2,7 @@ using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
 using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Classification;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Prompts;
 using EdhDeckBuilder.Core.Cards;
@@ -18,6 +19,9 @@ namespace EdhDeckBuilder.Agent.Llm;
 public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCache cache) : ILlmClassifier
 {
     private const int MaxTokens = 4096;
+    private UsageTracker? _usageTracker;
+
+    public void SetUsageTracker(UsageTracker tracker) => _usageTracker = tracker;
 
     public async Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
         IReadOnlyList<CardCandidate> candidates,
@@ -42,11 +46,13 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
     {
         var client = factory.CreateForCurrentUser();
 
+        var systemMessage = ClassificationPrompt.SystemPrompt;
+
         var request = new MessageCreateParams
         {
             Model     = ClaudeModels.Haiku,   // classification always uses Haiku
             MaxTokens = MaxTokens,
-            System    = new MessageCreateParamsSystem(ClassificationPrompt.SystemPrompt),
+            System    = new MessageCreateParamsSystem(systemMessage),
             Tools     = [ClassificationPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = ClassificationPrompt.ToolName },
             Messages  =
@@ -58,6 +64,8 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
         try
         {
             var response = await client.Messages.Create(request, ct);
+            if (_usageTracker != null)
+                _usageTracker.RecordCall("ClassifyBatch", ClaudeModels.Haiku, response.Usage);
             return ParseResponse(response.Content, candidates);
         }
         catch (AnthropicUnauthorizedException ex)

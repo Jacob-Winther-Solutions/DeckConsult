@@ -28,6 +28,10 @@ API usage:
 - Haiku, Tymna+Kraum, Combo, Pillowfort, Bracket 3, Budget 15 pr card 300 total:            0,36 -> 0,14 = 0,22 (26th try) (Yet Another Multi LocalStorage test)
 --------------- Funds refill -> +5 => 5.14 ------------------------
 - Kozilek, the Great Distortion, Aggro, Big-Mana, Bracket 3, Budget 15 pr card 300 total:   5,14 -> 5,02 = 0,12 (27th try) (Final Multi LocalStorage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        5,02 -> 4,89 = 0,13 (28th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        4,89 -> 4,80 = 0,09 (29th try) (Phase 1 Cost reduction test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                        4,80 -> 4,71 = 0,09 (29th try) (Phase 2 Cost reduction test)
+
 
 Bad classifications:
 Sephiroth (third try):
@@ -40,3 +44,4 @@ UI:
 Notes:
 - Check if it is possible to see how far each step has gotten when running the builder/LLM.
 - Consider adding a "must-include" feature to the builder, where the user can register cards to the 99 that must be in the deck. The LLM can suggest to cut them, but they must be classified, evaluated and included.
+- Consider having the "By Type" tab as the default one in the Results page.

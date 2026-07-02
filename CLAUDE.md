@@ -92,6 +92,14 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
 - **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
   after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
   backward compatibility.
+- **Prompt caching pending SDK update:** Anthropic SDK v12.30.0 does not yet expose `SystemBlockParam`
+  in the public API. When the SDK adds this (v12.31.0+), update `LlmClassifier.cs` and `LlmSelector.cs`
+  to wrap `SystemPrompt` in `SystemBlockParam` with `CacheControl = new CacheControlEphemeral()`.
+  See `TODO/CACHING_INVESTIGATION.md` for implementation. This will enable 25–30% cost reduction on
+  multi-build sessions through prompt caching.
+- **SDK versioning:** Anthropic package is pinned to v12.30.0 in `EdhDeckBuilder.Agent.csproj` to
+  prevent unexpected breaking changes. Review release notes before updating; notify the team of any
+  API changes that affect `LlmClassifier.cs` or `LlmSelector.cs`.
 
 ## Conventions
 

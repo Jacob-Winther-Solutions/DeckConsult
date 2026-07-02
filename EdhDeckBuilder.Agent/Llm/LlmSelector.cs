@@ -1,6 +1,7 @@
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Agent.Prompts;
@@ -18,6 +19,9 @@ namespace EdhDeckBuilder.Agent.Llm;
 public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
 {
     private const int MaxTokens = 2048;
+    private UsageTracker? _usageTracker;
+
+    public void SetUsageTracker(UsageTracker tracker) => _usageTracker = tracker;
 
     public async Task<IReadOnlyList<SelectionResult>> SelectAsync(
         CardRole role,
@@ -31,11 +35,13 @@ public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
 
         var client = factory.CreateForCurrentUser();
 
+        var systemMessage = SelectionPrompt.SystemPrompt;
+
         var request = new MessageCreateParams
         {
             Model      = factory.SelectionModel,
             MaxTokens  = MaxTokens,
-            System     = new MessageCreateParamsSystem(SelectionPrompt.SystemPrompt),
+            System     = new MessageCreateParamsSystem(systemMessage),
             Tools      = [SelectionPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = SelectionPrompt.ToolName },
             Messages   =
@@ -47,6 +53,8 @@ public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
         try
         {
             var response = await client.Messages.Create(request, ct);
+            if (_usageTracker != null)
+                _usageTracker.RecordCall($"Select-{role}", factory.SelectionModel, response.Usage);
             return ParseResponse(response.Content, candidates);
         }
         catch (AnthropicUnauthorizedException ex)
