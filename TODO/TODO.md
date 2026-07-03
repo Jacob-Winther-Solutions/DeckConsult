@@ -59,33 +59,37 @@ a list full of expensive staples they have to manually replace. Two independent 
 
 ---
 
-## Commander selection / discovery  (done — one enhancement deferred)
+## Commander selection / discovery  (done — two enhancements deferred)
 
-Currently the user must already know which commander they want. A discovery mode would let
-them describe a strategy and get back a shortlist of commanders that fit, before building a deck.
+Users can now describe a strategy and get a ranked LLM shortlist of commanders that fit via a
+dedicated `/discover` page. The page is standalone and independent of the CommanderBuilder.
 
 - [x] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
       optional colors or color identity constraints, and optionally a free-text description
       ("I want a grindy aristocrats deck that can play against Bracket 3–4").
-- [x] **Query the commander pool.** Scryfall can return all legendary creatures legal in
+- [x] **Query the commander pool.** Scryfall returns all legendary creatures legal in
       Commander filtered by color identity. This becomes the candidate set.
-- [x] **Score and rank commanders.** Ask the LLM to evaluate each candidate against the
-      stated strategy: does this commander's abilities actively support the archetype and theme,
-      or is it a generic good-stuff commander? Return a ranked shortlist (top 5–10) with a
-      one-paragraph explanation per candidate.
-- [x] **Wire into the pipeline.** Selecting a commander from the shortlist should feed directly
-      into the existing `IDeckBuilder.BuildAsync` flow, pre-populating the archetype/theme
-      weights the discovery mode resolved.
-- [x] **Consider a new interface `ICommanderSelector`** in the Agent layer, parallel to
-      `ILlmClassifier` and `ICardSelector`, so the LLM call is mockable and independently
-      testable.
-- [x] **UI:** A "Help me choose a commander" entry point before the deck-build form. Shows
-      the shortlist with art, color identity, and the LLM's explanation; user clicks one to
-      proceed to the full build.
+- [x] **Score and rank commanders.** LLM evaluates each candidate against the stated strategy:
+      does this commander's abilities actively support the archetype and theme, or is it
+      generic good-stuff? Returns a ranked shortlist (top 5–10) with one-paragraph explanation
+      per candidate via `ICommanderSelector` and `LlmCommanderSelector`.
+- [x] **Core infrastructure** — `ICardRepository.GetCommandersAsync` with color-identity filtering
+      and exact-match option in `CardRepository`.
+- [x] **Agent layer** — `CommanderDiscoveryRequest`, `CommanderDiscoveryResult`, `CommanderSuggestion`,
+      `ICommanderDiscovery`, `CommanderDiscovery` service with batching (≤150 single call,
+      >150 two-pass). `ICommanderSelector` interface + `LlmCommanderSelector` (user-selected model,
+      forced tool call, whitelist filtering). `CommanderSelectionPrompt` static system prompt +
+      tool schema.
+- [x] **Web UI** — Standalone `/discover` page. `DiscoveryTab.razor/.cs` with form (color picker,
+      archetype/theme/bracket/budget selectors, free-text description), LLM call with progress,
+      results grid. `CommanderSuggestionCard.razor` displays art, rationale, rank.
+      `ColorIdentityPicker.razor` (any-color toggle + 5-color checkboxes + exact-match checkbox).
+- [x] **Tests** — `CommanderDiscoveryTests` (pool size, batching, color filters),
+      `CommanderSelectionPromptTests` (message formatting), `MockCommanderSelector` manual mock.
+      All 281 existing tests pass; Commander Discovery tests included.
 - [ ] **Custom tab for CommanderDiscovery:** The discovery page currently only has a DiscoveryTab for
       LLM-assisted commander finding. Add a CustomTab variant (like CommanderBuilder has) allowing
-      users to manually enter a commander directly and proceed to the builder with the same
-      pre-population flow.
+      users to manually enter a commander directly without an LLM call.
 - [ ] **Partner and partner-with support:** Discovery currently evaluates each commander as
       a singleton. When filtering by exact color identity with `ExactColorMatch = true`, partner
       combinations with those colors are missed (e.g., searching for W/U/B/R/G doesn't return
@@ -143,11 +147,13 @@ sanctioned sources to add are:
 
 ---
 
-## Historic Brawl format support  (new format — depends on Additional sources above)
+## Multi-format support  (new formats — depends on Additional sources above)
 
-Historic Brawl on MTG Arena is 100-card singleton, same physical count as Commander, but
+### Historic Brawl on MTG Arena
+
+Historic Brawl is 100-card singleton, same physical count as Commander, but
 with meaningful differences: 1-vs-1, an **eternal** card pool (no rotation — cards are only
-removed via the Historic Brawl ban list when sets release new cards are added), and two
+removed via the Historic Brawl ban list when sets release), and two
 distinct queues with different power expectations.
 
 Key differences from EDH to plan around:
@@ -187,6 +193,39 @@ rules, and card ingestion need format-specific variants.
 - [ ] Update `IDeckBuilder.BuildAsync` (or a new `IBrawlDeckBuilder`) to accept a
       `FormatProfile` and route to the correct template, sources, and legality rules.
 - [ ] Test with a known strong Historic Brawl commander (e.g. Atraxa, Raffine, Sheoldred).
+
+### Duel Commander (French Commander)
+
+Duel Commander is 1v1 100-card singleton with a separate, more aggressive banlist than EDH.
+The format is primarily European but has a global competitive community with top-8 finishes
+published regularly.
+
+- [ ] Research Duel Commander legality — card pool differs from EDH (separate banlist).
+  Scryfall does not expose a dedicated legality flag; use an external source (e.g. Archidekt,
+  Scryfall's `restricted` flag, or French Commander's official banlist).
+- [ ] Integrate competitive meta source — TopDeck.gg covers Duel Commander tournaments.
+- [ ] Create Duel Commander `DeckTemplate` baseline — tuned for 1v1 faster pace vs. multiplayer EDH.
+- [ ] Update `FormatProfile` to support Duel Commander legality and bracket/queue model.
+
+### Pauper EDH (Pauper Commander)
+
+Pauper EDH is a casual variant where all cards in the deck (including the commander) must
+have been printed at common rarity at some point. No official format body, but active community.
+
+- [ ] Integrate Scryfall's rarity data — cards must be `rarity == "common"`.
+- [ ] Confirm banlist source (if any) — Pauper EDH is community-managed.
+- [ ] Create Pauper EDH `DeckTemplate` baseline — tuned for constrained power level.
+- [ ] Update `FormatProfile` to support Pauper EDH legality.
+
+### Peasant Commander
+
+Peasant Commander allows up to 5 uncommon cards in the deck (commander can be uncommon or rare,
+but only 5 uncommons allowed in the 99). Similar community-managed status to Pauper EDH.
+
+- [ ] Research Peasant Commander rules and banlist source.
+- [ ] Implement rarity-counting logic — track uncommons per deck, flag when exceeding 5.
+- [ ] Create Peasant Commander `DeckTemplate` baseline.
+- [ ] Update `FormatProfile` to support Peasant Commander legality and rarity constraints.
 
 ---
 
@@ -341,6 +380,87 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
       themselves — shares the `CartLine` mapping with the buy button.
 - [ ] (Future) Multi-retailer support (Card Kingdom etc.) — keep the builder interface shaped
       so a second provider can slot in without redesign.
+
+---
+
+## Deck Analysis & Enhancement Track  (new — three features)
+
+See `TODO/TODO_new_features.md` for the full brainstorm session with design context and open questions.
+
+### 1. Deck Analyzer
+
+Given an existing decklist (not built by this tool), classify it against the role taxonomy,
+estimate bracket/power level, and generate staged budget upgrade paths.
+
+**Features:**
+- [ ] **Decklist ingestion**: accept pasted decklists in common export formats (at minimum:
+      plain `1 Card Name` per line, Arena format). Resolve each line to Scryfall via existing
+      client. Handle fuzzy matches, DFCs, misprints, not-found cards (report to user).
+- [ ] **Commander detection**: separate commander(s) from the 99 — may need explicit user input
+      if format doesn't mark it.
+- [ ] **Role classification**: reuse `LlmClassifier` on pasted deck to tag cards with roles,
+      surface `CoverageByRole`, identify significant gaps vs. baseline template targets.
+      Output a report structure (reusable by subsequent features).
+- [ ] **Bracket estimation**: reuse/refactor existing bracket logic (currently generative only)
+      to evaluate a deck and estimate its bracket. Include human-readable explanation (e.g.
+      "N fast mana + M tutors").
+- [ ] **Budget upgrade paths**: given classified/gapped decklist, generate staged upgrade
+      suggestions at multiple budget tiers, mapped to identified role gaps. Reuse selection
+      logic rather than building parallel system.
+- [ ] **User experience feedback**: optional free-text field where user describes what they found
+      working and not working with the deck (e.g. "I always find that I cannot recover from a 
+      board wipe" or "It builds well, but I cannot finish the game"). This informs gap analysis 
+      and upgrade suggestions — if user reports recovery issues, prioritize board wipe protection 
+      in upgrades; if they report finishing issues, prioritize payoff/draw/tutors.
+
+**Open questions for Master:**
+- Exact budget tier breakpoints.
+- Which export formats to prioritize (Moxfield, Archidekt, Arena, MTGO).
+- Whether bracket-estimation needs new logic or can reuse generative constraints.
+- How to weight user experience feedback in upgrade suggestions (use as primary signal, secondary, or informational only)?
+
+### 2. Combo Finder
+
+Given a decklist, surface Commander Spellbook combos that are "close" — achievable with a
+small number of additional cards.
+
+- [ ] Integrate Commander Spellbook REST API client in Infrastructure (verify not already
+      scoped in `DATA_SOURCES.md`).
+- [ ] Query for combos where most pieces are already present; define and implement "distance"
+      metric (e.g. combos missing 1–2 cards, ranked by fewest missing).
+- [ ] Output: combo name/pieces, owned vs. missing, effect description. Respect Spellbook's
+      licensing/attribution.
+- [ ] **Integration point 1:** standalone check against pasted decklist (pairs with Analyzer).
+- [ ] **Integration point 2:** optional read-only signal during deck building (confirm with
+      Master — recommend starting read-only to avoid entangling with deterministic fill logic).
+
+**Open questions for Master:**
+- Is v1 read-only (analysis/discovery) or should it feed into build-time selection?
+- Attribution/display requirements from Spellbook's licensing.
+
+### 3. Locked / Included Cards
+
+Let the user specify cards that must appear in the generated deck regardless of budget,
+theme, or archetype constraints — for pet cards or cards the user already owns.
+
+- [ ] Add locked-card list input to Deck Builder flow (reuse decklist ingestion from Analyzer).
+- [ ] Validate locked cards against commander color identity before build starts; reject or
+      warn on illegal inclusions.
+- [ ] Reserved as fixed slots before fill pass; counted toward `CoverageByRole` so fill pass
+      doesn't over-provision.
+- [ ] Confirm interaction with land count / Pass A / Pass B logic if locked card is a land.
+- [ ] Confirm interaction with `RoleRelation` types — locked card with multiple roles must
+      resolve correctly.
+
+**Open questions for Master:**
+- Budget semantics: excluded from total budget entirely, or deducted from remaining budget?
+- Cap on number of locked cards (warn if alone they exceed 99, or hard build error)?
+
+### Explicitly out of scope for Deck Analysis track
+
+- Partner/Background commander support (separate, already on Master's roadmap).
+- True collection import via persistent storage (no storage layer exists yet; locked-card input is a per-run manual workaround, not collection tracking).
+- Any changes to Brawl builder, Duel Commander, or other format expansion work.
 
 ---
 
