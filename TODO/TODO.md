@@ -59,10 +59,11 @@ a list full of expensive staples they have to manually replace. Two independent 
 
 ---
 
-## Commander selection / discovery  (done — two enhancements deferred)
+## Commander selection / discovery  (done — one enhancement deferred)
 
 Users can now describe a strategy and get a ranked LLM shortlist of commanders that fit via a
 dedicated `/discover` page. The page is standalone and independent of the CommanderBuilder.
+Two discovery modes: **Guided** (archetype/theme-driven) and **Custom** (free-text description).
 
 - [x] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
       optional colors or color identity constraints, and optionally a free-text description
@@ -87,9 +88,13 @@ dedicated `/discover` page. The page is standalone and independent of the Comman
 - [x] **Tests** — `CommanderDiscoveryTests` (pool size, batching, color filters),
       `CommanderSelectionPromptTests` (message formatting), `MockCommanderSelector` manual mock.
       All 281 existing tests pass; Commander Discovery tests included.
-- [ ] **Custom tab for CommanderDiscovery:** The discovery page currently only has a DiscoveryTab for
-      LLM-assisted commander finding. Add a CustomTab variant (like CommanderBuilder has) allowing
-      users to manually enter a commander directly without an LLM call.
+- [x] **Custom tab for CommanderDiscovery:** The discovery page now has two tabs: Guided (archetype/theme-driven,
+      LLM-assisted) and Custom (free-text description). Custom tab mirrors the CustomTab pattern from
+      CommanderBuilder but accepts a deck description instead of a commander. Both tabs surface results
+      as ranked `CommanderSuggestionCard`s that link to the builder with pre-selected commanders.
+- [x] **UI polish:** Color Identity picker now shows the "Exactly this identity" checkbox inline
+      with the color buttons (flexbox layout) for better visibility. Token usage logging is consistent
+      across all discovery and build flows (summary header, table, total cost).
 - [ ] **Partner and partner-with support:** Discovery currently evaluates each commander as
       a singleton. When filtering by exact color identity with `ExactColorMatch = true`, partner
       combinations with those colors are missed (e.g., searching for W/U/B/R/G doesn't return

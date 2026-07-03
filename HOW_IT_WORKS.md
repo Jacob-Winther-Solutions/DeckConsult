@@ -5,6 +5,48 @@ and where your judgment still matters.
 
 ---
 
+## Commander Discovery
+
+If you know what kind of deck you want to build but haven't settled on a commander yet, use
+the **Commander Discovery** page (`/discover`). You describe your strategy, and the tool suggests
+commanders that fit.
+
+### Guided discovery
+
+The **Guided** tab asks for:
+
+- **Archetype(s)** — how you want to win (Control, Aggro, Combo, Midrange)
+- **Theme(s)** — what mechanical identity you want (Big Mana, Aristocrats, Voltron, etc.)
+- **Color identity (optional)** — filter the candidate pool to specific colors
+- **Bracket (optional)** — filter by power level (Casual through cEDH)
+- **Budget (optional)** — filter by price point (per-card or total deck budget)
+- **Additional notes (optional)** — free-text description of your strategy
+
+The tool queries all legal commanders, scores them against your inputs using Claude, and
+shows you a ranked shortlist with explanations. Click any result to jump to the builder
+with that commander pre-selected.
+
+### Custom discovery
+
+The **Custom** tab is for when you want to describe your deck idea in prose:
+
+- **Deck description (required)** — a free-text explanation of the strategy, play style, and
+  win conditions you have in mind. Be as specific as you'd like — the more detail you provide,
+  the better the suggestions.
+- **Color identity (optional)** — filter the commander pool by color
+- **Bracket (optional)** — power level guidance
+- **Budget (optional)** — price constraints
+
+The tool uses your description to find fitting commanders without requiring you to break down
+archetypes and themes upfront. This is useful if you have a specific play pattern in mind that
+doesn't neatly fit preset categories.
+
+Both tabs show results as a ranked list of suggested commanders. Each suggestion includes the
+commander's image, ability text, and a written explanation of why it fits your criteria. Click
+any card to build a deck with that commander pre-selected in the builder.
+
+---
+
 ## What you provide
 
 ### Before you start

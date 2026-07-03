@@ -1,0 +1,93 @@
+@using EdhDeckBuilder.Core.Cards
+@using EdhDeckBuilder.Core.Decks
+@using EdhDeckBuilder.Agent.Models
+
+<div class="card">
+    <div class="card-body">
+        @if (_isRunning)
+        {
+            <div class="spinner-border mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>@_currentStage</p>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Cancel())">Cancel</button>
+        }
+        else if (_result != null && _result.Suggestions.Count > 0)
+        {
+            <h5 class="mb-3">Found @_result.Suggestions.Count commanders</h5>
+            <button class="btn btn-outline-secondary mb-3" @onclick="@(() => ResetForm())">← Refine search</button>
+            <div class="row">
+                @foreach (var suggestion in _result.Suggestions)
+                {
+                    <div class="col-lg-6 mb-3">
+                        <CommanderSuggestionCard Suggestion="suggestion"
+                                                ArchetypeWeights="new Dictionary<Archetype, double>()"
+                                                Themes="[]"
+                                                BracketSelection="_bracketSelection"
+                                                Budget="_budget" />
+                    </div>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @_errorMessage
+            </div>
+        }
+        else
+        {
+            <!-- ── Section A: Deck Description ──────────────────────────────────── -->
+            <div class="card mb-4">
+                    <div class="card-header fw-semibold">Deck Description <span class="text-danger small ms-1">required</span></div>
+                    <div class="card-body">
+                        <label class="form-label small fw-semibold mb-1">Describe the deck you want to build</label>
+                        <textarea class="form-control" rows="4" @bind="_description"
+                                  placeholder="e.g., A graveyard-focused Aristocrats deck with a sacrifice theme, or a fast combo deck that wins through Laboratory Maniac."></textarea>
+                        <div class="text-muted small mt-1">Used as guidance for selecting a fitting commander and building your deck.</div>
+                    </div>
+                </div>
+
+                <!-- ── Section B: Color Identity (Optional) ───────────────────────── -->
+                <div class="card mb-4">
+                    <div class="card-header fw-semibold">Color Identity <span class="text-muted small ms-1">optional</span></div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Filter the commander pool by color identity.</p>
+                        <ColorIdentityPicker OnChanged="OnColorFilterChanged" />
+                    </div>
+                </div>
+
+                <!-- ── Section C: Bracket (Optional) ──────────────────────────────── -->
+                <div class="card mb-4">
+                    <div class="card-header fw-semibold">Power Level <span class="text-muted small ms-1">optional</span></div>
+                    <div class="card-body">
+                        <BracketPicker OnChanged="OnBracketChanged" />
+                    </div>
+                </div>
+
+                <!-- ── Section D: Budget ────────────────────────────────────────────── -->
+                <BudgetPicker OnChanged="OnBudgetChanged" @key="_budgetResetKey" />
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger alert-dismissible mb-4">
+                        @_errorMessage
+                        <button type="button" class="btn-close" @onclick="@(() => _errorMessage = null)"></button>
+                    </div>
+                }
+
+            <!-- ── Find button ──────────────────────────────────────────────– -->
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary"
+                        disabled="@(string.IsNullOrWhiteSpace(_description) || _isRunning)"
+                        @onclick="@(() => StartBuildAsync())">
+                    Find Commanders
+                </button>
+                @if (string.IsNullOrWhiteSpace(_description))
+                {
+                    <span class="align-self-center text-muted small">Add a deck description to continue.</span>
+                }
+            </div>
+        }
+    </div>
+</div>

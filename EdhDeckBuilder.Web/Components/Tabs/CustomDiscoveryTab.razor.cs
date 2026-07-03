@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EdhDeckBuilder.Web.Components.Tabs;
 
-public partial class DiscoveryTab : IDisposable
+public partial class CustomDiscoveryTab : ComponentBase, IDisposable
 {
     [Inject] private ICommanderDiscovery Discovery { get; set; } = default!;
     [Inject] private SessionApiKeyProvider Keys { get; set; } = default!;
@@ -17,32 +17,56 @@ public partial class DiscoveryTab : IDisposable
 
     private Color? _colorFilter = null;
     private bool _exactColorMatch = false;
-    private IReadOnlyDictionary<Archetype, double> _archetypeWeights = new Dictionary<Archetype, double>();
-    private IReadOnlyList<WeightedTheme> _themes = [];
     private BracketSelection _bracketSelection = new(Bracket.Three, true);
     private BudgetSelection _budget = new(null, null);
     private string _description = "";
 
     private bool _isRunning = false;
     private string _currentStage = "";
-    private string _errorMessage = "";
+    private string? _errorMessage;
     private CancellationTokenSource? _cts;
     private CommanderDiscoveryResult? _result;
+
+    private int _budgetResetKey = 0;
+
+    // ── Static form metadata ───────────────────────────────────────────────
+
+    private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
+        DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);
+
+    private static readonly CardRole[] FormRoles =
+        Enum.GetValues<CardRole>().Where(r => r != CardRole.Unclassified).ToArray();
+
+    private static Dictionary<CardRole, int> BuildDefaultTemplateValues() =>
+        FormRoles.ToDictionary(r => r,
+            r => DeckTemplate.Balanced.Targets.TryGetValue(r, out var t) ? t.Ideal : 0);
+
+    private Dictionary<CardRole, int> _customTemplateValues = BuildDefaultTemplateValues();
+
+    private static readonly IReadOnlyDictionary<CardRole, string> RoleDescriptions =
+        new Dictionary<CardRole, string>
+        {
+            [CardRole.Land]               = "Lands and mana-producing permanents",
+            [CardRole.Ramp]               = "Accelerants — rocks, dorks, rituals, land-fetch spells",
+            [CardRole.CardAdvantage]      = "Draw, impulse draw, and hand-refill effects",
+            [CardRole.TargetedDisruption] = "Single-target removal for creatures, artifacts, enchantments",
+            [CardRole.MassDisruption]     = "Board wipes and mass-bounce effects",
+            [CardRole.Protection]         = "Counterspells, hexproof, indestructibility",
+            [CardRole.Tutor]              = "Search effects that find specific cards",
+            [CardRole.Recursion]          = "Graveyard recursion and reanimation effects",
+            [CardRole.Plan]               = "Engines and threats that execute your core strategy",
+            [CardRole.Payoff]             = "Cards that close out or greatly accelerate a win",
+            [CardRole.Synergy]            = "Pieces that interact favorably with your commander or strategy",
+        };
+
+    internal static string RoleLabel(CardRole role) => CardRoleDisplay.FormLabel(role);
+
+    // ── Callbacks ──────────────────────────────────────────────────────────
 
     private void OnColorFilterChanged(ColorFilterSelection selection)
     {
         _colorFilter = selection.Filter;
         _exactColorMatch = selection.ExactMatch;
-    }
-
-    private void OnArchetypesChanged(IReadOnlyDictionary<Archetype, double> weights)
-    {
-        _archetypeWeights = weights;
-    }
-
-    private void OnThemesChanged(IReadOnlyList<WeightedTheme> themes)
-    {
-        _themes = themes;
     }
 
     private void OnBracketChanged(BracketSelection selection)
@@ -55,10 +79,14 @@ public partial class DiscoveryTab : IDisposable
         _budget = budget;
     }
 
-    private async Task FindCommandersAsync()
+    // ── Build ──────────────────────────────────────────────────────────────
+
+    private async Task StartBuildAsync()
     {
+        if (string.IsNullOrWhiteSpace(_description)) return;
+
         _isRunning = true;
-        _errorMessage = "";
+        _errorMessage = null;
         _result = null;
         _cts = new CancellationTokenSource();
 
@@ -69,8 +97,8 @@ public partial class DiscoveryTab : IDisposable
         {
             var request = new CommanderDiscoveryRequest
             {
-                Archetypes = _archetypeWeights.Keys.ToList(),
-                Themes = _themes.Where(t => t.Profile.Theme.HasValue).Select(t => t.Profile.Theme!.Value).ToList(),
+                Archetypes = [],
+                Themes = [],
                 ColorFilter = _colorFilter,
                 ExactColorMatch = _exactColorMatch,
                 Bracket = _bracketSelection.Bracket,
@@ -126,14 +154,13 @@ public partial class DiscoveryTab : IDisposable
     {
         _colorFilter = null;
         _exactColorMatch = false;
-        _archetypeWeights = new Dictionary<Archetype, double>();
-        _themes = [];
         _bracketSelection = new(Bracket.Three, true);
         _budget = new(null, null);
         _description = "";
         _result = null;
-        _errorMessage = "";
+        _errorMessage = null;
         _currentStage = "";
+        _customTemplateValues = BuildDefaultTemplateValues();
     }
 
     void IDisposable.Dispose()
