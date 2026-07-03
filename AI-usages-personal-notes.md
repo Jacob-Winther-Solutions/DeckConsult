@@ -46,7 +46,11 @@ API usage:
 - Haiku, Commander Discovery, WUBG (excatly), Combo, Counters, Bracket 3, Budget 15 pr card 300 total, Angels       4,26 -> 4,26 = 0,00 (41th try) (Test of transfering Source information to builder page)
 - Haiku, Commander Discovery, WUBG (excatly), Combo, Counters, Bracket 3, Budget 15 pr card 300 total, Angels       4,26 -> 4,26 = 0,00 (42th try) (Test of transfering Source information to builder page)
 - Haiku, Commander Discovery, WUBG (excatly), Combo, Counters, Bracket 3, Budget 15 pr card 300 total, Angels       4,26 -> 4,26 = 0,00 (43th try) (Test of transfering Source information to builder page)
-
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                4,26 -> 4,17 = 0,09 (44th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                4,17 -> 4,07 = 0,10 (45th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                4,07 -> 3,99 = 0,08 (46th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                3,99 -> 3,90 = 0,09 (47th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                3,90 -> 3,80 = 0,10 (48th try) (Token usage test)
 
 Bad classifications:
 Sephiroth (third try):

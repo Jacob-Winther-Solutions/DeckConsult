@@ -35,13 +35,11 @@ public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
 
         var client = factory.CreateForCurrentUser();
 
-        var systemMessage = SelectionPrompt.SystemPrompt;
-
         var request = new MessageCreateParams
         {
             Model      = factory.SelectionModel,
             MaxTokens  = MaxTokens,
-            System     = new MessageCreateParamsSystem(systemMessage),
+            System     = new MessageCreateParamsSystem(SelectionPrompt.SystemPrompt),
             Tools      = [SelectionPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = SelectionPrompt.ToolName },
             Messages   =

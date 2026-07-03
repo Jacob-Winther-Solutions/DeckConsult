@@ -92,8 +92,11 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
 - **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
   after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
   backward compatibility.
-- **Prompt caching pending SDK update:** Anthropic SDK v12.30.0 does not yet expose `SystemBlockParam`
-  in the public API. When v12.31.0+ is released, apply this fix to both `LlmClassifier.cs` and `LlmSelector.cs`:
+- **Prompt caching — awaiting SDK API exposure:** Anthropic SDK v12.35.1 is now current (upgraded
+  from v12.30.0). Prompt caching via `SystemBlockParam` is not yet exposed in the public C# SDK API,
+  despite being supported by the API. Monitor Anthropic SDK releases — when `SystemBlockParam` is
+  added to the public API (likely in a future v12.x release), apply this fix to both
+  `LlmClassifier.cs` and `LlmSelector.cs`:
   ```csharp
   var systemBlock = new SystemBlockParam
   {
@@ -106,12 +109,13 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
       // ... rest of params
   };
   ```
-  **Why:** Currently `CacheControl` is set on `Tool` (wrong place); it must be on the System prompt block.
-  **Impact:** ~25–30% cost reduction on multi-build sessions (system prompt cached after first call, reused on subsequent builds).
-  **Verification:** After upgrade, check usage report — `CacheCreationInputTokens` and `CacheReadInputTokens` should be > 0.
-- **SDK versioning:** Anthropic package is pinned to v12.30.0 in `EdhDeckBuilder.Agent.csproj` to
-  prevent unexpected breaking changes. Review release notes before updating; notify the team of any
-  API changes that affect `LlmClassifier.cs` or `LlmSelector.cs`.
+  **Why:** System prompt caching reduces input token cost on repeated calls (e.g., multi-build sessions).
+  **Impact:** ~25–30% cost reduction per cached call.
+  **Verification:** After implementing, check usage report — `CacheCreationInputTokens` and
+  `CacheReadInputTokens` should be > 0 on multi-build runs.
+- **SDK versioning:** Anthropic package is now v12.35.1 in `EdhDeckBuilder.Agent.csproj`.
+  Review release notes before updating; notify the team of any API changes that affect `LlmClassifier.cs`
+  or `LlmSelector.cs`. Check for `SystemBlockParam` public API availability.
 
 ## Conventions
 

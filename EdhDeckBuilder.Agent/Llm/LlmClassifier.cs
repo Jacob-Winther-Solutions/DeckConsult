@@ -45,19 +45,18 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
         CancellationToken ct)
     {
         var client = factory.CreateForCurrentUser();
-
-        var systemMessage = ClassificationPrompt.SystemPrompt;
+        var userMessage = ClassificationPrompt.FormatUserMessage(candidates, commanders);
 
         var request = new MessageCreateParams
         {
             Model     = ClaudeModels.Haiku,   // classification always uses Haiku
             MaxTokens = MaxTokens,
-            System    = new MessageCreateParamsSystem(systemMessage),
+            System    = new MessageCreateParamsSystem(ClassificationPrompt.SystemPrompt),
             Tools     = [ClassificationPrompt.Tool],
             ToolChoice = new ToolChoiceTool { Name = ClassificationPrompt.ToolName },
             Messages  =
             [
-                new() { Role = Role.User, Content = ClassificationPrompt.FormatUserMessage(candidates, commanders) },
+                new() { Role = Role.User, Content = userMessage },
             ],
         };
 
@@ -66,6 +65,10 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
             var response = await client.Messages.Create(request, ct);
             if (_usageTracker != null)
                 _usageTracker.RecordCall("ClassifyBatch", ClaudeModels.Haiku, response.Usage);
+
+            // Log response for debugging high output token counts (if enabled in appsettings)
+            ClassificationResponseLogger.LogResponse(candidates.Count, userMessage.Length, response, response.Usage.OutputTokens);
+
             return ParseResponse(response.Content, candidates);
         }
         catch (AnthropicUnauthorizedException ex)
@@ -110,6 +113,7 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
             var raw = new ClassificationResult
             {
                 OracleId    = id,
+                CardName    = card.Name,
                 PrimaryRole = ParseRole(dto.PrimaryRole),
                 Secondary   = dto.Secondary
                     .Select(s => new RoleContribution(

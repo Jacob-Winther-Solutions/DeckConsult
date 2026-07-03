@@ -16,7 +16,7 @@ builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 5 * 1024 * 1024);
 builder.Services.AddDataProtection();
 
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddAgent();
+builder.Services.AddAgent(builder.Configuration);
 builder.Services.AddScoped<IApiKeyStateService, ApiKeyStateService>();
 builder.Services.AddSingleton<DeckResultStore>();
 

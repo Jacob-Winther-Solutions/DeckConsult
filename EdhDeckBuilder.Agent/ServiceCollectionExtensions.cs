@@ -1,8 +1,10 @@
 using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Discovery;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Pipeline;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EdhDeckBuilder.Agent;
@@ -18,8 +20,20 @@ public static class ServiceCollectionExtensions
     /// their own key via <see cref="SessionApiKeyProvider"/>, which is populated by the
     /// settings UI and lives in a Blazor Server circuit-scoped service.
     /// </remarks>
-    public static IServiceCollection AddAgent(this IServiceCollection services)
+    public static IServiceCollection AddAgent(this IServiceCollection services, IConfiguration? configuration = null)
     {
+        // Initialize logging from appsettings
+        if (configuration != null)
+        {
+            var section = configuration.GetSection(InstrumentationOptions.Section);
+            var options = new InstrumentationOptions();
+            if (section.Exists() && bool.TryParse(section["LogClassificationResponses"], out var enabled))
+            {
+                options.LogClassificationResponses = enabled;
+            }
+            ClassificationResponseLogger.Initialize(options);
+        }
+
         // Per-circuit key holder — registered twice so settings UI (concrete) and agent
         // (interface) share the same instance per circuit.
         services.AddScoped<SessionApiKeyProvider>();

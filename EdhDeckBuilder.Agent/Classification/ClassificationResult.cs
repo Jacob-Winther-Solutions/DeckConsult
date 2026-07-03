@@ -14,6 +14,12 @@ public sealed record ClassificationResult
     /// </summary>
     public required Guid OracleId { get; init; }
 
+    /// <summary>
+    /// Card name for cache readability. Populated when storing to cache; may be null when
+    /// reconstructed from cache (not essential to functionality, only for human inspection).
+    /// </summary>
+    public string? CardName { get; init; }
+
     public required CardRole PrimaryRole { get; init; }
 
     /// <summary>Secondary roles this card also covers, with relation and coverage weight.</summary>
