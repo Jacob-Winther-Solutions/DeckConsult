@@ -44,9 +44,12 @@ public static class ClassificationPrompt
         **Synergy** — Glue cards that support the deck broadly without fitting a more specific role.
 
         ## Role Relations (for secondary roles only)
+        Only assign secondary roles when the secondary effect is **mechanically core to the card's function in the deck**, not minor or incidental.
         - **Always**: The card simultaneously provides both roles (e.g. Black Market Connections gives Ramp AND CardAdvantage at the same time).
         - **Modal**: The player chooses between roles when the card is played (e.g. Jeska's Will without commander gives mana OR draws — not both).
         - **Transform**: The card transitions from one role to another over the course of a game (e.g. Hedron Archive ramps first, then sacrifices to draw).
+
+        **Limit secondary roles:** Most cards should have 0–1 secondary role. Only add a second secondary if both are genuinely major to the card's value.
 
         ## Land Credit (back face land quality)
         Assign a non-zero land_credit ONLY when the back face is a Land type (check the TypeLine for "// Land").

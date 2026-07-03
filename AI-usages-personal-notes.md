@@ -51,6 +51,7 @@ API usage:
 - Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                4,07 -> 3,99 = 0,08 (46th try) (Token usage test)
 - Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                3,99 -> 3,90 = 0,09 (47th try) (Token usage test)
 - Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                3,90 -> 3,80 = 0,10 (48th try) (Token usage test)
+- Haiku, Sephiroth, Aggro, Aristocrats, Budget 15 pr card 300 total:                                                3,80 -> 3,72 = 0,08 (49th try) (Token usage test)
 
 Bad classifications:
 Sephiroth (third try):
