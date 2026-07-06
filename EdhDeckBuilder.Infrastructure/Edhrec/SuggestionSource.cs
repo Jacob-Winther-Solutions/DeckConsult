@@ -40,4 +40,16 @@ public sealed class SuggestionSource : ISuggestionSource
         }
         return await EdhrecMapper.ToCardCandidatesAsync(cardlists, _repository, _logger, ct);
     }
+
+    public async Task<Dictionary<string, int>> GetPartnerPopularityAsync(CancellationToken ct = default)
+    {
+        var page = await _client.GetPartnersPageAsync(ct);
+        return EdhrecPartnerMapper.ExtractPartnerPopularity(page, _logger);
+    }
+
+    public async Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken ct = default)
+    {
+        var page = await _client.GetPartnersPageAsync(ct);
+        return EdhrecPartnerMapper.ExtractPartnerWithPairs(page, _logger);
+    }
 }

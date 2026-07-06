@@ -14,16 +14,34 @@
                         <div class="text-muted">No image</div>
                     </div>
                 }
+
+                @if (Suggestion.PartnerCommander?.Images?.Normal != null)
+                {
+                    <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--bs-secondary); margin-bottom: 0.5rem;">+ Partner</div>
+                    <a href="#" @onclick:preventDefault @onclick="ToggleImageZoom" style="cursor: pointer;">
+                        <img src="@Suggestion.PartnerCommander.Images.Normal" alt="@Suggestion.PartnerCommander.Name" class="img-fluid rounded" style="max-height: 300px;" />
+                    </a>
+                }
             </div>
             <div class="col-md-8">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div>
                         <span class="badge bg-info">Rank #@Suggestion.Rank</span>
-                        <h5 class="card-title d-inline-block ms-2">@Suggestion.Commander.Name</h5>
+                        <h5 class="card-title d-inline-block ms-2">
+                            @Suggestion.Commander.Name
+                            @if (Suggestion.PartnerCommander != null)
+                            {
+                                <text> + @Suggestion.PartnerCommander.Name</text>
+                            }
+                        </h5>
                     </div>
                 </div>
 
                 <p class="text-muted small">@Suggestion.Commander.TypeLine</p>
+                @if (Suggestion.PartnerCommander != null)
+                {
+                    <p class="text-muted small">@Suggestion.PartnerCommander.TypeLine</p>
+                }
 
                 <div class="mb-2">
                     <ColorIdentityPips Identity="@Suggestion.Commander.ColorIdentity" />

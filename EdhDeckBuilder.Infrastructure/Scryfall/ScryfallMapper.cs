@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Infrastructure.Scryfall.Dto;
 
@@ -36,6 +37,55 @@ internal static class ScryfallMapper
             BackFaceTypeLine  = face1?.TypeLine,
             BackFaceText      = face1?.OracleText,
         };
+    }
+
+    /// <summary>
+    /// DEPRECATED: Use ExtractPartnershipKeywords(scryfallKeywords) with Scryfall's keywords array instead.
+    /// Kept for reference but not used — partnership keywords come from Scryfall's keywords property, not oracle text.
+    /// </summary>
+    [Obsolete("Use Scryfall keywords property instead of oracle text parsing")]
+    internal static IReadOnlySet<string> ExtractPartnershipKeywordsFromOracleText(string oracleText)
+    {
+        // Placeholder for backward compatibility if needed
+        return new HashSet<string>();
+    }
+
+    /// <summary>
+    /// Filters partnership-relevant keywords from Scryfall's keywords array.
+    /// Returns only keywords related to partnerships: Partner, Partner with, Background, etc.
+    /// This replaces oracle text parsing with direct keyword data from Scryfall.
+    /// </summary>
+    internal static IReadOnlySet<string> ExtractPartnershipKeywords(IReadOnlyList<string> scryfallKeywords)
+    {
+        if (scryfallKeywords == null || scryfallKeywords.Count == 0)
+            return new HashSet<string>();
+
+        var keywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var partnershipKeywords = new[]
+        {
+            "partner",
+            "partner with",
+            "background",
+            "choose a background",
+            "friends forever",
+            "doctor's companion",
+        };
+
+        foreach (var kw in scryfallKeywords)
+        {
+            // Check if this keyword starts with any partnership keyword
+            foreach (var partnerKw in partnershipKeywords)
+            {
+                if (kw.StartsWith(partnerKw, StringComparison.OrdinalIgnoreCase))
+                {
+                    keywords.Add(kw);
+                    break;
+                }
+            }
+        }
+
+        return keywords;
     }
 
     private static CardType ParseTypes(string typeLine)

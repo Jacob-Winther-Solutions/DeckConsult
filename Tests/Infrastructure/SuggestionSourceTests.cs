@@ -158,7 +158,6 @@ public sealed class SuggestionSourceTests
             CacheMaxAge    = TimeSpan.FromHours(24),
         });
         var bulk = new ScryfallBulkClient(new HttpClient(), scryfallOpts, NullLogger<ScryfallBulkClient>.Instance);
-        var repo = new CardRepository(bulk, NullLogger<CardRepository>.Instance);
 
         var edhrecOpts = Options.Create(new EdhrecOptions
         {
@@ -170,6 +169,7 @@ public sealed class SuggestionSourceTests
             edhrecOpts,
             NullLogger<EdhrecClient>.Instance);
 
+        var repo = new CardRepository(bulk, edhrec, NullLogger<CardRepository>.Instance);
         var source  = new SuggestionSource(edhrec, repo, NullLogger<SuggestionSource>.Instance);
         var korvold = await repo.GetByNameAsync("Korvold, Fae-Cursed King")
             ?? throw new InvalidOperationException("Korvold not in fixture — check Fixtures.ScryfallOracleCards");

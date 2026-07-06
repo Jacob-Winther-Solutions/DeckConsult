@@ -29,6 +29,10 @@ public sealed class BudgetTests
             => Task.FromResult(pool);
         public Task<IReadOnlyList<CardCandidate>> GetAverageDeckAsync(Card _, CancellationToken __)
             => Task.FromResult(pool);
+        public Task<Dictionary<string, int>> GetPartnerPopularityAsync(CancellationToken __)
+            => Task.FromResult(new Dictionary<string, int>());
+        public Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken __)
+            => Task.FromResult<IReadOnlyList<(string, string)>>(new List<(string, string)>());
     }
 
     /// <summary>Assigns roles by parsing the card name prefix ("Ramp_0" → Ramp, etc.).</summary>

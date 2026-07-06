@@ -1,4 +1,7 @@
+using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Infrastructure.Edhrec;
+using EdhDeckBuilder.Infrastructure.Edhrec.Dto;
 using EdhDeckBuilder.Infrastructure.Scryfall;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -22,7 +25,10 @@ public sealed class CardRepositoryTests : IDisposable
         });
         // HttpClient is never called — the fixture file is always fresh.
         var bulk = new ScryfallBulkClient(new HttpClient(), opts, NullLogger<ScryfallBulkClient>.Instance);
-        _repo = new CardRepository(bulk, NullLogger<CardRepository>.Instance);
+
+        // Create a mock EdhrecClient that returns test partnership data
+        var mockEdhrec = new MockEdhrecClient();
+        _repo = new CardRepository(bulk, mockEdhrec, NullLogger<CardRepository>.Instance);
     }
 
     public void Dispose() => _dir.Dispose();
@@ -98,11 +104,15 @@ public sealed class CardRepositoryTests : IDisposable
     [Fact]
     public async Task SearchAsync_returns_results_ordered_by_name()
     {
-        // "r" matches Forest, Korvold, Sol Ring — alphabetical: Forest < Korvold < Sol Ring
+        // "r" matches many cards: Drana, Dranarator, Forest, Korvold, Rograkh, Sol Ring, Thrasios, Tymna
+        // Just verify results are ordered alphabetically
         var results = await _repo.SearchAsync("r");
-        Assert.Equal(3, results.Count);
-        Assert.True(string.Compare(results[0].Name, results[1].Name, StringComparison.Ordinal) < 0);
-        Assert.True(string.Compare(results[1].Name, results[2].Name, StringComparison.Ordinal) < 0);
+        Assert.NotEmpty(results);
+        for (int i = 1; i < results.Count; i++)
+        {
+            Assert.True(string.Compare(results[i - 1].Name, results[i].Name, StringComparison.Ordinal) < 0,
+                $"Results not ordered: {results[i - 1].Name} >= {results[i].Name}");
+        }
     }
 
     [Fact]
@@ -150,5 +160,144 @@ public sealed class CardRepositoryTests : IDisposable
         Assert.Equal(Color.None, card.ColorIdentity);
         Assert.Equal(1m, card.ManaValue);
         Assert.False(card.CanBeCommander);
+    }
+
+    // --- GetPartnerCombosAsync ------------------------------------------------
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_returns_generic_partner_pairs()
+    {
+        var combos = await _repo.GetPartnerCombosAsync();
+
+        // Thrasios (G/U) + Tymna (W/B) is a valid partner pair
+        var thrasiosTymna = combos.FirstOrDefault(c =>
+            (c.FirstCardId == Fixtures.ThrasiosId && c.SecondCardId == Fixtures.TymnaId)
+            || (c.FirstCardId == Fixtures.TymnaId && c.SecondCardId == Fixtures.ThrasiosId));
+
+        Assert.NotNull(thrasiosTymna);
+    }
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_returns_partner_with_specific_pairs()
+    {
+        var combos = await _repo.GetPartnerCombosAsync();
+
+        // Rograkh + Drana is a "partner with" specific pair
+        var rograkDrana = combos.FirstOrDefault(c =>
+            (c.FirstCardId == Fixtures.RograkId && c.SecondCardId == Fixtures.DranaId)
+            || (c.FirstCardId == Fixtures.DranaId && c.SecondCardId == Fixtures.RograkId));
+
+        Assert.NotNull(rograkDrana);
+    }
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_filters_by_color_identity()
+    {
+        // Thrasios (G/U) + Tymna (W/B) = W/U/B/G (4-color)
+        var combos = await _repo.GetPartnerCombosAsync(Color.White | Color.Blue | Color.Black | Color.Green);
+
+        var thrasiosTymna = combos.FirstOrDefault(c =>
+            (c.FirstCardId == Fixtures.ThrasiosId && c.SecondCardId == Fixtures.TymnaId)
+            || (c.FirstCardId == Fixtures.TymnaId && c.SecondCardId == Fixtures.ThrasiosId));
+
+        Assert.NotNull(thrasiosTymna);
+    }
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_exact_match_enforces_strict_identity()
+    {
+        // Thrasios (G/U) + Tymna (W/B) = W/U/B/G
+        // exactMatch=true should only return if combined identity == W/U/B/G exactly
+        var combos = await _repo.GetPartnerCombosAsync(
+            Color.White | Color.Blue | Color.Black | Color.Green,
+            exactMatch: true);
+
+        var thrasiosTymna = combos.FirstOrDefault(c =>
+            (c.FirstCardId == Fixtures.ThrasiosId && c.SecondCardId == Fixtures.TymnaId)
+            || (c.FirstCardId == Fixtures.TymnaId && c.SecondCardId == Fixtures.ThrasiosId));
+
+        Assert.NotNull(thrasiosTymna);
+
+        // But if we ask for exact U/R/G, it should not match (since it's W/U/B/G)
+        var combo5ColorOnly = await _repo.GetPartnerCombosAsync(
+            Color.White | Color.Blue | Color.Red | Color.Black | Color.Green,
+            exactMatch: true);
+
+        // The combo should not be in this result because combined identity is W/U/B/G, not W/U/B/R/G
+        var notFound = combo5ColorOnly.FirstOrDefault(c =>
+            (c.FirstCardId == Fixtures.ThrasiosId && c.SecondCardId == Fixtures.TymnaId)
+            || (c.FirstCardId == Fixtures.TymnaId && c.SecondCardId == Fixtures.ThrasiosId));
+
+        Assert.Null(notFound);
+    }
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_returns_empty_when_no_filter_match()
+    {
+        // Ask for partners with Red + Blue only (R/U) — no combos should match
+        var combos = await _repo.GetPartnerCombosAsync(Color.Red | Color.Blue, exactMatch: true);
+        Assert.Empty(combos);
+    }
+
+    [Fact]
+    public async Task GetPartnerCombosAsync_null_filter_returns_all_combos()
+    {
+        var combos = await _repo.GetPartnerCombosAsync(colorFilter: null);
+
+        // Should include at least Thrasios+Tymna and Rograkh+Drana
+        Assert.NotEmpty(combos);
+        Assert.True(combos.Count >= 2);
+    }
+
+    // ── Mock EdhrecClient ────────────────────────────────────────────────────────
+
+    private sealed class MockEdhrecClient : IEdhrecClient
+    {
+        public Task<EdhrecPage?> GetCommanderPageAsync(string slug, CancellationToken ct = default)
+            => Task.FromResult<EdhrecPage?>(null);
+
+        public Task<EdhrecPage?> GetAverageDeckPageAsync(string slug, CancellationToken ct = default)
+            => Task.FromResult<EdhrecPage?>(null);
+
+        public Task<EdhrecPartnerPage?> GetPartnersPageAsync(CancellationToken ct = default)
+        {
+            // Return test partnership data with Thrasios+Tymna and Rograkh+Drana
+            var page = new EdhrecPartnerPage
+            {
+                Container = new EdhrecPartnerContainer
+                {
+                    JsonDict = new EdhrecPartnerJsonDict
+                    {
+                        Cardlists =
+                        [
+                            // Generic Partners cardlist (Thrasios + Tymna)
+                            new EdhrecPartnerCardlist
+                            {
+                                Header = "Partners",
+                                Tag = "partners",
+                                Cardviews =
+                                [
+                                    new EdhrecPartnerCardView { Name = "Thrasios, Triton Hero", Id = Fixtures.ThrasiosId.ToString() },
+                                    new EdhrecPartnerCardView { Name = "Tymna the Weaver", Id = Fixtures.TymnaId.ToString() },
+                                ]
+                            },
+                            // Partner with cardlist (Rograkh + Drana)
+                            new EdhrecPartnerCardlist
+                            {
+                                Header = "Partner with",
+                                Tag = "partnerwith",
+                                Cardviews =
+                                [
+                                    new EdhrecPartnerCardView { Name = "Rograkh, Son of Rohgadh", Id = Fixtures.RograkId.ToString() },
+                                    new EdhrecPartnerCardView { Name = "Drana, Liberator of Zendikar", Id = Fixtures.DranaId.ToString() },
+                                ]
+                            },
+                        ]
+                    }
+                }
+            };
+
+            return Task.FromResult<EdhrecPartnerPage?>(page);
+        }
     }
 }

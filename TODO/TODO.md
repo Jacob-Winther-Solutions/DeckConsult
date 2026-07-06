@@ -95,13 +95,32 @@ Two discovery modes: **Guided** (archetype/theme-driven) and **Custom** (free-te
 - [x] **UI polish:** Color Identity picker now shows the "Exactly this identity" checkbox inline
       with the color buttons (flexbox layout) for better visibility. Token usage logging is consistent
       across all discovery and build flows (summary header, table, total cost).
-- [ ] **Partner and partner-with support:** Discovery currently evaluates each commander as
-      a singleton. When filtering by exact color identity with `ExactColorMatch = true`, partner
-      combinations with those colors are missed (e.g., searching for W/U/B/R/G doesn't return
-      Thrasios + Tymna, which are stored as separate cards with incomplete color identity).
-      Consider: (a) post-filtering to construct valid partner pairs, (b) storing a "partner identity"
-      field for partner creatures, or (c) a dedicated partner-combo index. Defer until partner
-      discovery is confirmed as a priority.
+- [x] **Partner and partner-with support (Discovery & Core):** Discovery now surfaces partner pairs via dedicated
+      Core `PartnerCombo` entities and deterministic Infrastructure index. Supports all variants:
+      Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son.
+      - [x] `IEdhrecClient.GetPartnersPageAsync()` — fetches EDHREC partner index at startup
+      - [x] `PartnershipIndexBuilder` — deterministic pairing extraction by type (sequential pairs, all-vs-all, Doctor first + companions, etc.)
+      - [x] `CardRepository` — accepts EDHREC partnerships at construction; partnership eligibility enforced by Core rules
+      - [x] `CommanderDiscovery` — surfaces all legal partner combinations in results (top 10 or all if ≤10)
+      - [x] DI registration — `IEdhrecClient` seam, `AddHttpClient<EdhrecClient>` ordering
+      - [x] Test coverage — partnership extraction, validity checks, discovery result limits (9 new tests for variants)
+- [ ] **Partner support in Deck Builder (EDHREC):** The Commander Deck Builder (`DeckBuilder.cs`) accepts
+      multiple commanders and correctly combines color identity + merges recommendations. **However**,
+      it currently queries `ISuggestionSource` per individual commander and merges results. EDHREC
+      **does support partner pairings** — each partner pair has its own recommendation page:
+      `https://edhrec.com/commanders/{card1-slug}-{card2-slug}` (e.g., Thrasios+Tymna:
+      `https://edhrec.com/commanders/thrasios-triton-hero-tymna-the-weaver`).
+
+      **Implementation tasks:**
+      - [ ] Extend `EdhrecClient` with `GetRecommendationsForPartnerPairAsync(Card first, Card second)`
+      - [ ] Construct partner pair URL slug: `{first.Name.ToSlug()}-{second.Name.ToSlug()}` (match EDHREC's format)
+      - [ ] At build time in `DeckBuilder`, detect partner pairs via `ICardRepository.GetPartnerCombosAsync()`
+      - [ ] Call partner endpoint instead of merging two singleton pools
+      - [ ] Fallback to merged-singles approach if partner pair endpoint returns empty or 404
+      - [ ] Update `GatherPoolAsync()` to handle partner detection and routing
+
+      **Scope:** ~2–3 hours (EDHREC client method + URL slug logic + partner detection in fill pipeline).
+      **Status:** Deferred (Phase 5). Core partnership support is complete; this is a build-time optimization to avoid card-list merging.
 
 ---
 
@@ -466,6 +485,28 @@ theme, or archetype constraints — for pet cards or cards the user already owns
 - Partner/Background commander support (separate, already on Master's roadmap).
 - True collection import via persistent storage (no storage layer exists yet; locked-card input is a per-run manual workaround, not collection tracking).
 - Any changes to Brawl builder, Duel Commander, or other format expansion work.
+
+---
+
+## Card Data Refresh (Cache Updates)
+
+Scryfall bulk data is cached locally with a 24-hour max age. New cards released are not available until the app restarts and re-downloads. This creates a 24–48 hour lag between Scryfall publication and tool availability.
+
+**Options:**
+- **(a) Manual refresh button** — User clicks to force re-download if stale. Visible, deliberate.
+- **(b) Background sync job** — Periodic task (e.g., nightly) checks Scryfall's `updated_at` timestamp, re-downloads if newer. Silent, automated.
+- **(c) Hybrid (recommended)** — Show "last updated X hours ago" + optional manual refresh; background job runs nightly as fallback.
+
+**Implementation tasks (option c):**
+- [ ] `ICardRefreshService` interface: checks Scryfall `updated_at`, returns whether refresh happened and when
+- [ ] `CardRefreshService` impl: compares cache timestamp with Scryfall manifest, downloads if newer, updates cache
+- [ ] Wire into `ScryfallBulkClient` or as separate injected service
+- [ ] Add "Last updated X hours ago" + "Refresh" button to Web UI (optional UX refinement)
+- [ ] Background job (optional): scheduled task (using `ScheduledService` or similar) runs nightly
+- [ ] Documentation: explain cache refresh behavior in `README.md`
+
+**Scope:** ~2–3 hours for manual refresh (option a); add another 2–3 hours for background job (option b).
+**Priority:** Low — new cards appear within acceptable lag; not blocking MVP.
 
 ---
 

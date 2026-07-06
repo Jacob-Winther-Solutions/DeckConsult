@@ -19,10 +19,7 @@ public static class ServiceCollectionExtensions
             c.DefaultRequestHeaders.UserAgent.ParseAdd("EdhDeckBuilder/1.0");
             c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         });
-        services.AddSingleton<CardRepository>(sp => new CardRepository(
-            sp.GetRequiredService<ScryfallBulkClient>(),
-            sp.GetRequiredService<ILogger<CardRepository>>()));
-        services.AddSingleton<ICardRepository>(sp => sp.GetRequiredService<CardRepository>());
+        services.AddSingleton<IPartnershipEligibilityRule, PartnershipEligibilityRule>();
 
         services.Configure<EdhrecOptions>(configuration.GetSection("Edhrec"));
         services.AddHttpClient<EdhrecClient>(c =>
@@ -30,11 +27,20 @@ public static class ServiceCollectionExtensions
             c.DefaultRequestHeaders.UserAgent.ParseAdd("EdhDeckBuilder/1.0");
             c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         });
+        services.AddSingleton<IEdhrecClient>(sp => sp.GetRequiredService<EdhrecClient>());
+
+        services.AddSingleton<CardRepository>(sp => new CardRepository(
+            sp.GetRequiredService<ScryfallBulkClient>(),
+            sp.GetRequiredService<IEdhrecClient>(),
+            sp.GetRequiredService<ILogger<CardRepository>>()));
+        services.AddSingleton<ICardRepository>(sp => sp.GetRequiredService<CardRepository>());
         services.AddSingleton<SuggestionSource>(sp => new SuggestionSource(
             sp.GetRequiredService<EdhrecClient>(),
             sp.GetRequiredService<ICardRepository>(),
             sp.GetRequiredService<ILogger<SuggestionSource>>()));
         services.AddSingleton<ISuggestionSource>(sp => sp.GetRequiredService<SuggestionSource>());
+        services.AddSingleton<IPartnerPairingRepository>(sp => new PartnerPairingRepository(
+            sp.GetRequiredService<SuggestionSource>()));
 
         return services;
     }

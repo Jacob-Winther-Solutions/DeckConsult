@@ -15,6 +15,12 @@ internal static class Fixtures
     public static readonly Guid CultivateId = new("a0000000-0000-0000-0000-000000000003");
     public static readonly Guid ForestId    = new("a0000000-0000-0000-0000-000000000004");
 
+    // Partnership test cards
+    public static readonly Guid ThrasiosId  = new("a0000000-0000-0000-0000-000000000010");
+    public static readonly Guid TymnaId     = new("a0000000-0000-0000-0000-000000000011");
+    public static readonly Guid RograkId    = new("a0000000-0000-0000-0000-000000000012");
+    public static readonly Guid DranaId     = new("a0000000-0000-0000-0000-000000000013");
+
     /// <summary>
     /// A minimal Scryfall oracle_cards JSON array — exactly what the cached file looks like.
     /// Sol Ring and Korvold are included to cover: artifact, legendary creature, color identity,
@@ -64,6 +70,62 @@ internal static class Fixtures
             "cmc":            0.0,
             "color_identity": [],
             "type_line":      "Basic Land — Forest",
+            "legalities":     { "commander": "legal" }
+          },
+          {
+            "id":             "{{ThrasiosId}}",
+            "oracle_id":      "{{ThrasiosId}}",
+            "name":           "Thrasios, Triton Hero",
+            "mana_cost":      "{2}{G}{U}",
+            "cmc":            4.0,
+            "color_identity": ["G", "U"],
+            "type_line":      "Legendary Creature — Merfolk",
+            "oracle_text":    "Partner\n{T}: Draw a card, then you may put a land card from your hand onto the battlefield.",
+            "keywords":       ["partner"],
+            "power":          "2",
+            "toughness":      "2",
+            "legalities":     { "commander": "legal" }
+          },
+          {
+            "id":             "{{TymnaId}}",
+            "oracle_id":      "{{TymnaId}}",
+            "name":           "Tymna the Weaver",
+            "mana_cost":      "{1}{W}{B}",
+            "cmc":            3.0,
+            "color_identity": ["W", "B"],
+            "type_line":      "Legendary Creature — Cleric",
+            "oracle_text":    "Partner\n{T}: Exile the top card of your library. You may play that card this turn.",
+            "keywords":       ["partner"],
+            "power":          "2",
+            "toughness":      "2",
+            "legalities":     { "commander": "legal" }
+          },
+          {
+            "id":             "{{RograkId}}",
+            "oracle_id":      "{{RograkId}}",
+            "name":           "Rograkh, Son of Rohgadh",
+            "mana_cost":      "{R}",
+            "cmc":            1.0,
+            "color_identity": ["R"],
+            "type_line":      "Legendary Creature — Goblin Warrior",
+            "oracle_text":    "Partner with Drana, Liberator of Zendikar\nHaste\nRograkh, Son of Rohgadh cannot be blocked except by creatures with flying.",
+            "keywords":       ["partner with"],
+            "power":          "1",
+            "toughness":      "1",
+            "legalities":     { "commander": "legal" }
+          },
+          {
+            "id":             "{{DranaId}}",
+            "oracle_id":      "{{DranaId}}",
+            "name":           "Drana, Liberator of Zendikar",
+            "mana_cost":      "{2}{B}",
+            "cmc":            3.0,
+            "color_identity": ["B"],
+            "type_line":      "Legendary Creature — Vampire Ally",
+            "oracle_text":    "Partner with Rograkh, Son of Rohgadh\nMenace\nWhenever a land enters the battlefield under your control, each opponent loses 1 life.",
+            "keywords":       ["partner with"],
+            "power":          "2",
+            "toughness":      "2",
             "legalities":     { "commander": "legal" }
           }
         ]

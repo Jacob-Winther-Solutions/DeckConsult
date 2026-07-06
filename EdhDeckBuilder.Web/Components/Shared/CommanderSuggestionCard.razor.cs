@@ -31,6 +31,11 @@ public partial class CommanderSuggestionCard
         {
             var link = $"/commander?commander={Suggestion.Commander.OracleId}";
 
+            if (Suggestion.PartnerCommander != null)
+            {
+                link += $"&partnerCommander={Suggestion.PartnerCommander.OracleId}";
+            }
+
             if (ArchetypeWeights?.Count > 0)
             {
                 var archetypes = string.Join(",", ArchetypeWeights.Keys);

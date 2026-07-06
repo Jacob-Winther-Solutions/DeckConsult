@@ -5,11 +5,12 @@ using Microsoft.Extensions.Options;
 
 namespace EdhDeckBuilder.Infrastructure.Edhrec;
 
-internal sealed class EdhrecClient(
-    HttpClient http,
-    IOptions<EdhrecOptions> options,
-    ILogger<EdhrecClient> logger)
+internal sealed class EdhrecClient : IEdhrecClient
 {
+    private readonly HttpClient _http;
+    private readonly IOptions<EdhrecOptions> _options;
+    private readonly ILogger<EdhrecClient> _logger;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -18,30 +19,63 @@ internal sealed class EdhrecClient(
 
     private const string BaseUrl = "https://json.edhrec.com/pages";
 
+    public EdhrecClient(HttpClient http, IOptions<EdhrecOptions> options, ILogger<EdhrecClient> logger)
+    {
+        _http = http;
+        _options = options;
+        _logger = logger;
+    }
+
     public Task<EdhrecPage?> GetCommanderPageAsync(string slug, CancellationToken ct = default)
         => FetchPageAsync($"commanders/{slug}", slug, ct);
 
     public Task<EdhrecPage?> GetAverageDeckPageAsync(string slug, CancellationToken ct = default)
         => FetchPageAsync($"average-decks/{slug}", $"avg-{slug}", ct);
 
+    public async Task<EdhrecPartnerPage?> GetPartnersPageAsync(CancellationToken ct = default)
+    {
+        var opts = _options.Value;
+        Directory.CreateDirectory(opts.CacheDirectory);
+        var cachePath = Path.Combine(opts.CacheDirectory, "partners.json");
+
+        if (!IsCacheFresh(cachePath, opts.CacheMaxAge))
+        {
+            var url = $"{BaseUrl}/partners.json";
+            _logger.LogInformation("Fetching EDHREC partners page from {Url}", url);
+            try
+            {
+                var content = await _http.GetStringAsync(url, ct);
+                await File.WriteAllTextAsync(cachePath, content, ct);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning("Failed to fetch EDHREC partners page: {StatusCode}", ex.StatusCode);
+                return null;
+            }
+        }
+
+        await using var stream = File.OpenRead(cachePath);
+        return await JsonSerializer.DeserializeAsync<EdhrecPartnerPage>(stream, JsonOptions, ct);
+    }
+
     private async Task<EdhrecPage?> FetchPageAsync(string path, string cacheKey, CancellationToken ct)
     {
-        var opts = options.Value;
+        var opts = _options.Value;
         Directory.CreateDirectory(opts.CacheDirectory);
         var cachePath = Path.Combine(opts.CacheDirectory, $"{cacheKey}.json");
 
         if (!IsCacheFresh(cachePath, opts.CacheMaxAge))
         {
             var url = $"{BaseUrl}/{path}.json";
-            logger.LogInformation("Fetching EDHREC page from {Url}", url);
+            _logger.LogInformation("Fetching EDHREC page from {Url}", url);
             try
             {
-                var content = await http.GetStringAsync(url, ct);
+                var content = await _http.GetStringAsync(url, ct);
                 await File.WriteAllTextAsync(cachePath, content, ct);
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                logger.LogWarning("EDHREC has no page for {Path}", path);
+                _logger.LogWarning("EDHREC has no page for {Path}", path);
                 return null;
             }
         }

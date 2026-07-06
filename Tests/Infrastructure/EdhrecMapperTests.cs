@@ -1,5 +1,6 @@
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Partnerships;
 using EdhDeckBuilder.Infrastructure.Edhrec;
 using EdhDeckBuilder.Infrastructure.Edhrec.Dto;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -164,4 +165,10 @@ internal sealed class FakeCardRepository(params Card[] cards) : ICardRepository
                     || (exactMatch ? c.ColorIdentity == colorFilter.Value
                                    : c.ColorIdentity.IsWithin(colorFilter.Value)))
                 .ToList());
+
+    public Task<IReadOnlyList<PartnerCombo>> GetPartnerCombosAsync(
+        Color? colorFilter = null,
+        bool exactMatch = false,
+        CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<PartnerCombo>>(new List<PartnerCombo>());
 }

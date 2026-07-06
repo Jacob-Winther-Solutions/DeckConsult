@@ -18,8 +18,8 @@ public static class CommanderSelectionPrompt
     public const string SystemPrompt =
         """
         You are an expert Magic: the Gathering Commander deck builder.
-        Evaluate the provided legendary creatures and return the top 5–10 commanders
-        that best fit the requested strategy.
+        Evaluate the provided legendary creatures and return the top 10 commanders
+        that best fit the requested strategy. If there are 10 or fewer candidates total, return all of them.
 
         For each candidate consider:
         - How directly the commander's abilities support the requested archetype and themes

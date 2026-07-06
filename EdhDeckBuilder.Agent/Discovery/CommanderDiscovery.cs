@@ -4,12 +4,15 @@ using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Partnerships;
 
 namespace EdhDeckBuilder.Agent.Discovery;
 
 /// <summary>
 /// Discovers a ranked shortlist of commanders matching a strategy via color filter, archetype, theme, and bracket.
-/// For large candidate pools (>150), uses a two-pass algorithm: batch selection then finalists ranking.
+/// Surfaces both singleton commanders and partner pairs. For large candidate pools (>150), uses a two-pass algorithm:
+/// batch selection then finalists ranking. All partners are presented equally to the LLM for evaluation.
+/// CardRepository provides only authoritative partnership data from EDHREC.
 /// Supports usage tracking for token accounting.
 /// </summary>
 public sealed class CommanderDiscovery(
@@ -35,36 +38,163 @@ public sealed class CommanderDiscovery(
     {
         progress?.Report("Gathering commander candidates...");
 
-        var candidates = await repository.GetCommandersAsync(
+        var (allCandidates, partnerMap) = await GatherCandidatesAsync(request, ct);
+
+        if (allCandidates.Count == 0)
+            return new CommanderDiscoveryResult { Suggestions = [] };
+
+        progress?.Report($"Evaluating {allCandidates.Count} commanders...");
+
+        var results = await EvaluateAsync(allCandidates, request, ct);
+
+        var suggestions = BuildSuggestionsFromResults(results, allCandidates, partnerMap);
+
+        return new CommanderDiscoveryResult { Suggestions = suggestions };
+    }
+
+    /// <summary>
+    /// Gathers both singleton commanders and partner pair candidates matching the filter.
+    /// Singletons come from GetCommandersAsync (already filtered by color identity).
+    /// Partners come from GetPartnerCombosAsync (already filtered by combined color identity).
+    /// All partnerships in CardRepository are authoritative and need no further validation.
+    /// Individual cards are only added if they don't already appear as singletons (avoid duplicates).
+    /// Returns the unified candidate list and a map tracking which cards are partnered.
+    /// </summary>
+    private async Task<(List<Card> Candidates, Dictionary<Guid, PartnerCombo> PartnerMap)> GatherCandidatesAsync(
+        CommanderDiscoveryRequest request,
+        CancellationToken ct)
+    {
+        var singleCandidates = await repository.GetCommandersAsync(
             request.ColorFilter,
             request.ExactColorMatch,
             ct);
 
-        if (candidates.Count == 0)
-            return new CommanderDiscoveryResult { Suggestions = [] };
+        var partnerCombos = await repository.GetPartnerCombosAsync(
+            request.ColorFilter,
+            request.ExactColorMatch,
+            ct);
 
-        progress?.Report($"Evaluating {candidates.Count} commanders...");
+        var allCandidates = new List<Card>(singleCandidates);
+        var candidateIds = new HashSet<Guid>(allCandidates.Select(c => c.OracleId));
+        var partnerMap = new Dictionary<Guid, PartnerCombo>();
 
-        var results = await EvaluateAsync(candidates, request, ct);
+        if (partnerCombos.Count > 0)
+        {
+            await AddPartnerCandidatesAsync(partnerCombos, allCandidates, candidateIds, partnerMap, ct);
+        }
 
-        // Map results back to Card objects, build suggestions, order by rank
-        var cardMap = candidates.ToDictionary(c => c.OracleId);
+        return (allCandidates, partnerMap);
+    }
+    /// <summary>
+    /// Adds partner pair candidates to the candidate list.
+    /// Only adds individual cards if they're not already in singletons (to avoid duplicates when exact matching).
+    /// Tracks partnerships in partnerMap for later pairing in results.
+    /// </summary>
+    private async Task AddPartnerCandidatesAsync(
+        IReadOnlyList<PartnerCombo> combos,
+        List<Card> candidates,
+        HashSet<Guid> candidateIds,
+        Dictionary<Guid, PartnerCombo> partnerMap,
+        CancellationToken ct)
+    {
+        foreach (var combo in combos)
+        {
+            // Only add cards that aren't already in the singles list
+            // (e.g., cards that match exact color filter as singles should appear, but cards that
+            // only match as partners shouldn't be added individually — they should only appear as pairs)
+            var firstId = combo.FirstCardId;
+            var secondId = combo.SecondCardId;
+
+            if (!candidateIds.Contains(firstId))
+            {
+                var first = await repository.GetByOracleIdAsync(firstId, ct);
+                if (first != null)
+                {
+                    candidates.Add(first);
+                    candidateIds.Add(firstId);
+                }
+            }
+
+            if (!candidateIds.Contains(secondId))
+            {
+                var second = await repository.GetByOracleIdAsync(secondId, ct);
+                if (second != null)
+                {
+                    candidates.Add(second);
+                    candidateIds.Add(secondId);
+                }
+            }
+
+            // Track the partnership so we can group them in results
+            partnerMap[firstId] = combo;
+            partnerMap[secondId] = combo;
+        }
+    }
+
+    /// <summary>
+    /// Converts LLM ranking results into CommanderSuggestions, grouping partner pairs together.
+    /// Ensures each pair appears once (as primary + PartnerCommander), not twice.
+    /// </summary>
+    private List<CommanderSuggestion> BuildSuggestionsFromResults(
+        IReadOnlyList<CommanderSelectionResult> results,
+        IReadOnlyList<Card> allCandidates,
+        Dictionary<Guid, PartnerCombo> partnerMap)
+    {
+        var cardMap = allCandidates.ToDictionary(c => c.OracleId);
         var suggestions = new List<CommanderSuggestion>();
+        var processedIds = new HashSet<Guid>();
 
         foreach (var result in results.OrderBy(r => r.Rank))
         {
-            if (cardMap.TryGetValue(result.OracleId, out var card))
-            {
-                suggestions.Add(new CommanderSuggestion
-                {
-                    Commander = card,
-                    Rank = result.Rank,
-                    Rationale = result.Rationale,
-                });
-            }
+            if (processedIds.Contains(result.OracleId))
+                continue;
+
+            if (!cardMap.TryGetValue(result.OracleId, out var card))
+                continue;
+
+            var suggestion = BuildSuggestion(result, card, cardMap, partnerMap, processedIds);
+            suggestions.Add(suggestion);
         }
 
-        return new CommanderDiscoveryResult { Suggestions = suggestions };
+        return suggestions;
+    }
+
+    /// <summary>
+    /// Builds a single suggestion, handling both singleton and partner pair cases.
+    /// Marks both cards in a pair as processed to avoid duplication.
+    /// </summary>
+    private CommanderSuggestion BuildSuggestion(
+        CommanderSelectionResult result,
+        Card card,
+        IReadOnlyDictionary<Guid, Card> cardMap,
+        Dictionary<Guid, PartnerCombo> partnerMap,
+        HashSet<Guid> processedIds)
+    {
+        if (partnerMap.TryGetValue(result.OracleId, out var combo))
+        {
+            var partnerId = combo.FirstCardId == result.OracleId ? combo.SecondCardId : combo.FirstCardId;
+            var partnerCard = cardMap.GetValueOrDefault(partnerId);
+
+            processedIds.Add(result.OracleId);
+            processedIds.Add(partnerId);
+
+            return new CommanderSuggestion
+            {
+                Commander = card,
+                PartnerCommander = partnerCard,
+                Rank = result.Rank,
+                Rationale = result.Rationale,
+            };
+        }
+
+        processedIds.Add(result.OracleId);
+
+        return new CommanderSuggestion
+        {
+            Commander = card,
+            Rank = result.Rank,
+            Rationale = result.Rationale,
+        };
     }
 
     private async Task<IReadOnlyList<CommanderSelectionResult>> EvaluateAsync(

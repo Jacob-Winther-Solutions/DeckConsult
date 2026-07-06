@@ -4,6 +4,7 @@ using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using EdhDeckBuilder.Core.Partnerships;
 
 namespace EdhDeckBuilder.Tests.Agent;
 
@@ -187,5 +188,12 @@ public sealed class CommanderDiscoveryTests
                         || (exactMatch ? c.ColorIdentity == colorFilter.Value
                                        : c.ColorIdentity.IsWithin(colorFilter.Value)))
                     .ToList());
+
+        public Task<IReadOnlyList<PartnerCombo>> GetPartnerCombosAsync(
+            Color? colorFilter = null,
+            bool exactMatch = false,
+            CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<PartnerCombo>>(new List<PartnerCombo>());
     }
+
 }

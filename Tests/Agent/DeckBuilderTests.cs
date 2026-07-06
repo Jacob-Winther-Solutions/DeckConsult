@@ -29,6 +29,12 @@ public sealed class DeckBuilderTests
 
         public Task<IReadOnlyList<CardCandidate>> GetAverageDeckAsync(Card _, CancellationToken __)
             => Task.FromResult(pool);
+
+        public Task<Dictionary<string, int>> GetPartnerPopularityAsync(CancellationToken __)
+            => Task.FromResult(new Dictionary<string, int>());
+
+        public Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken __)
+            => Task.FromResult<IReadOnlyList<(string, string)>>(new List<(string, string)>());
     }
 
     /// <summary>

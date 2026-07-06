@@ -1,6 +1,20 @@
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Partnerships;
 
 namespace EdhDeckBuilder.Core.Abstractions;
+
+/// <summary>
+/// Provides authoritative partner pairing information from external sources.
+/// Used to disambiguate when keyword-based detection is unreliable.
+/// </summary>
+public interface IPartnerPairingRepository
+{
+    /// <summary>
+    /// Returns the definitive list of "Partner with" pairs from EDHREC.
+    /// These pairs are matched by name, so callers must resolve to oracle IDs.
+    /// </summary>
+    Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken ct = default);
+}
 
 /// <summary>Local card data sourced from Scryfall bulk data. Implemented in Infrastructure.</summary>
 public interface ICardRepository
@@ -9,6 +23,25 @@ public interface ICardRepository
     Task<Card?> GetByOracleIdAsync(Guid oracleId, CancellationToken ct = default);
     Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default);
     Task<IReadOnlyList<Card>> GetCommandersAsync(
+        Color? colorFilter = null,
+        bool exactMatch = false,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all valid partner-card combinations that match the given color-identity filter.
+    /// Color identity is computed as the union (bitwise OR) of both cards' color identities.
+    /// </summary>
+    /// <param name="colorFilter">
+    /// If specified, only return combos where the union of both cards' color identities
+    /// satisfies this filter. If null, all partner combos are returned.
+    /// </param>
+    /// <param name="exactMatch">
+    /// If true, require exact color-identity match (union == filter).
+    /// If false, allow union to be a subset of the filter (IsWithin).
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>All valid partner combos matching the filter.</returns>
+    Task<IReadOnlyList<PartnerCombo>> GetPartnerCombosAsync(
         Color? colorFilter = null,
         bool exactMatch = false,
         CancellationToken ct = default);
@@ -40,6 +73,21 @@ public interface ISuggestionSource
     /// Useful as a baseline or sanity-check against a freshly built deck.
     /// </summary>
     Task<IReadOnlyList<CardCandidate>> GetAverageDeckAsync(Card commander, CancellationToken ct = default);
+
+    /// <summary>
+    /// Partner-card popularity data from EDHREC's partners page.
+    /// Maps card names to number of decks they appear in.
+    /// Used by Commander Discovery to rank partner pairs.
+    /// </summary>
+    Task<Dictionary<string, int>> GetPartnerPopularityAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Definitive "Partner with" pairs from EDHREC's partners page.
+    /// EDHREC lists pre-matched partner pairs in the "Partner with" cardlist.
+    /// This is the source of truth for which cards should partner with each other.
+    /// Returns pairs as (FirstCardName, SecondCardName) tuples.
+    /// </summary>
+    Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken ct = default);
 }
 
 /// <summary>Assigns a functional role to a card. Heuristic and LLM implementations live elsewhere.</summary>

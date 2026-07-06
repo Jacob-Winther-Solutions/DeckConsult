@@ -24,6 +24,7 @@ internal sealed class ScryfallCard
     public string? OracleText { get; init; }
     public string? Power { get; init; }
     public string? Toughness { get; init; }
+    public List<string> Keywords { get; init; } = [];
     public ScryfallLegalities Legalities { get; init; } = new();
     public ScryfallPrices? Prices { get; init; }
     public ScryfallImageUris? ImageUris { get; init; }

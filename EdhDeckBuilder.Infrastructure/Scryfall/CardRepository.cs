@@ -1,6 +1,9 @@
 using System.Text.Json;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Partnerships;
+using EdhDeckBuilder.Infrastructure.Edhrec;
+using EdhDeckBuilder.Infrastructure.Edhrec.Dto;
 using EdhDeckBuilder.Infrastructure.Scryfall.Dto;
 using Microsoft.Extensions.Logging;
 
@@ -15,9 +18,25 @@ public sealed class CardRepository : ICardRepository
     };
 
     private readonly Lazy<Task<CardIndex>> _index;
+    private readonly IEdhrecClient? _edhrecClient;
+    private readonly ILogger<CardRepository> _logger;
 
-    internal CardRepository(ScryfallBulkClient bulkClient, ILogger<CardRepository> logger)
+    internal CardRepository(
+        ScryfallBulkClient bulkClient,
+        ILogger<CardRepository> logger)
     {
+        _logger = logger;
+        _edhrecClient = null;
+        _index = new Lazy<Task<CardIndex>>(() => BuildIndexAsync(bulkClient, logger));
+    }
+
+    internal CardRepository(
+        ScryfallBulkClient bulkClient,
+        IEdhrecClient edhrecClient,
+        ILogger<CardRepository> logger)
+    {
+        _logger = logger;
+        _edhrecClient = edhrecClient;
         _index = new Lazy<Task<CardIndex>>(() => BuildIndexAsync(bulkClient, logger));
     }
 
@@ -57,7 +76,19 @@ public sealed class CardRepository : ICardRepository
             .ToList();
     }
 
-    private static async Task<CardIndex> BuildIndexAsync(ScryfallBulkClient bulkClient, ILogger logger)
+    public async Task<IReadOnlyList<PartnerCombo>> GetPartnerCombosAsync(
+        Color? colorFilter = null,
+        bool exactMatch = false,
+        CancellationToken ct = default)
+    {
+        var index = await _index.Value;
+        return index.PartnerCombos
+            .Where(pc => colorFilter is null
+                || IsValidColorIdentity(pc, colorFilter.Value, exactMatch, index))
+            .ToList();
+    }
+
+    private async Task<CardIndex> BuildIndexAsync(ScryfallBulkClient bulkClient, ILogger logger)
     {
         var path = await bulkClient.GetOracleCardsFileAsync();
         logger.LogInformation("Building card index from {Path}", path);
@@ -80,11 +111,47 @@ public sealed class CardRepository : ICardRepository
         }
 
         logger.LogInformation("Card index built: {Count} cards", byOracleId.Count);
-        return new CardIndex(byName, byOracleId, all.AsReadOnly());
+
+        // Build partnership index from EDHREC data
+        List<PartnerCombo> combos;
+        if (_edhrecClient != null)
+        {
+            var edhrecPage = await _edhrecClient.GetPartnersPageAsync();
+            combos = PartnershipIndexBuilder.BuildFromEdhrec(edhrecPage, byName, logger);
+        }
+        else
+        {
+            logger.LogWarning("No EDHREC client provided; partnership index will be empty");
+            combos = new List<PartnerCombo>();
+        }
+
+        return new CardIndex(byName, byOracleId, all.AsReadOnly(), combos);
+    }
+
+
+    /// <summary>
+    /// Checks if a partner combo's combined color identity satisfies the filter.
+    /// </summary>
+    private static bool IsValidColorIdentity(
+        PartnerCombo combo,
+        Color filter,
+        bool exactMatch,
+        CardIndex index)
+    {
+        if (!index.ByOracleId.TryGetValue(combo.FirstCardId, out var first)
+            || !index.ByOracleId.TryGetValue(combo.SecondCardId, out var second))
+            return false;
+
+        var combined = first.ColorIdentity | second.ColorIdentity;
+
+        return exactMatch
+            ? combined == filter
+            : combined.IsWithin(filter);
     }
 
     private sealed record CardIndex(
         IReadOnlyDictionary<string, Card> ByName,
         IReadOnlyDictionary<Guid, Card> ByOracleId,
-        IReadOnlyList<Card> All);
+        IReadOnlyList<Card> All,
+        IReadOnlyList<PartnerCombo> PartnerCombos);
 }
