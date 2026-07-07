@@ -133,7 +133,8 @@ internal static class RepairEngine
         var runnerUps = pool
             .Where(fc => !committedIds.Contains(fc.Card.OracleId)
                       && !fc.Card.Types.HasFlag(CardType.Land)
-                      && fc.Card.CommanderLegality == Legality.Legal)
+                      && fc.Card.CommanderLegality == Legality.Legal
+                      && fc.Roles.Primary != CardRole.Unmatched)
             .OrderByDescending(fc => fc.Candidate.Inclusion)
             .Select(fc => fc.Candidate)
             .Take(30)

@@ -21,6 +21,9 @@ public static class ClassificationPrompt
         Each card has exactly one primary role — the role it is most often played for in this deck context.
         Secondary roles are additional contributions the card makes; only add a secondary role if the card meaningfully fulfils it, not just incidentally.
 
+        If a card does not fit any role in the deck context, assign it the **Unmatched** role.
+        The fill engine will decide whether to include it based on remaining deck slots.
+
         **Land** — Lands used for mana. Assign this role only to actual land cards.
 
         **Ramp** — Cards that accelerate mana production beyond one land per turn: mana rocks, land ramp spells, mana dorks, rituals.
@@ -110,7 +113,7 @@ public static class ClassificationPrompt
 
     private static InputSchema BuildSchema()
     {
-        const string roleEnum = """["Land","Ramp","CardAdvantage","TargetedDisruption","MassDisruption","Tutor","Protection","Recursion","Plan","Payoff","Synergy"]""";
+        const string roleEnum = """["Land","Ramp","CardAdvantage","TargetedDisruption","MassDisruption","Tutor","Protection","Recursion","Plan","Payoff","Synergy","Unmatched"]""";
         var json = $$"""
             {
               "type": "object",

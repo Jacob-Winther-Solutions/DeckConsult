@@ -6,6 +6,7 @@ using EdhDeckBuilder.Agent.Selection;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using Microsoft.Extensions.Logging;
 
 namespace EdhDeckBuilder.Tests.Agent;
 
@@ -62,7 +63,7 @@ public sealed class DeckBuilderTests
         private static CardRole ParseRole(string name)
         {
             var prefix = name.Contains('_') ? name[..name.IndexOf('_')] : name;
-            return Enum.TryParse<CardRole>(prefix, ignoreCase: true, out var r) ? r : CardRole.Synergy;
+            return Enum.TryParse<CardRole>(prefix, ignoreCase: true, out var r) ? r : CardRole.Unmatched;
         }
     }
 
@@ -167,7 +168,8 @@ public sealed class DeckBuilderTests
     private static DeckBuilder MakeBuilder(IReadOnlyList<CardCandidate> pool) =>
         new(new FixedSuggestionSource(pool),
             new RoleParsingClassifier(),
-            new InclusionOrderSelector());
+            new InclusionOrderSelector(),
+            LoggerFactory.Create(b => b.AddConsole()).CreateLogger<DeckBuilder>());
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -282,5 +284,50 @@ public sealed class DeckBuilderTests
 
         int total = result.Deck.Count + result.BasicLandCounts.Values.Sum();
         Assert.Equal(98, total);
+    }
+
+    [Fact]
+    public async Task BuildAsync_unmatched_cards_in_pool_are_not_included_in_deck()
+    {
+        var commander = MakeCommander("Plan_Commander", Color.Red | Color.Green);
+        var pool = CreatePool(Color.Red | Color.Green);
+
+        // Add unmatched cards to the pool (cards with names that don't parse to any role).
+        var poolWithUnmatched = pool.Concat([
+            new CardCandidate(new()
+            {
+                ScryfallId        = Guid.NewGuid(),
+                OracleId          = Guid.NewGuid(),
+                Name              = "UnmatchedCard_1",  // Will parse to Unmatched
+                TypeLine          = "Instant",
+                Types             = CardType.Instant,
+                ColorIdentity     = Color.Red | Color.Green,
+                ManaCost          = "{2}{R}{G}",
+                CommanderLegality = Legality.Legal,
+            }, 0.5, "Test"),
+            new CardCandidate(new()
+            {
+                ScryfallId        = Guid.NewGuid(),
+                OracleId          = Guid.NewGuid(),
+                Name              = "UnmatchedCard_2",  // Will parse to Unmatched
+                TypeLine          = "Instant",
+                Types             = CardType.Instant,
+                ColorIdentity     = Color.Red | Color.Green,
+                ManaCost          = "{2}{R}{G}",
+                CommanderLegality = Legality.Legal,
+            }, 0.5, "Test"),
+        ]).ToList();
+
+        var result = await MakeBuilder(poolWithUnmatched).BuildAsync(
+            [commander], DeckTemplate.Balanced,
+            [new WeightedArchetype(ArchetypeLibrary.All[Archetype.Midrange], 1.0)]);
+
+        // Unmatched cards should NOT appear in the deck
+        var unmatchedInDeck = result.Deck.Where(s => s.Card.Name.StartsWith("UnmatchedCard_"));
+        Assert.Empty(unmatchedInDeck);
+
+        // Unmatched cards should NOT appear in runner-ups (they're not useful)
+        var unmatchedInRunnerUps = result.RunnerUps.Where(s => s.Card.Name.StartsWith("UnmatchedCard_"));
+        Assert.Empty(unmatchedInRunnerUps);
     }
 }

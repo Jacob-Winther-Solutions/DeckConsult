@@ -29,6 +29,7 @@ public enum CardRole
 
     Payoff,               // win conditions that convert the plan into a win (Purphoros, Anointed Procession)
     Synergy,              // glue that supports the plan but isn't the plan itself
+    Unmatched,            // card did not match any primary role in the classifier
 }
 
 /// <summary>Where a role assignment came from, so the UI can surface provenance and confidence.</summary>

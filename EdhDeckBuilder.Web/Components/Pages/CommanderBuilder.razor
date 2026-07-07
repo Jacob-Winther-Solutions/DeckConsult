@@ -19,8 +19,8 @@
     }
     else
     {
-        <div style="padding: 0.75rem 1.5rem 0 1.5rem;">
-            <ul class="nav nav-tabs mb-0">
+        <div style="padding: 1.5rem;">
+            <ul class="nav nav-tabs mb-3">
                 <li class="nav-item">
                     <button class="nav-link @(_activeTab == "guided" ? "active" : "")"
                             @onclick='() => _activeTab = "guided"'>Guided</button>
@@ -30,18 +30,18 @@
                             @onclick='() => _activeTab = "custom"'>Custom</button>
                 </li>
             </ul>
-        </div>
 
-        <div style="@(_activeTab != "guided" ? "display:none;" : "")">
-            <GuidedTab @key="_guidedTabKey"
-                       InitialCommander="_preCommander"
-                       InitialArchetypeWeights="_preArchetypes"
-                       InitialThemes="_preThemes"
-                       InitialBracket="_preBracket"
-                       InitialBudget="_preBudget" />
-        </div>
-        <div style="@(_activeTab != "custom" ? "display:none;" : "")">
-            <CustomTab />
+            <div style="@(_activeTab != "guided" ? "display:none;" : "")">
+                <GuidedTab @key="_guidedTabKey"
+                           InitialCommander="_preCommander"
+                           InitialArchetypeWeights="_preArchetypes"
+                           InitialThemes="_preThemes"
+                           InitialBracket="_preBracket"
+                           InitialBudget="_preBudget" />
+            </div>
+            <div style="@(_activeTab != "custom" ? "display:none;" : "")">
+                <CustomTab />
+            </div>
         </div>
     }
 

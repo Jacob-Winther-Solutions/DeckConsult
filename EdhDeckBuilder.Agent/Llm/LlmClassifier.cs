@@ -132,7 +132,7 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
     }
 
     private static CardRole ParseRole(string s) =>
-        Enum.TryParse<CardRole>(s, ignoreCase: true, out var r) ? r : CardRole.Synergy;
+        Enum.TryParse<CardRole>(s, ignoreCase: true, out var r) ? r : CardRole.Unmatched;
 
     private static RoleRelation ParseRelation(string s) =>
         Enum.TryParse<RoleRelation>(s, ignoreCase: true, out var r) ? r : RoleRelation.Always;

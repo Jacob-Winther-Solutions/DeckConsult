@@ -72,6 +72,8 @@ API usage:
 - Haiku, Kraum+Tymna, Combo, Storm, Bracket 4, No Budget:                                                                   3,06 -> 2,98 = 0,08 (66th try) (Partner support in deck builder)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,98 -> 2,84 = 0,14 (67th try) (Partner support in deck builder)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,84 -> 2,71 = 0,13 (68th try) (Full cache clear - Test CardName injection in cache + partner-related builder warnings)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,71 -> 2,57 = 0,14 (69th try) (Full cache clear - Test logging and investigate card pool filtering)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,57 -> 2,43 = 0,14 (70th try) (Test logging and investigate card pool filtering)
 
 Bad classifications:
 Sephiroth (third try):

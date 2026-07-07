@@ -20,6 +20,15 @@ builder.Services.AddAgent(builder.Configuration);
 builder.Services.AddScoped<IApiKeyStateService, ApiKeyStateService>();
 builder.Services.AddSingleton<DeckResultStore>();
 
+// Configure logging: console in development (via default setup), structured JSON in production.
+// Controlled by Instrumentation:EnableStructuredDeckBuildLogging in appsettings per environment.
+builder.Logging.ClearProviders();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddConsole();
+}
+builder.Logging.AddDebug();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

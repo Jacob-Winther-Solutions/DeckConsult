@@ -58,7 +58,9 @@ public sealed class FillEngine(ICardSelector selector)
             if (state.Coverage.GetValueOrDefault(role) >= target.Ideal) continue;
 
             var candidates = pool
-                .Where(c => !committed.Contains(c.Card.OracleId) && c.Roles.Primary == role)
+                .Where(c => !committed.Contains(c.Card.OracleId)
+                         && c.Roles.Primary == role
+                         && c.Roles.Primary != CardRole.Unmatched)
                 .ToList();
 
             if (candidates.Count == 0) continue;
@@ -89,9 +91,11 @@ public sealed class FillEngine(ICardSelector selector)
         // ── Spillover: fill any remaining spell slots ─────────────────────────
         // Roles may have overlapped their way to ideal with fewer cards than the slot budget
         // allows; fill the remainder with the highest-inclusion uncommitted spells.
+        // Skip Unmatched cards; let the fill engine decide whether they're useful.
         var spillover = pool
             .Where(c => !committed.Contains(c.Card.OracleId)
-                     && !c.Card.Types.HasFlag(CardType.Land))
+                     && !c.Card.Types.HasFlag(CardType.Land)
+                     && c.Roles.Primary != CardRole.Unmatched)
             .OrderByDescending(c => c.Candidate.Inclusion)
             .ThenBy(c => c.Card.OracleId); // stable tiebreak
 
@@ -134,9 +138,11 @@ public sealed class FillEngine(ICardSelector selector)
             if (underRole is null) break; // all roles are within their minimum — done
 
             // Best uncommitted candidate that covers the under-served role.
+            // Skip Unmatched cards — they're not useful for any role.
             var toAdd = pool
                 .Where(c => !committed.Contains(c.Card.OracleId)
                          && !c.Card.Types.HasFlag(CardType.Land)   // keep swap loop to spell slots
+                         && c.Roles.Primary != CardRole.Unmatched
                          && c.Roles.AllRoles().Contains(underRole.Value))
                 .OrderByDescending(c => c.Roles.CoverageFor(underRole.Value))
                 .ThenByDescending(c => c.Candidate.Inclusion)

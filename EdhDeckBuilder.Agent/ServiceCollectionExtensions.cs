@@ -27,9 +27,12 @@ public static class ServiceCollectionExtensions
         {
             var section = configuration.GetSection(InstrumentationOptions.Section);
             var options = new InstrumentationOptions();
-            if (section.Exists() && bool.TryParse(section["LogClassificationResponses"], out var enabled))
+            if (section.Exists())
             {
-                options.LogClassificationResponses = enabled;
+                if (bool.TryParse(section["LogClassificationResponses"], out var logClassEnabled))
+                    options.LogClassificationResponses = logClassEnabled;
+                if (bool.TryParse(section["EnableStructuredDeckBuildLogging"], out var logDeckEnabled))
+                    options.EnableStructuredDeckBuildLogging = logDeckEnabled;
             }
             ClassificationResponseLogger.Initialize(options);
         }

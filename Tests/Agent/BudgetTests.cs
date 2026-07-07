@@ -6,6 +6,7 @@ using EdhDeckBuilder.Agent.Selection;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using Microsoft.Extensions.Logging;
 
 namespace EdhDeckBuilder.Tests.Agent;
 
@@ -173,7 +174,10 @@ public sealed class BudgetTests
     }
 
     private static DeckBuilder MakeBuilder(IReadOnlyList<CardCandidate> pool) =>
-        new(new FixedSuggestionSource(pool), new RoleParsingClassifier(), new InclusionOrderSelector());
+        new(new FixedSuggestionSource(pool),
+            new RoleParsingClassifier(),
+            new InclusionOrderSelector(),
+            LoggerFactory.Create(b => b.AddConsole()).CreateLogger<DeckBuilder>());
 
     private static SoftConstraints Constraints(decimal? maxCard = null, decimal? totalBudget = null) =>
         new() { Bracket = Bracket.Three, MaxCardPriceUsd = maxCard, TotalBudgetUsd = totalBudget };

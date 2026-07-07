@@ -4,6 +4,39 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
+## Bugs to Investigate
+
+### LLM Classifier returns all Unmatched on cold cache (2026-07-07)
+
+**Observed:** On first build after clearing the classification cache, the LLM classifier returns
+**all 257 cards as Unmatched**, resulting in 0 cards being filled. On the second identical build,
+the cache is warm and the classifier returns proper role assignments (56 valid roles, 201 Unmatched).
+
+**Evidence:** Test logs show:
+```
+Run 1 (empty cache):  Unmatched: 257, FillEngine: 0 cards committed, Final: 35 cards
+Run 2 (warm cache):   Unmatched: 201, FillEngine: 47 cards committed, Final: 82 cards
+```
+
+**Root cause hypothesis:** The LLM (Haiku) is consistently failing to parse or return valid role
+strings on the first batch when there's no prior cache context. Possible causes:
+- Tool schema not being honored (all cards falling through to default `Unmatched`)
+- LLM defaulting to unparseable role names (misspellings, inconsistent casing despite `ignoreCase`)
+- Prompt context is missing on cold start (system prompt not cached yet)
+- Response format breaking on large batches (~65 cards per batch)
+
+**Impact:** Users who clear cache or start fresh get a broken deck build. Workaround: rebuild immediately (uses cached responses).
+
+**Next steps:**
+1. Add debug logging to `LlmClassifier.ParseRole()` to log each role string before/after parsing
+2. Log the raw tool response JSON to see what role strings are actually coming back
+3. Check if prompt caching (once SDK exposes `SystemBlockParam` API) fixes this
+4. Consider warming the classifier cache during app startup with a small batch
+
+**Blocked on:** Investigation — need to reproduce and inspect raw LLM responses.
+
+---
+
 ## Web UI  (core done — two items deferred)
 
 - [x] Wire `IDeckBuilder` into a Blazor page / component tree.

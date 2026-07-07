@@ -14,4 +14,11 @@ public sealed class InstrumentationOptions
     /// containing per-call metrics and response details. Useful for debugging token usage.
     /// </summary>
     public bool LogClassificationResponses { get; set; } = false;
+
+    /// <summary>
+    /// Enable structured logging of deck builder pipeline stages (JSON format).
+    /// Logs card counts, role breakdowns, and timing for each stage.
+    /// Enabled in Production for observability; controlled per environment in appsettings.
+    /// </summary>
+    public bool EnableStructuredDeckBuildLogging { get; set; } = false;
 }
