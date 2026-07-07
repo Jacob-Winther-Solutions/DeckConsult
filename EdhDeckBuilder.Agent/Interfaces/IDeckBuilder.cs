@@ -41,5 +41,6 @@ public interface IDeckBuilder
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
         IProgress<string>? progress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        bool isLegalPartnerPair = false);
 }

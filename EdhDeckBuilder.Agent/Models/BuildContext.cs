@@ -48,4 +48,13 @@ public sealed record BuildContext
     /// 98 for a partner pair (two commanders, 98 + 2 = 100 total deck size).
     /// </summary>
     public int NonCommanderCount { get; init; } = 99;
+
+    /// <summary>
+    /// True if the two selected commanders form a legal partner pair (as defined by
+    /// <see cref="EdhDeckBuilder.Core.Rules.PartnershipEligibilityRule"/>).
+    /// Used by <see cref="DeckBuilder"/> to decide whether to use the EDHREC partner-pair
+    /// recommendations endpoint (if available) or fall back to merging single-commander pools.
+    /// Defaults to false (safe — always merge).
+    /// </summary>
+    public bool IsLegalPartnerPair { get; init; } = false;
 }

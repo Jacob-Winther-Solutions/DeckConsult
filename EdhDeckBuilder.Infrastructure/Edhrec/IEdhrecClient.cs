@@ -10,4 +10,5 @@ internal interface IEdhrecClient
     Task<EdhrecPage?> GetCommanderPageAsync(string slug, CancellationToken ct = default);
     Task<EdhrecPage?> GetAverageDeckPageAsync(string slug, CancellationToken ct = default);
     Task<EdhrecPartnerPage?> GetPartnersPageAsync(CancellationToken ct = default);
+    Task<EdhrecPage?> GetPartnerPairRecommendationsAsync(string firstSlug, string secondSlug, CancellationToken ct = default);
 }

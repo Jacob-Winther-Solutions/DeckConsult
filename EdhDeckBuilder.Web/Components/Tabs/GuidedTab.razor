@@ -28,6 +28,14 @@ else
         </div>
     </div>
 
+    @if (_partnerWarning is not null)
+    {
+        <div class="alert alert-warning alert-dismissible mb-4">
+            @_partnerWarning
+            <button type="button" class="btn-close" @onclick="() => _partnerWarning = null"></button>
+        </div>
+    }
+
     <!-- ── Archetype ─────────────────────────────────────────────────────── -->
     <ArchetypePicker OnChanged="OnArchetypesChanged" InitialArchetypeWeights="InitialArchetypeWeights" @key="(1, _archetypeResetKey)" />
 

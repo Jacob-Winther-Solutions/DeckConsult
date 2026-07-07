@@ -35,6 +35,9 @@ public sealed class DeckBuilderTests
 
         public Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken __)
             => Task.FromResult<IReadOnlyList<(string, string)>>(new List<(string, string)>());
+
+        public Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card _, Card __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);  // Mock returns null; real implementation tested separately
     }
 
     /// <summary>

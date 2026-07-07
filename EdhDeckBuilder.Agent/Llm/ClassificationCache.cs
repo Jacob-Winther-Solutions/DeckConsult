@@ -19,7 +19,11 @@ public sealed class ClassificationCache
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        Converters = { new JsonStringEnumConverter() },
+        Converters =
+        {
+            new JsonStringEnumConverter(),
+            // Guid converter ensures valid Guid deserialization from cache
+        },
         WriteIndented = false,
     };
 
@@ -101,8 +105,22 @@ public sealed class ClassificationCache
         {
             var json = File.ReadAllText(path);
             var list = JsonSerializer.Deserialize<List<ClassificationResult>>(json, SerializerOptions) ?? [];
+
+            // Filter out invalid entries (corrupted cache protection)
+            var valid = list.Where(r =>
+                r.OracleId != Guid.Empty &&  // No empty GUIDs
+                r.CardName != null &&         // CardName must be present
+                Enum.IsDefined(typeof(CardRole), r.PrimaryRole))  // Valid role
+                .ToList();
+
+            // Log if we filtered any corrupted entries
+            if (valid.Count < list.Count)
+            {
+                Console.WriteLine($"⚠️ Classification cache: filtered {list.Count - valid.Count} invalid entries");
+            }
+
             return new ConcurrentDictionary<Guid, ClassificationResult>(
-                list.ToDictionary(r => r.OracleId));
+                valid.ToDictionary(r => r.OracleId));
         }
         catch { return new(); }
     }

@@ -141,7 +141,19 @@ internal static class RepairEngine
 
         var cutSuggestions = BuildCutSuggestions(context, deck, state);
 
-        var allWarnings = new List<string>(fillResult.Warnings);
+        var allWarnings = new List<string>();
+
+        // Add incomplete deck warning first (highest priority)
+        int targetCardCount = 100 - context.Commanders.Count;
+        int actualCardCount = state.Committed.Count;
+        if (actualCardCount < targetCardCount)
+        {
+            allWarnings.Add($"⚠️ Deck is incomplete: {actualCardCount}/{targetCardCount} non-commander, non-basic slots filled. " +
+                $"Could not find enough cards to complete the deck with these constraints. " +
+                $"Consider adjusting archetypes, themes, or budget parameters.");
+        }
+
+        allWarnings.AddRange(fillResult.Warnings);
         allWarnings.AddRange(fixingWarnings);
 
         var totalPrice = deck.Sum(s => s.Card.PriceUsd ?? 0m);

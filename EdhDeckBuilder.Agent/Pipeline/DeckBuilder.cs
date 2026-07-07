@@ -57,15 +57,16 @@ public sealed class DeckBuilder(
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
         IProgress<string>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool isLegalPartnerPair = false)
     {
         // 1. Resolve template.
         progress?.Report("Resolving template");
         var resolved = TemplateResolver.Resolve(template, archetypes, themes, bracket);
 
-        // 2. Gather candidate pool from EDHREC (one call per commander; merged).
+        // 2. Gather candidate pool from EDHREC (one call per commander; merged or partner-pair).
         progress?.Report("Gathering card pool");
-        var rawPool = await GatherPoolAsync(commanders, ct);
+        var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, ct);
 
         // 3. Filter pool: legal, CI ⊆ commander CI, not a commander card, within budget.
         progress?.Report("Filtering pool");
@@ -132,8 +133,21 @@ public sealed class DeckBuilder(
 
     private async Task<IReadOnlyList<CardCandidate>> GatherPoolAsync(
         IReadOnlyList<Card> commanders,
+        bool isLegalPartnerPair,
         CancellationToken ct)
     {
+        // If this is a legal partner pair, try the partner-pair endpoint first.
+        if (isLegalPartnerPair && commanders.Count == 2)
+        {
+            var partnerPool = await suggestionSource.GetPartnerPairRecommendationsAsync(
+                commanders[0], commanders[1], ct);
+            if (partnerPool != null)
+            {
+                return partnerPool;
+            }
+            // If partner endpoint returns null, fall through to merge single-commander pools
+        }
+
         var tasks = commanders
             .Select(c => suggestionSource.GetRecommendationsAsync(c, ct))
             .ToList();

@@ -52,4 +52,18 @@ public sealed class SuggestionSource : ISuggestionSource
         var page = await _client.GetPartnersPageAsync(ct);
         return EdhrecPartnerMapper.ExtractPartnerWithPairs(page, _logger);
     }
+
+    public async Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card first, Card second, CancellationToken ct = default)
+    {
+        var firstSlug = EdhrecSlugger.FromCard(first);
+        var secondSlug = EdhrecSlugger.FromCard(second);
+        var page = await _client.GetPartnerPairRecommendationsAsync(firstSlug, secondSlug, ct);
+        if (page?.Container?.JsonDict?.Cardlists is not { Count: > 0 } cardlists)
+        {
+            _logger.LogWarning("No partner-pair recommendation data from EDHREC for {First} + {Second}",
+                first.Name, second.Name);
+            return null;
+        }
+        return await EdhrecMapper.ToCardCandidatesAsync(cardlists, _repository, _logger, ct);
+    }
 }

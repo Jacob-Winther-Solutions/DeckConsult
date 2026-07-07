@@ -88,6 +88,12 @@ public interface ISuggestionSource
     /// Returns pairs as (FirstCardName, SecondCardName) tuples.
     /// </summary>
     Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Recommendations optimized for a partner pair, fetched from EDHREC's partner-pair endpoint.
+    /// Returns null if the partner pair is not recognized by EDHREC.
+    /// </summary>
+    Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card first, Card second, CancellationToken ct = default);
 }
 
 /// <summary>Assigns a functional role to a card. Heuristic and LLM implementations live elsewhere.</summary>

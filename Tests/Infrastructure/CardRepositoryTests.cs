@@ -299,5 +299,8 @@ public sealed class CardRepositoryTests : IDisposable
 
             return Task.FromResult<EdhrecPartnerPage?>(page);
         }
+
+        public Task<EdhrecPage?> GetPartnerPairRecommendationsAsync(string firstSlug, string secondSlug, CancellationToken ct = default)
+            => Task.FromResult<EdhrecPage?>(null);  // Mock returns null; real implementation tested separately
     }
 }

@@ -21,6 +21,7 @@ public partial class GuidedTab : ComponentBase, IDisposable
     [Inject] private NavigationManager     Navigation  { get; set; } = default!;
     [Inject] private DeckResultStore       ResultStore { get; set; } = default!;
     [Inject] private IConfiguration        Config      { get; set; } = default!;
+    [Inject] private ICardRepository       CardRepository { get; set; } = default!;
 
     [Parameter] public Card? InitialCommander { get; set; }
     [Parameter] public IReadOnlyDictionary<Archetype, double>? InitialArchetypeWeights { get; set; }
@@ -65,6 +66,7 @@ public partial class GuidedTab : ComponentBase, IDisposable
     private string? _currentStage;
     private readonly List<string> _completedStages = [];
     private string? _errorMessage;
+    private string? _partnerWarning;
     private CancellationTokenSource? _buildCts;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -95,8 +97,28 @@ public partial class GuidedTab : ComponentBase, IDisposable
 
     // ── Callbacks ──────────────────────────────────────────────────────────
 
-    private void OnCommandersChanged(IReadOnlyList<Card> commanders) =>
+    private void OnCommandersChanged(IReadOnlyList<Card> commanders)
+    {
         _selectedCommanders = commanders;
+        _partnerWarning = null;  // Clear warning when commanders change
+
+        // Validate partner pair immediately if exactly 2 commanders selected
+        if (commanders.Count == 2)
+        {
+            _ = ValidateAndShowWarningAsync(commanders);
+        }
+    }
+
+    private async Task ValidateAndShowWarningAsync(IReadOnlyList<Card> commanders)
+    {
+        bool isLegalPair = await ValidatePartnerPairAsync(commanders, CancellationToken.None);
+        if (!isLegalPair)
+        {
+            _partnerWarning = "⚠️ This is not a legal partner pair. Recommendations will be merged from individual commanders. " +
+                "You can still build a deck, but it may not be optimized for the combination.";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
 
     private void OnArchetypesChanged(IReadOnlyDictionary<Archetype, double> weights) =>
         _archetypeWeights = weights;
@@ -112,6 +134,24 @@ public partial class GuidedTab : ComponentBase, IDisposable
 
     // ── Build ──────────────────────────────────────────────────────────────
 
+    private async Task<bool> ValidatePartnerPairAsync(IReadOnlyList<Card> commanders, CancellationToken ct)
+    {
+        if (commanders.Count != 2)
+            return false;
+
+        var combos = await CardRepository.GetPartnerCombosAsync(
+            colorFilter: null,
+            exactMatch: false,
+            ct);
+
+        var first = commanders[0];
+        var second = commanders[1];
+
+        return combos.Any(c =>
+            (c.FirstCardId == first.OracleId && c.SecondCardId == second.OracleId)
+            || (c.FirstCardId == second.OracleId && c.SecondCardId == first.OracleId));
+    }
+
     private async Task StartBuildAsync()
     {
         if (_selectedCommanders.Count == 0) return;
@@ -123,6 +163,9 @@ public partial class GuidedTab : ComponentBase, IDisposable
         _buildCts = new CancellationTokenSource();
 
         var p = BuildRequestFactory.ForGuided(_archetypeWeights, _themes, _bracketSelection, _budget);
+
+        // Determine if this is a legal partner pair (already validated in OnCommandersChanged, so just check the warning)
+        bool isLegalPartnerPair = _selectedCommanders.Count == 2 && _partnerWarning is null;
 
         // Enable token tracking if configured
         var enableTracking = Config.GetValue<bool>("Features:EnableTokenUsageTracking");
@@ -142,7 +185,8 @@ public partial class GuidedTab : ComponentBase, IDisposable
                 p.BracketProfile,
                 p.Constraints,
                 new Progress<string>(OnStageReport),
-                _buildCts.Token);
+                _buildCts.Token,
+                isLegalPartnerPair);
 
             // Log usage if tracking was enabled
             if (enableTracking && DeckBuilder.UsageTracker != null)

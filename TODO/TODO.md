@@ -104,23 +104,40 @@ Two discovery modes: **Guided** (archetype/theme-driven) and **Custom** (free-te
       - [x] `CommanderDiscovery` — surfaces all legal partner combinations in results (top 10 or all if ≤10)
       - [x] DI registration — `IEdhrecClient` seam, `AddHttpClient<EdhrecClient>` ordering
       - [x] Test coverage — partnership extraction, validity checks, discovery result limits (9 new tests for variants)
-- [ ] **Partner support in Deck Builder (EDHREC):** The Commander Deck Builder (`DeckBuilder.cs`) accepts
-      multiple commanders and correctly combines color identity + merges recommendations. **However**,
-      it currently queries `ISuggestionSource` per individual commander and merges results. EDHREC
-      **does support partner pairings** — each partner pair has its own recommendation page:
-      `https://edhrec.com/commanders/{card1-slug}-{card2-slug}` (e.g., Thrasios+Tymna:
-      `https://edhrec.com/commanders/thrasios-triton-hero-tymna-the-weaver`).
+- [x] **Partner support in Deck Builder (EDHREC):** The Commander Deck Builder now queries EDHREC's
+      partner-pair endpoints when two commanders form a legal partnership. Includes redirect handling
+      (non-canonical orderings automatically fetch canonical), canonical caching, and graceful fallback
+      to merged single-commander pools if the partner endpoint returns null or 404.
+      - [x] `IEdhrecClient.GetPartnerPairRecommendationsAsync(Card first, Card second)`
+      - [x] Redirect detection and canonical slug extraction
+      - [x] Partner pair endpoint integration in `DeckBuilder.GatherPoolAsync()`
+      - [x] UI validation and non-blocking warnings
+      - [x] Comprehensive test coverage (5 new tests)
 
-      **Implementation tasks:**
-      - [ ] Extend `EdhrecClient` with `GetRecommendationsForPartnerPairAsync(Card first, Card second)`
-      - [ ] Construct partner pair URL slug: `{first.Name.ToSlug()}-{second.Name.ToSlug()}` (match EDHREC's format)
-      - [ ] At build time in `DeckBuilder`, detect partner pairs via `ICardRepository.GetPartnerCombosAsync()`
-      - [ ] Call partner endpoint instead of merging two singleton pools
-      - [ ] Fallback to merged-singles approach if partner pair endpoint returns empty or 404
-      - [ ] Update `GatherPoolAsync()` to handle partner detection and routing
+- [ ] **EDHREC theme-specific tag endpoints (Phase 5):** EDHREC provides theme-focused recommendation
+      endpoints that filter to only cards aligned with a specific theme. These can reduce filtering
+      and improve pool quality for unusual theme combinations.
+      - [ ] Example: `https://json.edhrec.com/pages/commanders/{commander-slug}/{theme-name}.json`
+      - [ ] New method: `ISuggestionSource.GetThemeRecommendationsAsync(Card commander, WeightedTheme theme, ...)`
+      - [ ] In `GatherPoolAsync()`, try theme endpoints for each weighted theme before merging single-commander pools
+      - [ ] Fallback to single-commander pools if theme endpoints return null
+      - [ ] Cache by theme (e.g., `{commander-slug}-{theme-name}.json`)
 
-      **Scope:** ~2–3 hours (EDHREC client method + URL slug logic + partner detection in fill pipeline).
-      **Status:** Deferred (Phase 5). Core partnership support is complete; this is a build-time optimization to avoid card-list merging.
+      **Benefit:** Unusual partner pairs with niche themes (e.g., Sephiroth + very rare synergy) often result in
+      underfilled decks because classification filters heavily. Theme-focused pools should yield more relevant,
+      better-classified cards.
+
+      **Scope:** ~2–3 hours (new `EdhrecClient` methods + `GatherPoolAsync()` refactor + theme detection logic).
+      **Status:** Deferred. Current partner-pair support is production-ready; this is an optimization for edge cases.
+
+- [ ] **Underfilled deck warning:** When a deck doesn't reach 99 cards (or 98 for partner pairs), a high-priority
+      warning now appears first in the warnings list, alerting the user to the incomplete fill.
+      - [x] Message: "⚠️ Deck is incomplete: X/Y non-commander slots filled. Could not find enough cards..."
+      - [x] Placed first in warnings list (highest priority)
+      - [x] Includes suggestion to adjust archetypes/themes/budget
+
+- [ ] **Partner pair slot accounting (UI):** Ensure all deck views correctly show X/98 for partner pairs, not X/99.
+      - [ ] Verify UI components use `commanders.Count` for denominator calculation
 
 ---
 

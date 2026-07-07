@@ -67,6 +67,11 @@ API usage:
 - Haiku, Commander Discovery, WUGG (exactly), Combo, Draw-Go, Bracket 4, No Budget, No angels                               3,27 -> 3,26 = 0,01 (61th try) (Another test of partner pairing in Discovery, using partner EDHREC endpoint - 25 commanders to evaluate)
 - Haiku, Commander Discovery, WUGG (exactly), Combo, Draw-Go, Bracket 4, No Budget, No angels                               3,26 -> 3,26 = 0,00 (62th try) (Another test of partner pairing in Discovery, using partner EDHREC endpoint - 2 commanders to evaluate)
 - Haiku, Commander Discovery, WUGG (exactly), Combo, Draw-Go, Bracket 4, No Budget, No angels                               3,26 -> 3,25 = 0,01 (63th try) (Another test of partner pairing in Discovery, using partner EDHREC endpoint - 11 commanders to evaluate)
+- Haiku, Tymna+Thrasios, Combo, Draw-Go, Bracket 4, No Budget:                                                              3,25 -> 3,14 = 0,11 (64th try) (Partner support in deck builder)
+- Haiku, Kraum+Tymna, Combo, Storm, Bracket 4, No Budget:                                                                   3,14 -> 3,06 = 0,08 (65th try) (Partner support in deck builder)
+- Haiku, Kraum+Tymna, Combo, Storm, Bracket 4, No Budget:                                                                   3,06 -> 2,98 = 0,08 (66th try) (Partner support in deck builder)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,98 -> 2,84 = 0,14 (67th try) (Partner support in deck builder)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,84 -> 2,71 = 0,13 (68th try) (Full cache clear - Test CardName injection in cache + partner-related builder warnings)
 
 Bad classifications:
 Sephiroth (third try):
