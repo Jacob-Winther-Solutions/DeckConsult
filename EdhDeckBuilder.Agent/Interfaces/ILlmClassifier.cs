@@ -4,14 +4,14 @@ using EdhDeckBuilder.Core.Cards;
 namespace EdhDeckBuilder.Agent.Interfaces;
 
 /// <summary>
-/// Classifies a batch of candidate cards into functional roles, given the commander context.
+/// Classifies candidate cards into functional roles, given the commander context.
 /// The LLM implementation lives in <c>EdhDeckBuilder.Agent.Llm.LlmClassifier</c>;
 /// a mock implementation is used in fill-engine tests to keep them fast and API-free.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Cards are classified in batches — one API call per batch, not one per card. The caller
-/// is responsible for splitting into sensibly-sized batches if the pool is very large.
+/// Internally batches candidates for efficiency (one API call per ~30 cards, not one per card).
+/// The caller simply provides all cards to classify and receives all classifications back.
 /// </para>
 /// <para>
 /// Classification is cached globally by <c>OracleId</c> for stable roles (Ramp,
@@ -31,7 +31,7 @@ public interface ILlmClassifier
     /// The commander(s) for this build, included in the prompt so the model can assign
     /// <c>Plan</c> and <c>Synergy</c> roles with commander-specific context.
     /// </param>
-    Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
+    Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
         IReadOnlyList<CardCandidate> candidates,
         IReadOnlyList<Card> commanders,
         CancellationToken ct = default);

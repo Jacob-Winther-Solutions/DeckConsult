@@ -24,6 +24,7 @@ internal sealed class EdhrecCardlist
 
 internal sealed class EdhrecCardView
 {
+    public string Id { get; init; } = "";
     public string Name { get; init; } = "";
     public int NumDecks { get; init; }
     public int PotentialDecks { get; init; }

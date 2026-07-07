@@ -52,6 +52,12 @@ public sealed class CardRepository : ICardRepository
         return index.ByOracleId.GetValueOrDefault(oracleId);
     }
 
+    public async Task<Card?> GetByScryfallIdAsync(Guid scryfallId, CancellationToken ct = default)
+    {
+        var index = await _index.Value;
+        return index.ByScryfallId.GetValueOrDefault(scryfallId);
+    }
+
     public async Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default)
     {
         var index = await _index.Value;
@@ -95,15 +101,17 @@ public sealed class CardRepository : ICardRepository
 
         await using var stream = File.OpenRead(path);
 
-        var byName     = new Dictionary<string, Card>(30_000, StringComparer.OrdinalIgnoreCase);
-        var byOracleId = new Dictionary<Guid, Card>(30_000);
-        var all        = new List<Card>(30_000);
+        var byName       = new Dictionary<string, Card>(30_000, StringComparer.OrdinalIgnoreCase);
+        var byOracleId   = new Dictionary<Guid, Card>(30_000);
+        var byScryfallId = new Dictionary<Guid, Card>(30_000);
+        var all          = new List<Card>(30_000);
 
         await foreach (var dto in JsonSerializer.DeserializeAsyncEnumerable<ScryfallCard>(stream, JsonOptions))
         {
             if (dto is null) continue;
             var card = ScryfallMapper.ToCard(dto);
             byName.TryAdd(card.Name, card);
+            byScryfallId.TryAdd(card.ScryfallId, card);
             if (byOracleId.TryAdd(card.OracleId, card))
             {
                 all.Add(card);
@@ -125,7 +133,7 @@ public sealed class CardRepository : ICardRepository
             combos = new List<PartnerCombo>();
         }
 
-        return new CardIndex(byName, byOracleId, all.AsReadOnly(), combos);
+        return new CardIndex(byName, byOracleId, byScryfallId, all.AsReadOnly(), combos);
     }
 
 
@@ -152,6 +160,7 @@ public sealed class CardRepository : ICardRepository
     private sealed record CardIndex(
         IReadOnlyDictionary<string, Card> ByName,
         IReadOnlyDictionary<Guid, Card> ByOracleId,
+        IReadOnlyDictionary<Guid, Card> ByScryfallId,
         IReadOnlyList<Card> All,
         IReadOnlyList<PartnerCombo> PartnerCombos);
 }

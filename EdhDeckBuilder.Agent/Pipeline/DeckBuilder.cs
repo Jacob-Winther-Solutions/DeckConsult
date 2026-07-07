@@ -33,7 +33,6 @@ public sealed class DeckBuilder(
     ICardSelector selector,
     ILogger<DeckBuilder> logger) : IDeckBuilder
 {
-    private const int ClassificationBatchSize = 100;
     private UsageTracker? _usageTracker;
 
     public UsageTracker? UsageTracker
@@ -96,7 +95,7 @@ public sealed class DeckBuilder(
         var commanderCandidates = commanders
             .Select(c => new CardCandidate(c, 1.0, "Commanders"))
             .ToList();
-        var commanderClassifications = await classifier.ClassifyBatchAsync(commanderCandidates, commanders, ct);
+        var commanderClassifications = await classifier.ClassifyAsync(commanderCandidates, commanders, ct);
         var commanderProfiles = BuildCommanderProfiles(commanderClassifications, commanders);
         var netTargets = ComputeNetTargets(resolved, commanderProfiles);
         stageTimer.Stop();
@@ -122,7 +121,7 @@ public sealed class DeckBuilder(
         // 6. Classify pool → FillCandidates.
         progress?.Report("Classifying card pool");
         stageTimer.Restart();
-        var fillPool = await ClassifyPoolAsync(filteredPool, commanders, ct);
+        var (fillPool, classifications) = await ClassifyPoolAsync(filteredPool, commanders, ct);
         stageTimer.Stop();
 
         // Count breakdown by role
@@ -134,6 +133,21 @@ public sealed class DeckBuilder(
         foreach (var (role, count) in roleBreakdown.OrderBy(kv => kv.Key.ToString()))
         {
             logger.LogInformation("  {Role}: {Count}", role, count);
+        }
+
+        // Log Unmatched cards with reasoning (debug mode only)
+        var unmatchedCards = fillPool.Where(fc => fc.Roles.Primary == CardRole.Unmatched).ToList();
+        if (unmatchedCards.Count > 0)
+        {
+            logger.LogInformation("Unmatched cards ({Count}):", unmatchedCards.Count);
+            var classificationsByOracleId = classifications.ToDictionary(c => c.OracleId);
+            foreach (var unmatched in unmatchedCards.OrderBy(c => c.Card.Name))
+            {
+                var reasoning = classificationsByOracleId.TryGetValue(unmatched.Card.OracleId, out var c)
+                    ? c.Reasoning ?? "(no reasoning provided)"
+                    : "(no classification found)";
+                logger.LogInformation("  {CardName}: {Reasoning}", unmatched.Card.Name, reasoning);
+            }
         }
 
         // 7. Fill engine (Passes A + B: greedy fill + reconciliation).
@@ -180,6 +194,14 @@ public sealed class DeckBuilder(
         stageTimer.Stop();
         logger.LogInformation("Assemble: {DeckSize} cards in final deck, {ElapsedMs}ms",
             result.Deck.Count, stageTimer.ElapsedMilliseconds);
+
+        // Log runner-up stats
+        var classificationsByOracleId = classifications.ToDictionary(c => c.OracleId);
+        var classifiedRunnerUps = result.RunnerUps
+            .Count(ru => classificationsByOracleId.ContainsKey(ru.Card.OracleId));
+        var unclassifiedRunnerUps = result.RunnerUps.Count - classifiedRunnerUps;
+        logger.LogInformation("RunnerUps: {Total} total ({Classified} classified, {Unclassified} unclassified)",
+            result.RunnerUps.Count, classifiedRunnerUps, unclassifiedRunnerUps);
 
         timer.Stop();
         logger.LogInformation("DeckBuild_Complete: {DeckSize} cards total, {TotalElapsedMs}ms elapsed",
@@ -274,24 +296,17 @@ public sealed class DeckBuilder(
         return result;
     }
 
-    private async Task<IReadOnlyList<FillCandidate>> ClassifyPoolAsync(
+    private async Task<(IReadOnlyList<FillCandidate>, IReadOnlyList<ClassificationResult>)> ClassifyPoolAsync(
         IReadOnlyList<CardCandidate> pool,
         IReadOnlyList<Card> commanders,
         CancellationToken ct)
     {
-        var classifications = new List<ClassificationResult>();
-
-        for (int i = 0; i < pool.Count; i += ClassificationBatchSize)
-        {
-            var batch   = pool.Skip(i).Take(ClassificationBatchSize).ToList();
-            var results = await classifier.ClassifyBatchAsync(batch, commanders, ct);
-            classifications.AddRange(results);
-        }
+        var classifications = await classifier.ClassifyAsync(pool, commanders, ct);
 
         var poolById       = pool.ToDictionary(c => c.Card.OracleId);
         var classifiedById = classifications.ToDictionary(r => r.OracleId);
 
-        return poolById.Keys
+        var fillCandidates = poolById.Keys
             .Select(id => new FillCandidate
             {
                 Candidate   = poolById[id],
@@ -301,6 +316,8 @@ public sealed class DeckBuilder(
                 LandCredit  = classifiedById.TryGetValue(id, out var r2) ? r2.LandCredit : 0.0,
             })
             .ToList();
+
+        return (fillCandidates, classifications);
     }
 
     /// <summary>

@@ -144,11 +144,17 @@ internal sealed class FakeCardRepository(params Card[] cards) : ICardRepository
     private readonly Dictionary<Guid, Card> _byOracleId =
         cards.ToDictionary(c => c.OracleId);
 
+    private readonly Dictionary<Guid, Card> _byScryfallId =
+        cards.ToDictionary(c => c.ScryfallId);
+
     public Task<Card?> GetByNameAsync(string name, CancellationToken ct = default)
         => Task.FromResult(_byName.GetValueOrDefault(name.Trim()));
 
     public Task<Card?> GetByOracleIdAsync(Guid oracleId, CancellationToken ct = default)
         => Task.FromResult(_byOracleId.GetValueOrDefault(oracleId));
+
+    public Task<Card?> GetByScryfallIdAsync(Guid scryfallId, CancellationToken ct = default)
+        => Task.FromResult(_byScryfallId.GetValueOrDefault(scryfallId));
 
     public Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Card>>(

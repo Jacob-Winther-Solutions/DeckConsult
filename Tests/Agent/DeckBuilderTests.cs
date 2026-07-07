@@ -47,7 +47,7 @@ public sealed class DeckBuilderTests
     /// </summary>
     private sealed class RoleParsingClassifier : ILlmClassifier
     {
-        public Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
+        public Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
             IReadOnlyList<CardCandidate> candidates,
             IReadOnlyList<Card> commanders,
             CancellationToken ct)

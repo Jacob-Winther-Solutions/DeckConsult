@@ -6,6 +6,7 @@ using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Prompts;
 using EdhDeckBuilder.Core.Cards;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace EdhDeckBuilder.Agent.Llm;
@@ -16,14 +17,18 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// Results for non-commander-dependent roles (anything except Plan and Synergy) are cached in
 /// <see cref="ClassificationCache"/> across multiple builds in the same session.
 /// </summary>
-public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCache cache) : ILlmClassifier
+public sealed class LlmClassifier(
+    IClaudeClientFactory factory,
+    ClassificationCache cache,
+    ILogger<LlmClassifier> logger) : ILlmClassifier
 {
     private const int MaxTokens = 4096;
+    private const int BatchSize = 30;
     private UsageTracker? _usageTracker;
 
     public void SetUsageTracker(UsageTracker tracker) => _usageTracker = tracker;
 
-    public async Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
+    public async Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
         IReadOnlyList<CardCandidate> candidates,
         IReadOnlyList<Card> commanders,
         CancellationToken ct = default)
@@ -33,7 +38,14 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
         if (misses.Count == 0)
             return hits;
 
-        var fresh = await CallLlmAsync(misses, commanders, ct);
+        // Batch misses at full LLM efficiency: each batch goes to LLM at target size.
+        var fresh = new List<ClassificationResult>();
+        for (int i = 0; i < misses.Count; i += BatchSize)
+        {
+            var batch = misses.Skip(i).Take(BatchSize).ToList();
+            var results = await CallLlmAsync(batch, commanders, ct);
+            fresh.AddRange(results);
+        }
         cache.Store(fresh);
 
         return [.. hits, .. fresh];
@@ -77,7 +89,7 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
         }
     }
 
-    private static IReadOnlyList<ClassificationResult> ParseResponse(
+    private IReadOnlyList<ClassificationResult> ParseResponse(
         IReadOnlyList<ContentBlock> content,
         IReadOnlyList<CardCandidate> candidates)
     {
@@ -92,16 +104,55 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
         }
 
         if (toolUse is null)
+        {
+            logger.LogError("No tool use block found in LLM response");
             return [];
+        }
 
         if (!toolUse.Input.TryGetValue("classifications", out var classificationsEl))
+        {
+            // Log detailed diagnostic info about the malformed response
+            var inputJson = toolUse.Input.ToString() ?? "(null)";
+            var keyCount = toolUse.Input.Keys.Count();
+            logger.LogError(
+                "Tool response missing 'classifications' key. Keys count: {KeyCount}, Keys: {Keys}, Full input JSON: {InputJson}",
+                keyCount,
+                string.Join(", ", toolUse.Input.Keys),
+                inputJson);
             return [];
+        }
 
         var dtos = classificationsEl.Deserialize<List<CardClassificationDto>>() ?? [];
+
+        // Diagnostic logging: compare input vs output
+        var jsonSize = toolUse.Input.ToString()?.Length ?? 0;
+        logger.LogInformation(
+            "Classification Response: {InputCount} cards sent, {OutputCount} classifications returned, {JsonSize} bytes",
+            candidates.Count,
+            dtos.Count,
+            jsonSize);
 
         // Whitelist: only accept oracle IDs that were in the input batch.
         var batchIds = candidates.Select(c => c.Card.OracleId).ToHashSet();
         var cardsByOracleId = candidates.ToDictionary(c => c.Card.OracleId, c => c.Card);
+
+        // Find missing cards (in input but not in output)
+        var returnedIds = dtos.Select(d => Guid.TryParse(d.OracleId, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .ToHashSet();
+        var missingCards = candidates
+            .Where(c => !returnedIds.Contains(c.Card.OracleId))
+            .Select(c => c.Card.Name)
+            .ToList();
+
+        if (missingCards.Count > 0)
+        {
+            logger.LogWarning(
+                "Missing {MissingCount} cards from classification response. First 10: {Examples}",
+                missingCards.Count,
+                string.Join(", ", missingCards.Take(10)));
+        }
+
         var results = new List<ClassificationResult>(dtos.Count);
 
         foreach (var dto in dtos)
@@ -122,6 +173,7 @@ public sealed class LlmClassifier(IClaudeClientFactory factory, ClassificationCa
                         Math.Clamp(s.Weight, 0.0, 1.0)))
                     .ToArray(),
                 LandCredit  = Math.Clamp(dto.LandCredit, 0.0, 1.0),
+                Reasoning   = dto.Reasoning,
             };
 
             var r1 = ClassificationSanitizer.SanitizeLandRole(raw, card.Types);

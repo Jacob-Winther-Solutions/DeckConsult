@@ -12,7 +12,7 @@
                 Bracket @((int)Bracket) &mdash; @BracketLibrary.All[Bracket].Name
             </span>
             <span class="badge bg-light text-dark border">
-                @(Result.Deck.Count + Result.BasicLandCounts.Values.Sum()) / 99 cards
+                @(Result.Deck.Count + Result.BasicLandCounts.Values.Sum()) / @(100 - Commanders.Count) cards
             </span>
             @if (Result.TotalPriceUsd > 0)
             {

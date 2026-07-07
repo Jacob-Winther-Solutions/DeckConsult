@@ -27,10 +27,21 @@ internal static class EdhrecMapper
         var result = new List<CardCandidate>(best.Count);
         foreach (var (view, section) in best.Values.OrderByDescending(e => Inclusion(e.View)))
         {
-            var card = await repository.GetByNameAsync(view.Name, ct);
+            // Try to lookup by Scryfall ID first (most reliable), then fall back to name
+            Card? card = null;
+            if (!string.IsNullOrEmpty(view.Id) && Guid.TryParse(view.Id, out var scryfallId))
+            {
+                card = await repository.GetByScryfallIdAsync(scryfallId, ct);
+            }
+
             if (card is null)
             {
-                logger.LogDebug("EDHREC card {Name} not found in local repository; skipping", view.Name);
+                card = await repository.GetByNameAsync(view.Name, ct);
+            }
+
+            if (card is null)
+            {
+                logger.LogDebug("EDHREC card {Name} (ID: {Id}) not found in local repository; skipping", view.Name, view.Id);
                 continue;
             }
             result.Add(new CardCandidate(card, Inclusion(view), section));

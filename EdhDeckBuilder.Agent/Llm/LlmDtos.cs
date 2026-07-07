@@ -24,6 +24,9 @@ internal sealed record CardClassificationDto
 
     [JsonPropertyName("land_credit")]
     public double LandCredit { get; init; }
+
+    [JsonPropertyName("reasoning")]
+    public string? Reasoning { get; init; }
 }
 
 internal sealed record SecondaryRoleDto

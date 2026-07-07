@@ -1,4 +1,5 @@
 using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Core.Cards;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +13,7 @@ namespace EdhDeckBuilder.Agent.Prompts;
 public static class ClassificationPrompt
 {
     public const string ToolName = "classify_cards";
+    private static InstrumentationOptions? _options;
 
     public const string SystemPrompt =
         """
@@ -67,15 +69,24 @@ public static class ClassificationPrompt
         Return the oracle_id values exactly as supplied — do not modify, invent, or omit any.
         """;
 
-    /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
-    public static Tool Tool { get; } = new()
+    /// <summary>Initialize the prompt with instrumentation options (enables/disables reasoning).</summary>
+    public static void SetInstrumentationOptions(InstrumentationOptions options)
     {
-        Name = ToolName,
-        Description = "Classify each candidate card into its primary role and any secondary roles for this Commander deck.",
-        InputSchema = BuildSchema(),
-        Strict = true,
-        CacheControl = new CacheControlEphemeral(),
-    };
+        _options = options;
+    }
+
+    /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
+    public static Tool Tool
+    {
+        get => new()
+        {
+            Name = ToolName,
+            Description = "Classify each candidate card into its primary role and any secondary roles for this Commander deck.",
+            InputSchema = BuildSchema(),
+            Strict = true,
+            CacheControl = new CacheControlEphemeral(),
+        };
+    }
 
     public static string FormatUserMessage(IReadOnlyList<CardCandidate> candidates, IReadOnlyList<Card> commanders)
     {
@@ -114,6 +125,33 @@ public static class ClassificationPrompt
     private static InputSchema BuildSchema()
     {
         const string roleEnum = """["Land","Ramp","CardAdvantage","TargetedDisruption","MassDisruption","Tutor","Protection","Recursion","Plan","Payoff","Synergy","Unmatched"]""";
+
+        // Build properties object dynamically based on whether reasoning is enabled
+        var properties = new StringBuilder();
+        properties.Append($$"""
+              "oracle_id":    { "type": "string" },
+              "primary_role": { "type": "string", "enum": {{roleEnum}} },
+              "secondary": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "role":     { "type": "string", "enum": {{roleEnum}} },
+                    "relation": { "type": "string", "enum": ["Always","Modal","Transform"] },
+                    "weight":   { "type": "number" }
+                  },
+                  "required": ["role","relation","weight"]
+                }
+              },
+              "land_credit": { "type": "number" }
+            """);
+
+        if (_options?.EnableClassificationReasoning == true)
+        {
+            properties.Append(",\n              \"reasoning\": { \"type\": \"string\" }");
+        }
+
         var json = $$"""
             {
               "type": "object",
@@ -125,22 +163,7 @@ public static class ClassificationPrompt
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                      "oracle_id":    { "type": "string" },
-                      "primary_role": { "type": "string", "enum": {{roleEnum}} },
-                      "secondary": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "role":     { "type": "string", "enum": {{roleEnum}} },
-                            "relation": { "type": "string", "enum": ["Always","Modal","Transform"] },
-                            "weight":   { "type": "number" }
-                          },
-                          "required": ["role","relation","weight"]
-                        }
-                      },
-                      "land_credit": { "type": "number" }
+                      {{properties}}
                     },
                     "required": ["oracle_id","primary_role","secondary","land_credit"]
                   }

@@ -21,4 +21,12 @@ public sealed class InstrumentationOptions
     /// Enabled in Production for observability; controlled per environment in appsettings.
     /// </summary>
     public bool EnableStructuredDeckBuildLogging { get; set; } = false;
+
+    /// <summary>
+    /// Include reasoning explanations in classification results (debug mode only).
+    /// When enabled, the classifier returns a brief explanation for each card's role assignment,
+    /// especially useful for understanding why cards are marked as Unmatched.
+    /// Adds token cost; only enabled in Development.
+    /// </summary>
+    public bool EnableClassificationReasoning { get; set; } = false;
 }

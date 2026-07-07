@@ -173,6 +173,9 @@ public sealed class CommanderDiscoveryTests
         public Task<Card?> GetByOracleIdAsync(Guid oracleId, CancellationToken ct = default)
             => Task.FromResult(_commanders.FirstOrDefault(c => c.OracleId == oracleId));
 
+        public Task<Card?> GetByScryfallIdAsync(Guid scryfallId, CancellationToken ct = default)
+            => Task.FromResult(_commanders.FirstOrDefault(c => c.ScryfallId == scryfallId));
+
         public Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Card>>(
                 _commanders.Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList());

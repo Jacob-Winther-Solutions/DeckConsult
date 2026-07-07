@@ -32,6 +32,13 @@ public sealed record ClassificationResult
     /// </summary>
     public double LandCredit { get; init; }
 
+    /// <summary>
+    /// Optional reasoning for the role assignment (only populated if EnableClassificationReasoning is true).
+    /// Useful for debugging why a card was marked as Unmatched or assigned a particular role.
+    /// Null in production mode to save tokens.
+    /// </summary>
+    public string? Reasoning { get; init; }
+
     /// <summary>Convenience: turn this result into a <see cref="RoleProfile"/> for a <c>FillCandidate</c>.</summary>
     public RoleProfile ToRoleProfile() =>
         RoleProfile.Of(PrimaryRole).With([.. Secondary]);

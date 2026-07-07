@@ -4,6 +4,7 @@ using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Pipeline;
+using EdhDeckBuilder.Agent.Prompts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,8 +34,11 @@ public static class ServiceCollectionExtensions
                     options.LogClassificationResponses = logClassEnabled;
                 if (bool.TryParse(section["EnableStructuredDeckBuildLogging"], out var logDeckEnabled))
                     options.EnableStructuredDeckBuildLogging = logDeckEnabled;
+                if (bool.TryParse(section["EnableClassificationReasoning"], out var reasoningEnabled))
+                    options.EnableClassificationReasoning = reasoningEnabled;
             }
             ClassificationResponseLogger.Initialize(options);
+            ClassificationPrompt.SetInstrumentationOptions(options);
         }
 
         // Per-circuit key holder — registered twice so settings UI (concrete) and agent

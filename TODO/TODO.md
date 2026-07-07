@@ -37,6 +37,30 @@ strings on the first batch when there's no prior cache context. Possible causes:
 
 ---
 
+### Partner pair data mismatches in EDHREC (2026-07-08)
+
+**Observed:** During CardRepository initialization, debug logs show `dbug: ... Partner pair not found in card repository` for ~10 EDHREC partner pairs. Example: `Alisaie Leveilleur // Alphinaud Leveilleur + Amy Pond // Rory Williams`.
+
+**Context:** `PartnershipIndexBuilder.BuildFromEdhrec()` attempts to resolve each EDHREC partner combo by card name. If either card is not found in the Scryfall index (by name match), the combo is silently dropped and logged as debug.
+
+**Root cause candidates:**
+- EDHREC uses card names that don't exactly match Scryfall (e.g. "Alisaie" vs. a full front-face name)
+- EDHREC lists double-faced cards by a specific face, Scryfall stores them differently
+- EDHREC partner list is stale relative to Scryfall (rare)
+- EDHREC cards use Scryfall IDs but the index-builder is name-based (brittle seam)
+
+**Impact:** Low — affected pairs don't reach the partnership index, so they won't appear as suggestions in Discovery. If a user manually enters them as commanders, the builder falls back to merged single-commander pools (graceful).
+
+**Next steps:**
+1. Audit the ~10 missing pairs: check if they exist in Scryfall by exact name, partial name, or ID
+2. If name-matching is the issue, consider migrating `PartnershipIndexBuilder` to ID-based lookup (EDHREC provides IDs; infrastructure already supports `GetByScryfallIdAsync`)
+3. Confirm whether the affected pairs are valid EDH partnerships (legal, indexed on EDHREC for a reason)
+4. If confirmed valid, update the index builder; if archival/errata, update EDHREC data source comment
+
+**Blocked on:** Investigation — need to manually verify affected partner pairs against Scryfall.
+
+---
+
 ## Web UI  (core done — two items deferred)
 
 - [x] Wire `IDeckBuilder` into a Blazor page / component tree.

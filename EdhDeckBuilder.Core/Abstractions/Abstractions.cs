@@ -21,6 +21,7 @@ public interface ICardRepository
 {
     Task<Card?> GetByNameAsync(string name, CancellationToken ct = default);
     Task<Card?> GetByOracleIdAsync(Guid oracleId, CancellationToken ct = default);
+    Task<Card?> GetByScryfallIdAsync(Guid scryfallId, CancellationToken ct = default);
     Task<IReadOnlyList<Card>> SearchAsync(string query, CancellationToken ct = default);
     Task<IReadOnlyList<Card>> GetCommandersAsync(
         Color? colorFilter = null,

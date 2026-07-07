@@ -61,7 +61,7 @@ classify commanders  ← LLM call 1 (ILlmClassifier / claude-haiku-4-5, batch)
     ↓
 compute net targets  ← commander coverage subtracted at 1.5× weight
     ↓
-classify pool        ← LLM call 1 continued (50-card batches, cached by OracleId)
+classify pool        ← LLM call 1 continued (30-card batches, cached by OracleId)
     ↓
 FillEngine           ← greedy fill (scarce→abundant) + reconciliation swap loop
     ↓
@@ -77,10 +77,12 @@ RepairEngine.Assemble → DeckBuildResult
 ### LLM consultation points
 
 **Classification** (`LlmClassifier` — `claude-haiku-4-5-20251001`, temperature 0.1)  
-Input: a batch of `CardCandidate`s + commander context.  
-Output: `[{oracleId, primaryRole, secondaryRoles, landCredit}]`.  
+Input: all candidate pool cards + commander context.  
+Output: `[{oracleId, primaryRole, secondaryRoles, landCredit, reasoning?}]`.  
+Internally batches candidates in 30-card groups for LLM efficiency (avoids malformed responses at >65 cards).
 Results are cached globally by `OracleId` except for `Plan`, `Synergy`, and `Payoff`, which are
-commander-dependent and re-classified per build.
+commander-dependent and re-classified per build. The `reasoning` field is optional (controlled by
+`EnableClassificationReasoning` config; disabled in Production to save output tokens).
 
 **Selection** (`LlmSelector` — user-selected model, default `claude-haiku-4-5-20251001`, temperature 0.6)  
 Input: role-filtered classified pool + current build state + soft constraints.  

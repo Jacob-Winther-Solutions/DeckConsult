@@ -41,7 +41,7 @@ public sealed class BudgetTests
     /// <summary>Assigns roles by parsing the card name prefix ("Ramp_0" → Ramp, etc.).</summary>
     private sealed class RoleParsingClassifier : ILlmClassifier
     {
-        public Task<IReadOnlyList<ClassificationResult>> ClassifyBatchAsync(
+        public Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
             IReadOnlyList<CardCandidate> candidates,
             IReadOnlyList<Card> commanders,
             CancellationToken ct)

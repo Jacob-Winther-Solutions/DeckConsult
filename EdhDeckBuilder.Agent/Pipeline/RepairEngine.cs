@@ -146,10 +146,10 @@ internal static class RepairEngine
 
         // Add incomplete deck warning first (highest priority)
         int targetCardCount = 100 - context.Commanders.Count;
-        int actualCardCount = state.Committed.Count;
+        int actualCardCount = state.Committed.Count + state.BasicCount;
         if (actualCardCount < targetCardCount)
         {
-            allWarnings.Add($"⚠️ Deck is incomplete: {actualCardCount}/{targetCardCount} non-commander, non-basic slots filled. " +
+            allWarnings.Add($"⚠️ Deck is incomplete: {actualCardCount}/{targetCardCount} cards total ({state.Committed.Count} non-basic + {state.BasicCount} basics). " +
                 $"Could not find enough cards to complete the deck with these constraints. " +
                 $"Consider adjusting archetypes, themes, or budget parameters.");
         }

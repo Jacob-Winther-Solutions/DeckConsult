@@ -74,6 +74,12 @@ API usage:
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,84 -> 2,71 = 0,13 (68th try) (Full cache clear - Test CardName injection in cache + partner-related builder warnings)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,71 -> 2,57 = 0,14 (69th try) (Full cache clear - Test logging and investigate card pool filtering)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,57 -> 2,43 = 0,14 (70th try) (Test logging and investigate card pool filtering)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,43 -> 2,29 = 0,14 (71th try) (Investigate card pool filtering via Unmatched role)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,29 -> 2,17 = 0,12 (72th try) (Try out new lookup method using Card.Id instead of name)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,17 -> 2,04 = 0,13 (73th try) (Investigate why cards are not classified)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,04 -> 1,90 = 0,14 (74th try) (Investigate why cards are not classified)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              1,90 -> 1,66 = 0,24 (75th try) (Lowering batch size for Classifier)
+- Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              1,66 -> 1,49 = 0,17 (76th try) (Improving batching logic)
 
 Bad classifications:
 Sephiroth (third try):
