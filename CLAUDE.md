@@ -133,3 +133,25 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   All tests must pass and the build must be error-free. Fix any failures before responding.
 - **Git commits are user's responsibility.** Never commit changes. Stage and test, but leave the
   final commit decision to Jacob. Committing work is a deliberate human action, not an automation step.
+
+## TODO.md maintenance pattern
+
+Structure `TODO.md` as follows:
+
+1. **Investigations** — bugs requiring diagnosis (current state, root-cause hypothesis, next steps).
+2. **Feature sections** — one per major feature, with:
+   - Brief description of what it accomplishes.
+   - Implementation tasks (both complete `[x]` and incomplete `[ ]`).
+   - Owner decisions/open questions (if applicable).
+3. **Partially deferred features** — features with core implementation done; edge cases or optional enhancements deferred as subsections.
+4. **Multi-format support** — format-specific work (Brawl, Duel Commander, Pauper EDH, etc.).
+5. **Potential upgrades** — nice-to-have features and conveniences (no blocking path).
+6. **Additional card sources** — new data providers (Commander Spellbook, TopDeck.gg, EDHREC extensions, etc.).
+7. **Infrastructure** — deployment, caching, data refresh, etc.
+8. **Summary of completed work** — a brief bulleted recap of all finished layers (Core, Infrastructure, Agent, Web, Tests).
+
+When features graduate from "in progress" to "done":
+- Summarize them into the "Summary of completed work" section.
+- Remove their old task checklist from the feature sections.
+- Move any deferred edge cases or stretch items into **Partially deferred features** or **Potential upgrades** as appropriate.
+- Small deferred items (temperature audit, subscription tier limits, etc.) belong in **Partially deferred features** under a subsection per feature area they improve.

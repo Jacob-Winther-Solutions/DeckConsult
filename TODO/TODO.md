@@ -61,142 +61,6 @@ strings on the first batch when there's no prior cache context. Possible causes:
 
 ---
 
-## Web UI  (core done — two items deferred)
-
-- [x] Wire `IDeckBuilder` into a Blazor page / component tree.
-- [x] Role-grouped deck view: expandable role buckets, each card showing `CardSuggestion.Reason`;
-      secondary-role contributions shown in an "Also contributes" strip per bucket.
-- [x] Basic land section: display `DeckBuildResult.BasicLandCounts`.
-- [x] Runner-up panel: show `DeckBuildResult.RunnerUps` (collapsed by default).
-- [x] Coverage summary: table comparing `DeckBuildResult.ActualCoverage` against
-      `DeckBuildResult.PlannedTemplate` targets with a progress bar per role.
-- [x] Cut suggestions: surfaced inline in role buckets (warning badge + "consider cutting").
-- [x] Commander input: debounced search box with Scryfall autocomplete, supports partner pairs.
-- [x] Archetype / theme picker: weight sliders for archetypes; 29 preset themes with weight,
-      tune-preset form (absolute slot values), and custom-theme escape hatch.
-- [x] Three deck views: By Role (role buckets), By Type (card-type buckets, priority-ordered),
-      All Cards (alphabetical table with role badges).
-- [x] Budget input in the UI (see Budget section below).
-- [x] Deck download: "Export Build Report" button generates a `.md` file and streams it as a browser download
-      (see Deck Download section below).
-- [x] Refactor UI to make components reusable for future pages, e.g. "Commander Discovery" and "Historic Brawl" pages.
-
----
-
-## Budget-aware card selection  (done)
-
-Players on tight budgets should get a competitive deck within their price range rather than
-a list full of expensive staples they have to manually replace. Two independent budget axes:
-
-- **Per-card budget** (`MaxCardPriceUsd`) — no single card may exceed this amount. The
-  primary lever: directly prevents the LLM from selecting expensive staples.
-- **Total deck budget** (`TotalBudgetUsd`) — the sum of all 99 cards must stay within this
-  amount. Useful when a player is fine with one or two expensive pieces but wants to stay
-  under a total spend. Both fields are nullable/optional and can be combined.
-
-- [x] **Add both budget fields to `SoftConstraints`** — `decimal? MaxCardPriceUsd` and
-      `decimal? TotalBudgetUsd`. The builder already passes `SoftConstraints` to the selector
-      prompt, so this is the natural place to carry them.
-- [x] **Fetch card prices.** Scryfall bulk card data includes `prices.usd` and `prices.usd_foil`.
-      Store the non-foil price on `Card` at ingestion time. Scryfall bulk data is already cached
-      locally, so no extra network call is needed.
-- [x] **Pass budget to the selector prompt.** The selection prompt should instruct the LLM to
-      deprioritize cards that would breach either threshold and prefer affordable alternatives.
-      Budget is a soft preference — if no affordable card can fill a role, pick the best
-      available and flag it in the result.
-- [x] **Surface budget violations in the result.** Add a `BudgetWarnings` field (or reuse
-      `CoverageWarnings`) listing any cards that exceeded `MaxCardPriceUsd`, plus the total
-      deck price so the user can see at a glance whether they are within `TotalBudgetUsd`.
-- [x] **UI:** Two budget fields on the deck-build form ("max per card" and "total deck");
-      highlight over-budget cards in the deck view; show running total price in the header.
-- [x] **Tests:** Unit tests for `FilterPool` (per-card pre-filter drops known over-budget cards,
-      keeps null-price cards), `RepairBudgetExcess` (swaps costliest card for cheapest same-role
-      alternative, stops when within budget, marks cards as tried when no replacement exists),
-      and `BuildBudgetWarnings` (per-card and total violations reported correctly).
-
----
-
-## Commander selection / discovery  (done — one enhancement deferred)
-
-Users can now describe a strategy and get a ranked LLM shortlist of commanders that fit via a
-dedicated `/discover` page. The page is standalone and independent of the CommanderBuilder.
-Two discovery modes: **Guided** (archetype/theme-driven) and **Custom** (free-text description).
-
-- [x] **Design the input model.** The user provides archetype(s), theme(s), optional budget,
-      optional colors or color identity constraints, and optionally a free-text description
-      ("I want a grindy aristocrats deck that can play against Bracket 3–4").
-- [x] **Query the commander pool.** Scryfall returns all legendary creatures legal in
-      Commander filtered by color identity. This becomes the candidate set.
-- [x] **Score and rank commanders.** LLM evaluates each candidate against the stated strategy:
-      does this commander's abilities actively support the archetype and theme, or is it
-      generic good-stuff? Returns a ranked shortlist (top 5–10) with one-paragraph explanation
-      per candidate via `ICommanderSelector` and `LlmCommanderSelector`.
-- [x] **Core infrastructure** — `ICardRepository.GetCommandersAsync` with color-identity filtering
-      and exact-match option in `CardRepository`.
-- [x] **Agent layer** — `CommanderDiscoveryRequest`, `CommanderDiscoveryResult`, `CommanderSuggestion`,
-      `ICommanderDiscovery`, `CommanderDiscovery` service with batching (≤150 single call,
-      >150 two-pass). `ICommanderSelector` interface + `LlmCommanderSelector` (user-selected model,
-      forced tool call, whitelist filtering). `CommanderSelectionPrompt` static system prompt +
-      tool schema.
-- [x] **Web UI** — Standalone `/discover` page. `DiscoveryTab.razor/.cs` with form (color picker,
-      archetype/theme/bracket/budget selectors, free-text description), LLM call with progress,
-      results grid. `CommanderSuggestionCard.razor` displays art, rationale, rank.
-      `ColorIdentityPicker.razor` (any-color toggle + 5-color checkboxes + exact-match checkbox).
-- [x] **Tests** — `CommanderDiscoveryTests` (pool size, batching, color filters),
-      `CommanderSelectionPromptTests` (message formatting), `MockCommanderSelector` manual mock.
-      All 281 existing tests pass; Commander Discovery tests included.
-- [x] **Custom tab for CommanderDiscovery:** The discovery page now has two tabs: Guided (archetype/theme-driven,
-      LLM-assisted) and Custom (free-text description). Custom tab mirrors the CustomTab pattern from
-      CommanderBuilder but accepts a deck description instead of a commander. Both tabs surface results
-      as ranked `CommanderSuggestionCard`s that link to the builder with pre-selected commanders.
-- [x] **UI polish:** Color Identity picker now shows the "Exactly this identity" checkbox inline
-      with the color buttons (flexbox layout) for better visibility. Token usage logging is consistent
-      across all discovery and build flows (summary header, table, total cost).
-- [x] **Partner and partner-with support (Discovery & Core):** Discovery now surfaces partner pairs via dedicated
-      Core `PartnerCombo` entities and deterministic Infrastructure index. Supports all variants:
-      Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son.
-      - [x] `IEdhrecClient.GetPartnersPageAsync()` — fetches EDHREC partner index at startup
-      - [x] `PartnershipIndexBuilder` — deterministic pairing extraction by type (sequential pairs, all-vs-all, Doctor first + companions, etc.)
-      - [x] `CardRepository` — accepts EDHREC partnerships at construction; partnership eligibility enforced by Core rules
-      - [x] `CommanderDiscovery` — surfaces all legal partner combinations in results (top 10 or all if ≤10)
-      - [x] DI registration — `IEdhrecClient` seam, `AddHttpClient<EdhrecClient>` ordering
-      - [x] Test coverage — partnership extraction, validity checks, discovery result limits (9 new tests for variants)
-- [x] **Partner support in Deck Builder (EDHREC):** The Commander Deck Builder now queries EDHREC's
-      partner-pair endpoints when two commanders form a legal partnership. Includes redirect handling
-      (non-canonical orderings automatically fetch canonical), canonical caching, and graceful fallback
-      to merged single-commander pools if the partner endpoint returns null or 404.
-      - [x] `IEdhrecClient.GetPartnerPairRecommendationsAsync(Card first, Card second)`
-      - [x] Redirect detection and canonical slug extraction
-      - [x] Partner pair endpoint integration in `DeckBuilder.GatherPoolAsync()`
-      - [x] UI validation and non-blocking warnings
-      - [x] Comprehensive test coverage (5 new tests)
-
-- [ ] **EDHREC theme-specific tag endpoints (Phase 5):** EDHREC provides theme-focused recommendation
-      endpoints that filter to only cards aligned with a specific theme. These can reduce filtering
-      and improve pool quality for unusual theme combinations.
-      - [ ] Example: `https://json.edhrec.com/pages/commanders/{commander-slug}/{theme-name}.json`
-      - [ ] New method: `ISuggestionSource.GetThemeRecommendationsAsync(Card commander, WeightedTheme theme, ...)`
-      - [ ] In `GatherPoolAsync()`, try theme endpoints for each weighted theme before merging single-commander pools
-      - [ ] Fallback to single-commander pools if theme endpoints return null
-      - [ ] Cache by theme (e.g., `{commander-slug}-{theme-name}.json`)
-
-      **Benefit:** Unusual partner pairs with niche themes (e.g., Sephiroth + very rare synergy) often result in
-      underfilled decks because classification filters heavily. Theme-focused pools should yield more relevant,
-      better-classified cards.
-
-      **Scope:** ~2–3 hours (new `EdhrecClient` methods + `GatherPoolAsync()` refactor + theme detection logic).
-      **Status:** Deferred. Current partner-pair support is production-ready; this is an optimization for edge cases.
-
-- [ ] **Underfilled deck warning:** When a deck doesn't reach 99 cards (or 98 for partner pairs), a high-priority
-      warning now appears first in the warnings list, alerting the user to the incomplete fill.
-      - [x] Message: "⚠️ Deck is incomplete: X/Y non-commander slots filled. Could not find enough cards..."
-      - [x] Placed first in warnings list (highest priority)
-      - [x] Includes suggestion to adjust archetypes/themes/budget
-
-- [ ] **Partner pair slot accounting (UI):** Ensure all deck views correctly show X/98 for partner pairs, not X/99.
-      - [ ] Verify UI components use `commanders.Count` for denominator calculation
-
----
 
 ## Additional card sources — Commander Spellbook + TopDeck.gg  (prerequisite for Brawl / Duel Commander)
 
@@ -242,6 +106,24 @@ sanctioned sources to add are:
       different inclusion scales (EDHREC % vs. TopDeck.gg raw frequency) are combined.
 - [ ] Add TopDeck.gg attribution credit to the Web UI (visible link) wherever competitive
       frequency data is surfaced.
+
+### EDHREC theme-specific tag endpoints
+
+EDHREC provides theme-focused recommendation endpoints that filter to only cards aligned with a
+specific theme. These can reduce filtering and improve pool quality for unusual theme combinations.
+
+- [ ] Example: `https://json.edhrec.com/pages/commanders/{commander-slug}/{theme-name}.json`
+- [ ] New method: `ISuggestionSource.GetThemeRecommendationsAsync(Card commander, WeightedTheme theme, ...)`
+- [ ] In `GatherPoolAsync()`, try theme endpoints for each weighted theme before merging single-commander pools
+- [ ] Fallback to single-commander pools if theme endpoints return null
+- [ ] Cache by theme (e.g., `{commander-slug}-{theme-name}.json`)
+
+**Benefit:** Unusual partner pairs with niche themes (e.g., Sephiroth + very rare synergy) often result in
+underfilled decks because classification filters heavily. Theme-focused pools should yield more relevant,
+better-classified cards.
+
+**Scope:** ~2–3 hours (new `EdhrecClient` methods + `GatherPoolAsync()` refactor + theme detection logic).
+**Status:** Deferred. Current partner-pair support is production-ready; this is an optimization for edge cases.
 
 ---
 
@@ -327,41 +209,28 @@ but only 5 uncommons allowed in the 99). Similar community-managed status to Pau
 
 ---
 
-## Multi-role classification  (partially deferred)
+## Partially deferred features
 
-- [x] Data model: `RoleProfile` (primary + secondary contributions), `RoleRelation`
-      (Always / Modal / Transform), coverage accounting on `Deck`.
-- [x] Classifier produces `RoleProfile`s — `LlmClassifier` via forced tool call.
+### Multi-role classification
+
+Core and UI infrastructure complete. Edge-case tuning deferred:
+
 - [ ] Context-aware classification: e.g. Jeska's Will behaves differently with vs. without
       the commander on board; depends on commander castability and deck context.
 - [ ] Tune default coverage weights (Always=1.0, Modal=0.5, Transform=0.75 are currently
       baked into Core defaults; may need per-commander calibration once real builds are tested).
-- [x] Coverage-gap report / template-adherence warnings in the UI — rendered in the By Role
-      view as an alert above the role buckets.
 
----
+### BYOK — Scoped settings
 
-## Other deferred
+Base implementation complete. Optional visibility features deferred:
 
-- [x] `CanBeCommander` logic at Scryfall ingestion — extended to catch legendary creatures
-      AND any card whose oracle text contains "can be your commander" (planeswalkers with the
-      RC ruling, special cases). `ScryfallMapper.IsCommanderEligible`. 4 new tests.
-- [x] **Colorless commanders** (e.g. Kozilek) run Wastes as their basic land.
-      `DeckBuilder.DistributeBasics` returns an empty dict when `ColorIdentity == Color.None`.
-      Wastes handling needs to be added before colorless commanders are supported.
-- [x] **MDFC / DFC back-face data and land credit assignment.** `Card.BackFaceTypeLine` and
-      `Card.BackFaceText` are now populated at ingestion for **all** double-faced cards (MDFCs,
-      transform, creature//planeswalker, etc.), not just land-backed ones. The classifier prompt
-      includes both lines so the LLM can evaluate any DFC by both faces. Land credit is only
-      non-zero when the back face is a Land type — enforced deterministically by
-      `ClassificationSanitizer.SanitizeLandCredit`, which `LlmClassifier` chains after the
-      existing role sanitizer using the full `Card` object (not just `CardType`). 12 new tests.
-- [x] Power-bracket integration into selector prompt — `SelectionPrompt.AppendBracketGuidance`
-      emits bracket number, name, and description; Brackets 1–2 list all Game Changers to avoid;
-      Brackets 4–5 encourage Game Changers. 7 new tests.
-- [ ] Per-call temperature audit: `Temperature` is deprecated for models after Claude Opus 4.6.
-      Once the SDK removes backward-compatibility handling, update both `LlmClassifier` and
-      `LlmSelector` to remove the field or replace it with the new mechanism when available.
+- [ ] (Stretch) Approximate token/cost estimate displayed after each build, since users now
+      pay directly and will want visibility.
+
+### Saved deck results
+
+Base storage complete. Subscription-aware limits deferred:
+
 - [ ] **Wire saved-result limit to subscription tier.** Currently hardcoded as
       `DeckResultStorage.DefaultMaxSavedResults = 3` in `EdhDeckBuilder.Web/Services/DeckResultStorage.cs`.
       The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
@@ -369,78 +238,6 @@ but only 5 uncommons allowed in the 99). Similar community-managed status to Pau
       or feature-flag service and pass it to `JS.InvokeVoidAsync("saveDeckResult", key, json,
       resolvedLimit)` in `GuidedTab.razor.cs` and `CustomTab.razor.cs`. The two call sites are the
       only places that need updating.
-- [ ] (Stretch) Opening-hand / curve simulation to sanity-check consistency.
-
----
-
-## Deck Download — Markdown export (done)
-
-No server-side deck storage. Instead, a finished deck can be exported as a self-contained
-`.md` file the user saves locally. The file is generated server-side from `DeckBuildResult`
-and streamed as a browser download — pure Web layer concern, no Core changes.
-
-**File contents (in order):**
-- Header: commander(s), archetype/theme weights, bracket, budget constraints, build date.
-- Role buckets: one section per `CardRole`, each card on its own line with the
-  `CardSuggestion.Reason` inline — same structure as the By Role view.
-- Runner-ups: collapsed appendix listing `DeckBuildResult.RunnerUps` by role.
-- Coverage summary: planned vs. actual counts per role.
-- Raw decklist: plain `1 Card Name` lines (basic lands with their counts), ready to paste
-  into Moxfield, Archidekt, or any other deck builder that accepts text import.
-
-**Implementation tasks:**
-- [x] `DeckMarkdownExporter` service in the Web project: accepts `DeckBuildResult` +
-      `BuildContext`, returns a `string` (the markdown). No infrastructure dependencies.
-- [x] Blazor "Export Build Report" button: calls the exporter, then uses JS interop
-      (`URL.createObjectURL`) to trigger a `.md` file download.
-      Filename: `<commander-name>-build-report.md` (slugified).
-- [x] Tests: snapshot-style unit test — given a known `DeckBuildResult`, assert the
-      markdown output contains the expected sections and raw decklist lines.
-
----
-
-## BYOK — Per-user Anthropic API keys
-
-Users supply their own Anthropic API key (created at console.anthropic.com). Usage bills
-to their account at pay-per-token rates. This is the only sanctioned model for a public
-app — Anthropic's terms prohibit routing all users through a single company key.
-
-See `TODO/BYOK_API_KEY.md` for the full design spec.
-
-**Key decisions (already made):**
-- Blazor Server hosting: the key lives server-side in a scoped service (one per circuit),
-  never sent to the browser.
-- Persistence: encrypted HttpOnly cookie via ASP.NET Core Data Protection. The user pastes
-  once, checks "remember my key", and never sees the prompt again until the key expires or
-  they explicitly disconnect.
-- Data Protection keyring persisted via a named Docker volume (see Deployment section).
-
-**Implementation tasks:**
-- [x] `IClaudeApiKeyProvider` + `SessionApiKeyProvider` (scoped) in the Agent project.
-      `SessionApiKeyProvider` holds the in-memory key for the circuit; exposes `Set` / `Clear`.
-- [x] `IClaudeClientFactory` + `ClaudeClientFactory` (scoped): builds an `AnthropicClient`
-      per call from the provider. This is the sole seam touching the SDK constructor. Updated
-      `LlmClassifier` and `LlmSelector` to accept the factory instead of a singleton client.
-      Removed the singleton `ANTHROPIC_API_KEY` client construction from DI.
-- [x] `IClaudeKeyTester` + `ClaudeKeyTester`: fires a minimal 1-token Haiku call to validate
-      a key before accepting it. Used by the settings UI.
-- [x] **Cookie persistence**: encrypted value written via JS interop using ASP.NET Core Data
-      Protection. Read back in `OnAfterRenderAsync` after the circuit connects. "Remember my
-      key" checkbox defaults on. Cookie is not HttpOnly (written from JS) but payload is opaque.
-- [x] `ApiKeySettings.razor` component: password input + "Connect" / "Test key" / "Disconnect"
-      buttons, "Remember my key" checkbox (default on). Shows connected/disconnected state.
-      Gates the build form: shows info alert instead of form sections when no key is connected.
-- [x] Handle HTTP 401 from Anthropic at the agent boundary: `AnthropicUnauthorizedException`
-      caught in `LlmClassifier`/`LlmSelector`, rethrown as `ApiKeyRejectedException`.
-      `CommanderBuilder` catches it, calls `Keys.Clear()`, shows reconnect message.
-- [x] DI registration: `SessionApiKeyProvider` as Scoped (twice — concrete + interface).
-      All LLM-dependent services (`ILlmClassifier`, `ICardSelector`, `IDeckBuilder`) changed
-      from Singleton to Scoped. `ClassificationCache` stays Singleton.
-- [x] **Model picker**: `SelectedModel` on `SessionApiKeyProvider`; exposed via
-      `IClaudeClientFactory.SelectionModel`; `LlmSelector` uses it at call time.
-      Classification always uses Haiku. Dropdown: Haiku 4.5 / Sonnet 5 / Opus 4.8.
-- [ ] (Stretch) Approximate token/cost estimate displayed after each build, since users now
-      pay directly and will want visibility.
 
 ---
 
@@ -474,9 +271,9 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
       cross-origin POST and prevents following the 303 redirect to the cart.
 - [ ] DI registration: `TcgPlayerLinkOptions` as singleton; `TcgPlayerMassEntryLinkBuilder`
       as scoped.
-- [ ] (Future) Plain text decklist export for users who prefer to paste into Mass Entry
+- [ ] Plain text decklist export for users who prefer to paste into Mass Entry
       themselves — shares the `CartLine` mapping with the buy button.
-- [ ] (Future) Multi-retailer support (Card Kingdom etc.) — keep the builder interface shaped
+- [ ] Multi-retailer support (Card Kingdom etc.) — keep the builder interface shaped
       so a second provider can slot in without redesign.
 
 ---
@@ -562,6 +359,21 @@ theme, or archetype constraints — for pet cards or cards the user already owns
 
 ---
 
+## Potential upgrades
+
+Features and enhancements worth considering for future iterations:
+
+- [ ] **Opening-hand / curve simulation** — Sanity-check deck consistency by simulating
+      opening hands and mana curves.
+- [ ] **Token/cost estimate** — Display approximate token usage and cost after each build
+      now that users pay directly.
+- [ ] **Plain text decklist export** — For users who prefer to manually paste into external
+      deck builders (TCGPlayer Mass Entry, etc.). Shares the `CartLine` mapping with the buy button.
+- [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
+      while keeping the builder interface slot-in-ready.
+
+---
+
 ## Card Data Refresh (Cache Updates)
 
 Scryfall bulk data is cached locally with a 24-hour max age. New cards released are not available until the app restarts and re-downloads. This creates a 24–48 hour lag between Scryfall publication and tool availability.
@@ -620,37 +432,22 @@ must change (key would be browser-side).
 
 ---
 
-## Done
+## Summary of completed work
 
-- [x] **Core** — domain model, rules, templates, archetypes, themes, bracket system.
-- [x] **Infrastructure** — Scryfall bulk client + EDHREC client + `SuggestionSource`.
-- [x] **Agent — models & interfaces** — `BuildContext`, `BuildState`, `FillCandidate`,
-      `SoftConstraints`, `CardSuggestion`, `DeckBuildResult`, `ILlmClassifier`, `ICardSelector`,
-      `IDeckBuilder`, `ClassificationResult`, `SelectionResult`.
-- [x] **Agent — fill engine** — `FillEngine` (greedy fill + bounded monotonic reconciliation
-      swap loop, max 50 iterations), `ColorFixingPass` (Pass C: pip-demand scoring, 8-basic
-      floor, 50% non-basic cap), 31 unit tests.
-- [x] **Agent — LLM seam** — `LlmClassifier` (Haiku, forced tool call, batched, globally
-      cached except Plan/Synergy/Payoff), `LlmSelector` (user-selected model via `IClaudeClientFactory`,
-      forced tool call, per-build rationale capture), `ClassificationCache`, `ClassificationPrompt`,
-      `SelectionPrompt`.
-- [x] **Agent — pipeline** — `RepairEngine` (deterministic CI-violation repair + result
-      assembly), `DeckBuilder` (10-stage orchestration), 5 integration tests.
-- [x] **Agent — BYOK** — `Authentication/` folder: `SessionApiKeyProvider` (scoped per-circuit,
-      pre-populates from `Anthropic:ApiKey` config for dev), `IClaudeClientFactory` /
-      `ClaudeClientFactory` (sole SDK-constructor seam), `IClaudeKeyTester` / `ClaudeKeyTester`
-      (1-token probe), `MissingApiKeyException`, `ApiKeyRejectedException`, `ClaudeModels`
-      (Haiku/Sonnet/Opus constants). `LlmClassifier` and `LlmSelector` updated to use factory;
-      401 responses wrapped as `ApiKeyRejectedException`. All LLM-dependent services changed
-      to Scoped; `ClassificationCache` remains Singleton.
-- [x] **Agent — DI** — `ServiceCollectionExtensions.AddAgent()` (no longer takes `IConfiguration`
-      — key comes from `SessionApiKeyProvider` which injects `IConfiguration` directly).
-- [x] **Web — BYOK UI** — `ApiKeySettings.razor` component: connect / test key / disconnect,
-      "Remember my key" checkbox (Data Protection-encrypted cookie, 30-day expiry), model picker
-      (Haiku / Sonnet 5 / Opus 4.8 dropdown). `CommanderBuilder` gates the build form on key
-      presence and handles `ApiKeyRejectedException` with a reconnect prompt. Cookie helpers
-      (`setCookie`, `getCookie`, `deleteCookie`) added to `app.js`.
-- [x] **Web — UI** — full Blazor UI: commander search, deck views (by role / by type / all cards),
-      budget input & enforcement, export build report (`.md` download), raw decklist copy.
-      Role buckets with coverage summary, runner-up panel, cut suggestions, archetype/theme picker
-      with weight sliders, tune/custom theme form, bracket picker, color identity pips.
+All four projects compile; 281 tests pass.
+
+**Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
+
+**Agent pipeline:** `LlmClassifier` (Haiku, forced tool call, batched, cached except Plan/Synergy/Payoff), `LlmSelector` (user model, forced tool call, per-build rationale). `FillEngine` (greedy + reconciliation, max 50 iterations), `ColorFixingPass` (pip-demand scoring). Deterministic `RepairEngine` + `DeckBuilder` (12-stage pipeline). Multi-role classification: role profiles, secondary contributions, coverage accounting.
+
+**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit), `IClaudeClientFactory` (SDK seam), `ClaudeKeyTester` (1-token probe), 401→`ApiKeyRejectedException` wrapping. Model picker (Haiku / Sonnet 5 / Opus 4.8). Data Protection-encrypted cookie (30-day expiry).
+
+**Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option.
+
+**Commander Discovery:** Standalone `/discover` page with two tabs: Guided (LLM-assisted, archetype/theme-driven) and Custom (free-text strategy description). Ranked commander suggestions with art, rationale, and power level. Partner-pair support (all 8 variants: Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son). EDHREC partner index integrated. Deck builder pool gathering queries partner-pair endpoints with redirect handling and canonical caching. Graceful fallback to merged single-commander pools.
+
+**Deck results & logging:** Saved locally (3-max, Data Protection cookie). Token usage logging across all discovery and build flows (summary header, table, total cost).
+
+**Deck Download:** Markdown export with header, role buckets (with rationale), runner-ups, coverage summary, raw decklist (ready to paste).
+
+**Tests:** 281 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration). All green.
