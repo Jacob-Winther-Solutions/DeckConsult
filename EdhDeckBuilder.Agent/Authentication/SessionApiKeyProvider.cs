@@ -14,29 +14,70 @@ namespace EdhDeckBuilder.Agent.Authentication;
 /// </remarks>
 public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 {
-    private string? _key;
+    private string? _anthropicKey;
+    private string? _gitHubKey;
+    private AiProvider _activeProvider;
 
     public SessionApiKeyProvider(IConfiguration config)
     {
-        var configKey = config["Anthropic:ApiKey"];
-        if (!string.IsNullOrWhiteSpace(configKey))
-            _key = configKey.Trim();
+        var anthropicKey = config["Anthropic:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(anthropicKey))
+            _anthropicKey = anthropicKey.Trim();
+
+        var gitHubKey = config["GitHub:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(gitHubKey))
+            _gitHubKey = gitHubKey.Trim();
+
+        // Read initial provider preference from config, default to GitHubModels
+        var providerSetting = config["Provider:Default"];
+        _activeProvider = providerSetting?.Equals("Anthropic", StringComparison.OrdinalIgnoreCase) == true
+            ? AiProvider.Anthropic
+            : AiProvider.GitHubModels;
     }
 
-    public string? GetApiKey() => _key;
+    public AiProvider ActiveProvider
+    {
+        get => _activeProvider;
+        set => _activeProvider = value;
+    }
+
+    public string? GetApiKey() =>
+        ActiveProvider == AiProvider.GitHubModels ? _gitHubKey : _anthropicKey;
 
     public string SelectedModel { get; set; } = ClaudeModels.Haiku;
 
-    /// <summary>Sets the API key after validating the sk-ant- prefix.</summary>
+    /// <summary>Sets the API key after validating the prefix for the active provider.</summary>
     public void Set(string apiKey)
     {
-        if (string.IsNullOrWhiteSpace(apiKey) ||
-            !apiKey.Trim().StartsWith("sk-ant-", StringComparison.Ordinal))
-            throw new ArgumentException(
-                "That doesn't look like an Anthropic API key (expected 'sk-ant-' prefix).",
-                nameof(apiKey));
-        _key = apiKey.Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("API key cannot be empty.", nameof(apiKey));
+
+        var trimmed = apiKey.Trim();
+
+        if (ActiveProvider == AiProvider.GitHubModels)
+        {
+            if (!trimmed.StartsWith("ghp_", StringComparison.Ordinal) &&
+                !trimmed.StartsWith("github_pat_", StringComparison.Ordinal))
+                throw new ArgumentException(
+                    "That doesn't look like a GitHub Personal Access Token (expected 'ghp_' or 'github_pat_' prefix).",
+                    nameof(apiKey));
+            _gitHubKey = trimmed;
+        }
+        else
+        {
+            if (!trimmed.StartsWith("sk-ant-", StringComparison.Ordinal))
+                throw new ArgumentException(
+                    "That doesn't look like an Anthropic API key (expected 'sk-ant-' prefix).",
+                    nameof(apiKey));
+            _anthropicKey = trimmed;
+        }
     }
 
-    public void Clear() => _key = null;
+    public void Clear()
+    {
+        if (ActiveProvider == AiProvider.GitHubModels)
+            _gitHubKey = null;
+        else
+            _anthropicKey = null;
+    }
 }

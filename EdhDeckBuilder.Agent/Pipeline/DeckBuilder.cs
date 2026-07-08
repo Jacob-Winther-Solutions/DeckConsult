@@ -140,10 +140,10 @@ public sealed class DeckBuilder(
         if (unmatchedCards.Count > 0)
         {
             logger.LogInformation("Unmatched cards ({Count}):", unmatchedCards.Count);
-            var classificationsByOracleId = classifications.ToDictionary(c => c.OracleId);
+            var classifsByOracleId = classifications.ToDictionary(c => c.OracleId);
             foreach (var unmatched in unmatchedCards.OrderBy(c => c.Card.Name))
             {
-                var reasoning = classificationsByOracleId.TryGetValue(unmatched.Card.OracleId, out var c)
+                var reasoning = classifsByOracleId.TryGetValue(unmatched.Card.OracleId, out var c)
                     ? c.Reasoning ?? "(no reasoning provided)"
                     : "(no classification found)";
                 logger.LogInformation("  {CardName}: {Reasoning}", unmatched.Card.Name, reasoning);

@@ -12,4 +12,13 @@ public static class ClaudeModels
         (Sonnet, "Sonnet 5 — better reasoning"),
         (Opus,   "Opus 4.8 — highest quality"),
     ];
+
+    public static readonly IReadOnlyList<(string Id, string Label)> GitHubSelectionModels =
+    [
+        ("claude-3-5-haiku",  "Haiku 3.5 (GitHub Models — free)"),
+        ("claude-3-5-sonnet", "Sonnet 3.5 (GitHub Models — free)"),
+    ];
+
+    public static IReadOnlyList<(string Id, string Label)> GetSelectionModels(AiProvider provider)
+        => provider == AiProvider.GitHubModels ? GitHubSelectionModels : SelectionModels;
 }

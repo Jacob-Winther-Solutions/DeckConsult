@@ -3,12 +3,12 @@
 <div class="position-relative d-flex align-items-center gap-2">
     @if (_connected)
     {
-        <span class="badge bg-success py-2 px-3">&#10003; Connected</span>
+        <span class="badge bg-success py-2 px-3">&#10003; Connected (@_selectedProvider)</span>
         <select class="form-select form-select-sm"
-                style="width: auto; min-width: 140px;"
+                style="width: auto; min-width: 200px;"
                 value="@_selectedModel"
                 @onchange="OnModelChanged">
-            @foreach (var (id, label) in ClaudeModels.SelectionModels)
+            @foreach (var (id, label) in ClaudeModels.GetSelectionModels(_selectedProvider))
             {
                 <option value="@id" selected="@(_selectedModel == id)">@label</option>
             }
@@ -25,19 +25,47 @@
         @if (_showForm)
         {
             <div class="position-absolute end-0 bg-white border rounded shadow p-3"
-                 style="top: calc(100% + 0.5rem); min-width: 380px; z-index: 1100;">
+                 style="top: calc(100% + 0.5rem); min-width: 420px; z-index: 1100;">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-semibold small">Connect Anthropic API Key</span>
+                    <span class="fw-semibold small">Connect API Key</span>
                     <button type="button" class="btn-close btn-sm" @onclick="() => _showForm = false"></button>
                 </div>
-                <p class="small text-muted mb-3">
-                    Builds run on your own key, billed to your account.
-                    Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-                </p>
+
+                <div class="mb-3">
+                    <label class="small fw-semibold d-block mb-1">Provider</label>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <input type="radio" class="btn-check" id="provider-anthropic"
+                               checked="@(_selectedProvider == AiProvider.Anthropic)"
+                               @onchange="OnProviderChanged" value="@AiProvider.Anthropic" />
+                        <label class="btn btn-outline-secondary" for="provider-anthropic">Anthropic</label>
+
+                        <input type="radio" class="btn-check" id="provider-github"
+                               checked="@(_selectedProvider == AiProvider.GitHubModels)"
+                               @onchange="OnProviderChanged" value="@AiProvider.GitHubModels" />
+                        <label class="btn btn-outline-secondary" for="provider-github">GitHub Models (Free)</label>
+                    </div>
+                </div>
+
+                @if (_selectedProvider == AiProvider.Anthropic)
+                {
+                    <p class="small text-muted mb-3">
+                        Builds run on your own key, billed to your account.
+                        Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+                    </p>
+                }
+                else
+                {
+                    <p class="small text-muted mb-3">
+                        Free access to Claude via GitHub Models.
+                        Get a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>
+                        (no scopes needed, minimum permissions).
+                    </p>
+                }
+
                 <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
                     <input type="password" class="form-control form-control-sm"
                            style="min-width: 200px; flex: 1;"
-                           placeholder="sk-ant-…"
+                           placeholder="@(_selectedProvider == AiProvider.Anthropic ? "sk-ant-…" : "ghp_…")"
                            autocomplete="off"
                            @bind="_keyInput" @bind:event="oninput" />
                     <button class="btn btn-primary btn-sm"
