@@ -15,7 +15,7 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// (moderate temperature for creative judgment). Uses a forced tool call so output is
 /// always structured JSON. Supports usage tracking for token accounting.
 /// </summary>
-public sealed class LlmCommanderSelector(IClaudeClientFactory factory) : ICommanderSelector
+public sealed class LlmCommanderSelector(IClaudeClientFactory factory) : ICommanderSelector, IUsageTrackerAware
 {
     private const int MaxTokens = 2048;
     private UsageTracker? _usageTracker;

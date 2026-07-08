@@ -1,6 +1,8 @@
 # EdhDeckBuilder
 
-An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end.
+An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end. Supports both
+Anthropic Claude (via the official C# SDK) and Google Gemini (via a custom REST client) as the
+LLM backend, chosen per user session.
 
 ## Solution layout
 
@@ -8,7 +10,7 @@ An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end
 EdhDeckBuilder.slnx
 ├── EdhDeckBuilder.Core            # domain model + rules + templates (no external deps)  ← done
 ├── EdhDeckBuilder.Infrastructure  # Scryfall + EDHREC clients, local card store         ← done
-├── EdhDeckBuilder.Agent           # Anthropic SDK, fill engine, LLM seam, pipeline      ← done
+├── EdhDeckBuilder.Agent           # Anthropic + Gemini adapters, fill engine, pipeline  ← done
 └── EdhDeckBuilder.Web             # Blazor Web App (the visual, grouped deck view)       ← done
 ```
 
@@ -76,22 +78,67 @@ RepairEngine.Assemble → DeckBuildResult
 
 ### LLM consultation points
 
-**Classification** (`LlmClassifier` — `claude-haiku-4-5-20251001`, temperature 0.1)  
+**Classification** (`ILlmClassifier`, temperature 0.1, 30-card batches)  
 Input: all candidate pool cards + commander context.  
 Output: `[{oracleId, primaryRole, secondaryRoles, landCredit, reasoning?}]`.  
-Internally batches candidates in 30-card groups for LLM efficiency (avoids malformed responses at >65 cards).
 Results are cached globally by `OracleId` except for `Plan`, `Synergy`, and `Payoff`, which are
 commander-dependent and re-classified per build. The `reasoning` field is optional (controlled by
 `EnableClassificationReasoning` config; disabled in Production to save output tokens).
 
-**Selection** (`LlmSelector` — user-selected model, default `claude-haiku-4-5-20251001`, temperature 0.6)  
+**Selection** (`ICardSelector`, temperature 0.6, per-role call)  
 Input: role-filtered classified pool + current build state + soft constraints.  
 Output: `[{oracleId, rank, rationale}]` — ranked picks only; the fill engine decides count.  
-The model is configurable per session via the settings UI (Haiku / Sonnet 5 / Opus 4.8).
+The model is configurable per session via the settings UI.
 
-Both calls use a forced tool call (`ToolChoiceTool`, `Tool.Strict = true`) for guaranteed
-structured output. The model can never emit a card name not in the input batch; all responses
-are filtered against a whitelist of known oracle ids.
+Both calls use forced structured output (Anthropic: `ToolChoiceTool` with `Tool.Strict = true`;
+Gemini: `responseSchema` with `responseMimeType: "application/json"`). The model can never emit
+a card name not in the input batch; all responses are filtered against a whitelist of known
+oracle ids.
+
+### Provider adapters
+
+Two provider paths are wired in `EdhDeckBuilder.Agent/Llm/`, dispatched at DI resolution time
+against `SessionApiKeyProvider.ActiveProvider`:
+
+**Anthropic Claude** (`Llm/LlmClassifier.cs`, `Llm/LlmSelector.cs`, `Llm/LlmCommanderSelector.cs`)  
+Uses the official Anthropic C# SDK (v12.35.1). Classification always runs on
+`claude-haiku-4-5-20251001` regardless of user selection; selection uses the user's chosen model
+(Haiku / Sonnet 5 / Opus 4.8). Both use a forced tool call — `Tool.Strict = true`.
+
+**Google Gemini** (`Llm/Gemini/GeminiClassifier.cs`, `GeminiSelector.cs`, `GeminiCommanderSelector.cs`)  
+Uses a custom REST client (`GeminiRestClient`) posting directly to
+`https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`. No OpenAI SDK
+wrapping — Gemini's OpenAI-compatible endpoint has enough quirks that a direct implementation
+is cleaner. Structured output is requested via `generationConfig.responseSchema` (Gemini's
+OpenAPI 3.0 subset with `propertyOrdering` to stabilize output key order). Both classifier and
+selector run on the user's chosen Gemini model.
+
+Supporting pieces on the Gemini path:
+
+- **`GeminiRateLimiter`** (Scoped per Blazor circuit) enforces a minimum 1050 ms spacing between
+  calls to stay under free-tier RPM ceilings (as low as 5 RPM on some models).
+- **`GeminiRestClient`** retries transient failures (429, 502, 503, 504) up to 3 times with
+  `Retry-After`-aware backoff. Non-transient errors (401/403 → `ApiKeyRejectedException`,
+  MAX_TOKENS truncation → returned as null payload) are surfaced cleanly with Google's structured
+  error body parsed into the exception message so `RESOURCE_EXHAUSTED` cases (billing-gated
+  models on free tier) are diagnosable at first glance.
+- **`GeminiSchemas`** builds the response schema in Gemini's dialect — uppercase types
+  (`OBJECT` / `ARRAY` / `STRING`), `format: enum` for constrained strings, and `propertyOrdering`
+  set so reasoning fields (e.g. `rationale`) precede the answer they justify. This measurably
+  improves ranking quality on smaller models.
+
+### Cost accounting
+
+`Instrumentation/ModelPricing.cs` holds per-model paid-tier USD rates per 1M tokens (Anthropic:
+Haiku 4.5, Sonnet 5, Opus 4.8; Gemini: 2.5/2.0 Flash, Flash Lite, 3.x series). `UsageTracker`
+uses it for both per-call rows and the summary total — a mixed-provider run tallies correctly.
+Free-tier Gemini usage still reports a cost figure: it's the "what you'd pay on paid tier"
+estimate. When a new model is added to a picker, add its row to `ModelPricing.Prices` in the
+same change; unknown models silently report $0.
+
+`IUsageTrackerAware` is a marker interface implemented by all six adapters (three Anthropic +
+three Gemini). `DeckBuilder` and `CommanderDiscovery` dispatch through it — no type-specific
+`is LlmXxx` branches.
 
 ### Slot accounting invariant
 
@@ -107,9 +154,20 @@ per iteration, so the total stays constant.
 builder.Services.AddAgent();
 ```
 
-The API key is supplied per-user via the settings UI (BYOK). In development, you can pre-populate
-it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` environment variable —
-`SessionApiKeyProvider` reads it on construction so the UI shows "Connected" automatically.
+API keys are supplied per-user via the settings UI (BYOK). In development, you can pre-populate
+any of the three provider keys via user-secrets or environment variables — `SessionApiKeyProvider`
+reads them on construction so the UI shows "Connected" automatically:
+
+| Provider | Config key |
+|---|---|
+| Anthropic | `Anthropic:ApiKey` |
+| Google Gemini | `Google:ApiKey` |
+| GitHub Models | `GitHub:ApiKey` |
+
+The startup provider can be selected via `Provider:Default` (`Anthropic` / `Google` /
+`GitHubModels`). **Note:** the provider is also persisted per-user in a browser cookie, so once
+you connect through the UI the cookie wins on subsequent loads. To force a config change to take
+effect, clear the cookie or use an incognito window.
 
 ## Getting it running
 
@@ -118,20 +176,24 @@ it by setting `Anthropic:ApiKey` in user-secrets or the `ANTHROPIC_API_KEY` envi
 dotnet restore
 dotnet build
 
-# Run all 281 tests:
+# Run all 328 tests:
 dotnet test Tests
 
 # Run the app:
 dotnet run --project EdhDeckBuilder.Web
 ```
 
-On first launch, paste your Anthropic API key in the "Connect your Anthropic API key" card.
+On first launch, pick a provider and paste its API key in the "Connect your API key" card.
 The key is held server-side for the session and optionally saved as an encrypted browser cookie.
 
-For development, skip the UI step by setting the key in user-secrets:
+For development, skip the UI step by setting a key in user-secrets:
 
 ```bash
+# Anthropic
 dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-..." --project EdhDeckBuilder.Web
+# Or Google Gemini
+dotnet user-secrets set "Google:ApiKey" "AIza..." --project EdhDeckBuilder.Web
+dotnet user-secrets set "Provider:Default" "Google" --project EdhDeckBuilder.Web
 ```
 
 Requires the .NET 10 SDK.

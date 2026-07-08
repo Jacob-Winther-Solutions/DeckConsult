@@ -1,4 +1,12 @@
-# Gemini Provider Implementation Notes
+# Gemini Provider Implementation Notes — ARCHIVED
+
+**Status: COMPLETED 2026-07-08.** The three LLM adapters this document said were blocked on
+OpenAI SDK v2.2 were instead implemented as a custom REST client against Gemini's
+`generateContent` endpoint. The OpenAI SDK dependency was dropped entirely. See
+`EdhDeckBuilder.Agent/Llm/Gemini/` for the live code and `CLAUDE.md` / `README.md` for the
+current architecture. Kept in Archive for historical context.
+
+---
 
 ## Session Summary (2026-07-08)
 

@@ -4,63 +4,96 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## Multi-Provider LLM Support (In Progress — 2026-07-08)
+## Multi-Provider LLM Support — Gemini LIVE (2026-07-08)
 
-### Status: Infrastructure Complete, LLM Adapters Pending
+Anthropic and Google Gemini are both fully wired end-to-end. The Gemini adapters use a custom
+REST client (not the OpenAI-compatible SDK path) posting directly to `generateContent` with a
+structured `responseSchema`. See `README.md` and `CLAUDE.md` for the architecture; the archived
+`TODO/Archive/GEMINI_IMPLEMENTATION_NOTES.md` records the original blocked state for context.
 
-**What's done:**
-- ✅ `AiProvider` enum added (Anthropic, GitHubModels, Google)
-- ✅ `SessionApiKeyProvider` refactored for dual/triple key storage
-- ✅ Provider toggle in Web UI (radio buttons: Anthropic / GitHub Models / Google AI Studio)
-- ✅ Provider-specific help text and API links
-- ✅ Provider + model cookie persistence across page reloads and app restarts
-- ✅ Google API key validation (flexible prefix check, accepts "AQ", "AIza", etc.)
-- ✅ DI foundation: factory lambdas ready to dispatch on `ActiveProvider`
-- ✅ Gemini client factory skeleton created
+**Still deferred:** GitHub Models LLM adapters — the Azure.AI.Inference SDK type surface is still
+in beta. UI, cookie, and key storage for GitHub Models remain in place; when the SDK stabilizes,
+the three adapters can slot in following the same `IUsageTrackerAware` + factory pattern the
+Anthropic and Gemini adapters use.
 
-**What's blocked (deferred to next session):**
-- [ ] **Gemini LLM Adapters** — Three classes need implementation:
-  - `GeminiClassifier` (implements `ILlmClassifier`)
-  - `GeminiSelector` (implements `ICardSelector`)
-  - `GeminiCommanderSelector` (implements `ICommanderSelector`)
+---
 
-**Why deferred:**
-The OpenAI C# SDK v2.2 API surface differs from v2.0 docs; the initial adapter code has mismatches in the Chat API (correct parameter names/types are: `CompleteAsync(messages, tools, options)` not `CompleteAsync(options)`; `UserChatMessage` not `ChatMessage(ChatMessageRole.User, text)`). Rather than burn tokens debugging SDK method signatures, better to document the expected pattern and resume in a fresh session.
+## LLM Provider Layer Refactor — streamline the adapter shape
 
-**Implementation template (for next session):**
-```csharp
-// Create messages list
-var messages = new List<ChatMessage> { new UserChatMessage(userMessage) };
+Both provider adapters (Anthropic + Gemini) follow the same conceptual shape today: factory
+hands out a client → format user message → call provider with structured-output schema →
+record usage → whitelist-parse response into DTOs. But the shape is enforced by convention
+only, not by code, and the Anthropic implementations still carry generic `Llm*` names that
+don't identify them as provider-specific. Adding a third provider (GitHub Models, or any future
+one) requires re-implementing all of it by copy-paste-modify, with no compile-time guarantee
+that new adapters conform to the same skeleton.
 
-// Create tool
-var tool = ChatTool.CreateFunctionTool(name, description, BinaryData.FromObjectAsJson(schema));
+Goal: make adding a provider mostly about implementing a small provider-specific transport,
+not re-implementing batching / whitelist / cache / usage-recording per adapter.
 
-// Call
-var response = await client.CompleteAsync(messages, tools: [tool], options: new ChatCompletionOptions
-{
-    Temperature = 0.1f,
-    MaxTokens = 4096,
-}, ct);
+**Rename + relocate Anthropic files** (mechanical, low-risk — do this even if the streamlining
+below is deferred):
 
-// Parse
-var toolCall = response.Value?.Choices?.FirstOrDefault()?.Message?.ToolCalls?.FirstOrDefault();
-var json = toolCall?.Function?.Arguments?.ToString() ?? "";
-// ... deserialize DTOs, whitelist filter, return results
-```
+- [ ] `Llm/LlmClassifier.cs` → `Llm/Anthropic/AnthropicClassifier.cs`
+- [ ] `Llm/LlmSelector.cs` → `Llm/Anthropic/AnthropicSelector.cs`
+- [ ] `Llm/LlmCommanderSelector.cs` → `Llm/Anthropic/AnthropicCommanderSelector.cs`
+- [ ] Keep `Llm/LlmDtos.cs` and `Llm/ClassificationCache.cs` in `Llm/` root — they're shared
+      across providers. Consider a `Llm/Shared/` subfolder if the root gets cluttered.
+- [ ] Update DI wiring in `ServiceCollectionExtensions.cs`
+- [ ] Update `CLAUDE.md`, `README.md`, and memory references to the new names
+- [ ] Verify all 328 tests still pass
 
-**Testing the infrastructure (manual):**
-1. Start app with `Provider:Default: "Google"` in appsettings + Google API key in user secrets
-2. Verify UI shows Google provider + Gemini models
-3. Change model (e.g., to 2.5 Flash) → verify it persists on reload
-4. Switch to Anthropic → model resets to Anthropic default (expected)
-5. Switch back to Google → 2.5 Flash restored from cookie (expected)
-6. Deck build will fail (adapter not done), but the key/provider/model stack is complete
+**Also consider renaming the Authentication-layer `Claude*` files for symmetry with `Gemini*`**
+(open question — see decisions below):
 
-**Files to finish:**
-- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiClassifier.cs` — complete the SDK call
-- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiSelector.cs` — same pattern
-- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiCommanderSelector.cs` — same pattern
-- Verify DI dispatch in `ServiceCollectionExtensions.cs` is correct (already wired)
+- `Authentication/ClaudeClientFactory.cs` → `AnthropicClientFactory.cs` (+ interface)
+- `Authentication/ClaudeModels.cs` → `AnthropicModels.cs` (or keep `Claude` since the enum
+  values are Haiku/Sonnet/Opus — model names, not company names)
+- `Authentication/ClaudeKeyTester.cs` currently handles all three providers — either rename to
+  `LlmKeyTester` (drop the Claude tag entirely) or split into provider-specific testers
+
+**Streamline the adapter shape (design decision needed before implementing):**
+
+Three options, roughly ordered by intrusiveness:
+
+- **(A) Convention-only.** Keep separate classes; document the required shape in `CLAUDE.md`
+  and a new `Llm/README.md`. No compiler enforcement, but the smallest surface change. Good if
+  new providers are added rarely.
+- **(B) Shared base class or helper.** Extract batching / cache lookup / whitelist / usage
+  recording into a base class (or a static helper); each provider adapter implements only the
+  provider-specific transport call and response-payload extraction. Reduces per-provider code
+  by ~30–40%. Base class can enforce the whitelist rule so bugs like "trusts model-returned
+  card names" become uncompilable.
+- **(C) Full transport abstraction.** Define `ILlmTransport` with
+  `SendStructuredRequestAsync(systemPrompt, userMessage, schema, config) → payloadString` that
+  each SDK/REST client implements once. `LlmClassifier` / `LlmSelector` / `LlmCommanderSelector`
+  become provider-agnostic — one implementation each, parameterized by the transport. Biggest
+  structural change; also the cleanest end-state, and it turns "add GitHub Models" into a
+  transport-only task.
+
+**Owner decisions needed:**
+
+- [ ] Which of (A) / (B) / (C) to pursue. (C) reduces future per-provider work most but
+      requires reworking the schema layer too — Anthropic uses `Tool` + `InputSchema`, Gemini
+      uses `responseSchema` — they'd need a common schema representation.
+- [ ] Whether Authentication-layer `Claude*` files should also rename for symmetry, or whether
+      `Claude` is fine there since it refers to the model family and not the API surface.
+- [ ] Whether to do the rename + relocation as one PR and the streamlining as a second, or
+      bundle them.
+
+**Constraints to preserve regardless of approach:**
+
+- `IUsageTrackerAware` seam — the marker interface + dispatch pattern must remain.
+- Whitelist rule — every `OracleId` echoed by the model must be verified against the input
+  batch before returning to callers.
+- Provider-specific error mapping — Anthropic's `AnthropicUnauthorizedException` and Gemini's
+  401/403/`limit: 0` handling both surface as `ApiKeyRejectedException`; whatever refactor
+  happens must keep the mapping close to the transport (not leaked into the classifier).
+- `ClassificationCache` is a Singleton; only `Plan`, `Synergy`, `Payoff` are excluded from
+  caching. This behavior stays.
+
+**Related:** GitHub Models adapters can slot in as the third implementation of whichever
+pattern is chosen — natural moment to unblock them if Azure.AI.Inference has stabilized by then.
 
 ---
 
@@ -282,10 +315,8 @@ Core and UI infrastructure complete. Edge-case tuning deferred:
 
 ### BYOK — Scoped settings
 
-Base implementation complete. Optional visibility features deferred:
-
-- [ ] (Stretch) Approximate token/cost estimate displayed after each build, since users now
-      pay directly and will want visibility.
+Base implementation complete. Token/cost estimate is now live per provider
+(`Instrumentation/ModelPricing.cs`) — no remaining stretch items in this area.
 
 ### Saved deck results
 
@@ -425,8 +456,6 @@ Features and enhancements worth considering for future iterations:
 
 - [ ] **Opening-hand / curve simulation** — Sanity-check deck consistency by simulating
       opening hands and mana curves.
-- [ ] **Token/cost estimate** — Display approximate token usage and cost after each build
-      now that users pay directly.
 - [ ] **Plain text decklist export** — For users who prefer to manually paste into external
       deck builders (TCGPlayer Mass Entry, etc.). Shares the `CartLine` mapping with the buy button.
 - [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
@@ -494,20 +523,24 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 281 tests pass.
+All four projects compile; 328 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 
 **Agent pipeline:** `LlmClassifier` (Haiku, forced tool call, batched, cached except Plan/Synergy/Payoff), `LlmSelector` (user model, forced tool call, per-build rationale). `FillEngine` (greedy + reconciliation, max 50 iterations), `ColorFixingPass` (pip-demand scoring). Deterministic `RepairEngine` + `DeckBuilder` (12-stage pipeline). Multi-role classification: role profiles, secondary contributions, coverage accounting.
 
-**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit), `IClaudeClientFactory` (SDK seam), `ClaudeKeyTester` (1-token probe), 401→`ApiKeyRejectedException` wrapping. Model picker (Haiku / Sonnet 5 / Opus 4.8). Data Protection-encrypted cookie (30-day expiry).
+**Multi-provider LLM (Anthropic + Gemini):** Provider dispatch via `SessionApiKeyProvider.ActiveProvider`. Anthropic path via official C# SDK v12.35.1; Gemini path via custom `GeminiRestClient` posting directly to `generateContent` with `responseSchema` structured output. `GeminiSchemas` translates our schema shape to Gemini's OpenAPI 3.0 subset (uppercase types, `propertyOrdering`, `format: enum`). `GeminiRateLimiter` (Scoped) enforces per-circuit RPM pacing. `GeminiRestClient` retries 429/502/503/504 with `Retry-After`-aware backoff; parses Google's structured error body so free-tier `limit: 0` gating is diagnosable. MAX_TOKENS handled distinct from JSON parse errors. Model picker covers `2.5 Flash`, `2.5 Flash Lite`, `3.1 Flash Lite` (default — 500 RPD), `3 Flash`, `3.5 Flash`, `2.0 Flash*` (needs billing).
 
-**Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option.
+**Cost accounting:** `Instrumentation/ModelPricing.cs` — per-model USD rates per 1M tokens for both providers. `UsageTracker` uses it for per-call rows and summary totals; mixed-provider runs tally correctly. Free-tier Gemini calls show the "what you'd pay on paid tier" estimate. `IUsageTrackerAware` marker interface removes type-specific dispatch — all six LLM adapters implement it, `DeckBuilder` and `CommanderDiscovery` wire the tracker through it.
 
-**Commander Discovery:** Standalone `/discover` page with two tabs: Guided (LLM-assisted, archetype/theme-driven) and Custom (free-text strategy description). Ranked commander suggestions with art, rationale, and power level. Partner-pair support (all 8 variants: Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son). EDHREC partner index integrated. Deck builder pool gathering queries partner-pair endpoints with redirect handling and canonical caching. Graceful fallback to merged single-commander pools.
+**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit) with triple-key storage (Anthropic / GitHub / Google). `IClaudeClientFactory` (Anthropic SDK seam), `IGeminiClientFactory` (Gemini REST client seam). `ClaudeKeyTester` (1-token probe for Anthropic; format check for Google/GitHub). 401/403 → `ApiKeyRejectedException` wrapping on both provider paths. Data Protection-encrypted cookies (30-day expiry) for each provider plus a selected-model cookie; cookies win over `Provider:Default` in appsettings.
 
-**Deck results & logging:** Saved locally (3-max, Data Protection cookie). Token usage logging across all discovery and build flows (summary header, table, total cost).
+**Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option. Provider toggle (Anthropic / GitHub Models / Google AI Studio) with per-provider help text and dynamic model dropdown.
+
+**Commander Discovery:** Standalone `/discover` page with two tabs: Guided (LLM-assisted, archetype/theme-driven) and Custom (free-text strategy description). Ranked commander suggestions with art, rationale, and power level. Contiguous rank normalization in `BuildSuggestionsFromResults` — display is always 1..N regardless of what the model emits. Partner-pair support (all 8 variants: Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son). EDHREC partner index integrated. Deck builder pool gathering queries partner-pair endpoints with redirect handling and canonical caching. Graceful fallback to merged single-commander pools.
+
+**Deck results & logging:** Saved locally (3-max, Data Protection cookie). Token usage logging with per-call table + summary total across all discovery and build flows, per-provider pricing.
 
 **Deck Download:** Markdown export with header, role buckets (with rationale), runner-ups, coverage summary, raw decklist (ready to paste).
 
-**Tests:** 281 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration). All green.
+**Tests:** 328 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration). All green.

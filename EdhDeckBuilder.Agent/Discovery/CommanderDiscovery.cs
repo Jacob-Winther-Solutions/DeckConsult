@@ -27,8 +27,8 @@ public sealed class CommanderDiscovery(
     public void SetUsageTracker(UsageTracker tracker)
     {
         _usageTracker = tracker;
-        if (selector is LlmCommanderSelector llmSelector)
-            llmSelector.SetUsageTracker(tracker);
+        if (selector is IUsageTrackerAware aware)
+            aware.SetUsageTracker(tracker);
     }
 
     public async Task<CommanderDiscoveryResult> DiscoverAsync(
@@ -144,6 +144,11 @@ public sealed class CommanderDiscovery(
         var suggestions = new List<CommanderSuggestion>();
         var processedIds = new HashSet<Guid>();
 
+        // Renumber ranks to contiguous 1..N after ordering by the model's rank. Some
+        // lightweight models (Gemini Flash Lite) treat rank as a rating scale and emit
+        // gaps like 1, 3, 5, 6, 7; the ordering preserves the model's preference but the
+        // display is always clean 1, 2, 3, …
+        int displayRank = 1;
         foreach (var result in results.OrderBy(r => r.Rank))
         {
             if (processedIds.Contains(result.OracleId))
@@ -152,8 +157,10 @@ public sealed class CommanderDiscovery(
             if (!cardMap.TryGetValue(result.OracleId, out var card))
                 continue;
 
-            var suggestion = BuildSuggestion(result, card, cardMap, partnerMap, processedIds);
+            var normalized = result with { Rank = displayRank };
+            var suggestion = BuildSuggestion(normalized, card, cardMap, partnerMap, processedIds);
             suggestions.Add(suggestion);
+            displayRank++;
         }
 
         return suggestions;

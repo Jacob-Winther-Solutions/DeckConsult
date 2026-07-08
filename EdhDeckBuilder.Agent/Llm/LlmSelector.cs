@@ -16,7 +16,7 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// (moderate temperature for creative judgment). Uses a forced tool call so output is
 /// always structured JSON. Selection is always context-dependent, so results are never cached.
 /// </summary>
-public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector
+public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector, IUsageTrackerAware
 {
     private const int MaxTokens = 2048;
     private UsageTracker? _usageTracker;

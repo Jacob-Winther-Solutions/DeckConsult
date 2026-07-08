@@ -20,7 +20,7 @@ namespace EdhDeckBuilder.Agent.Llm;
 public sealed class LlmClassifier(
     IClaudeClientFactory factory,
     ClassificationCache cache,
-    ILogger<LlmClassifier> logger) : ILlmClassifier
+    ILogger<LlmClassifier> logger) : ILlmClassifier, IUsageTrackerAware
 {
     private const int MaxTokens = 4096;
     private const int BatchSize = 30;

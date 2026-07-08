@@ -16,16 +16,38 @@ public sealed class UsageTracker
     /// </summary>
     public void RecordCall(string stage, string model, Usage usage)
     {
+        RecordCall(
+            stage,
+            model,
+            inputTokens: (int)usage.InputTokens,
+            outputTokens: (int)usage.OutputTokens,
+            cacheCreationInputTokens: (int)(usage.CacheCreationInputTokens ?? 0),
+            cacheReadInputTokens: (int)(usage.CacheReadInputTokens ?? 0));
+    }
+
+    /// <summary>
+    /// Records a single LLM call from a provider whose SDK doesn't expose Anthropic's
+    /// <see cref="Usage"/> shape (Gemini, GitHub Models). Cache-token fields default to zero
+    /// since those providers don't report them today.
+    /// </summary>
+    public void RecordCall(
+        string stage,
+        string model,
+        int inputTokens,
+        int outputTokens,
+        int cacheCreationInputTokens = 0,
+        int cacheReadInputTokens = 0)
+    {
         _callCounter++;
         _calls.Add(new CallRecord
         {
             CallNumber = _callCounter,
             Stage = stage,
             Model = model,
-            InputTokens = (int)usage.InputTokens,
-            OutputTokens = (int)usage.OutputTokens,
-            CacheCreationInputTokens = (int)(usage.CacheCreationInputTokens ?? 0),
-            CacheReadInputTokens = (int)(usage.CacheReadInputTokens ?? 0),
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            CacheCreationInputTokens = cacheCreationInputTokens,
+            CacheReadInputTokens = cacheReadInputTokens,
             Timestamp = DateTime.UtcNow,
         });
     }
@@ -36,7 +58,9 @@ public sealed class UsageTracker
     public IReadOnlyList<CallRecord> GetCalls() => _calls.AsReadOnly();
 
     /// <summary>
-    /// Computes aggregate statistics across all calls in the build.
+    /// Computes aggregate statistics across all calls in the build. Cost is summed per-call
+    /// using each call's own model rate — a mixed-provider build (Anthropic classification +
+    /// Gemini selection, or similar) totals correctly.
     /// </summary>
     public UsageSummary GetSummary()
     {
@@ -44,11 +68,8 @@ public sealed class UsageTracker
         var totalOutputTokens = _calls.Sum(c => c.OutputTokens);
         var totalCacheCreation = _calls.Sum(c => c.CacheCreationInputTokens);
         var totalCacheRead = _calls.Sum(c => c.CacheReadInputTokens);
-
-        // Haiku pricing: $1 per MTok input, $5 per MTok output
-        var inputCost = (totalInputTokens * 1m) / 1_000_000m;
-        var outputCost = (totalOutputTokens * 5m) / 1_000_000m;
-        var estimatedCost = inputCost + outputCost;
+        var estimatedCost = _calls.Sum(c =>
+            ModelPricing.EstimateCost(c.Model, c.InputTokens, c.OutputTokens));
 
         return new UsageSummary
         {
@@ -75,13 +96,13 @@ public sealed class UsageTracker
 
         foreach (var call in _calls)
         {
-            var cost = (call.InputTokens * 1m + call.OutputTokens * 5m) / 1_000_000m;
-            sb.AppendLine($"{call.CallNumber,-6} {call.Stage,-30} {call.Model,-30} {call.InputTokens,-8} {call.OutputTokens,-8} {call.CacheCreationInputTokens,-12} {call.CacheReadInputTokens,-10} ${cost:F4,-9}");
+            var cost = ModelPricing.EstimateCost(call.Model, call.InputTokens, call.OutputTokens);
+            sb.AppendLine($"{call.CallNumber,-6} {call.Stage,-30} {call.Model,-30} {call.InputTokens,-8} {call.OutputTokens,-8} {call.CacheCreationInputTokens,-12} {call.CacheReadInputTokens,-10} ${cost,-9:F4}");
         }
 
         sb.AppendLine(new string('─', 114));
         var summary = GetSummary();
-        sb.AppendLine($"{"TOTAL",-6} {"",-30} {"",-30} {summary.TotalInputTokens,-8} {summary.TotalOutputTokens,-8} {summary.CacheCreationTokens,-12} {summary.CacheReadTokens,-10} ${summary.EstimatedCostUsd:F4,-9}");
+        sb.AppendLine($"{"TOTAL",-6} {"",-30} {"",-30} {summary.TotalInputTokens,-8} {summary.TotalOutputTokens,-8} {summary.CacheCreationTokens,-12} {summary.CacheReadTokens,-10} ${summary.EstimatedCostUsd,-9:F4}");
 
         return sb.ToString();
     }

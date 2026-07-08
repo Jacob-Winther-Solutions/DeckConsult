@@ -80,6 +80,8 @@ API usage:
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              2,04 -> 1,90 = 0,14 (74th try) (Investigate why cards are not classified)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              1,90 -> 1,66 = 0,24 (75th try) (Lowering batch size for Classifier)
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              1,66 -> 1,49 = 0,17 (76th try) (Improving batching logic)
+- Gemini Flash, Joel+Ellie, Aggro, Aristocrats, Bracket 3, No Budget:                                                       1,49 -> 1,49 = 0,00 (77th try) (Should be free on Antropic account as Google AI Studio should be used with a free account => was free for me! Estimated cost was $0,0064)
+- Haiku, Commander Discovery, WUGG (exactly), Combo, Counters, Bracket 3, No Budget, No angels                              1,49 -> 1,49 = 0,00 (78th try) (Compare Haiku costs with Gemini => $0,0079, but waaay slower to respond)
 
 Bad classifications:
 Sephiroth (third try):

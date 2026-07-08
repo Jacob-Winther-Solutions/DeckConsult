@@ -1,9 +1,9 @@
-using OpenAI.Chat;
+using EdhDeckBuilder.Agent.Llm.Gemini;
 
 namespace EdhDeckBuilder.Agent.Authentication;
 
 public interface IGeminiClientFactory
 {
-    ChatClient CreateForCurrentUser();
+    GeminiRestClient CreateForCurrentUser();
     string SelectionModel { get; }
 }

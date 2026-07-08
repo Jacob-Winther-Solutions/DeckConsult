@@ -22,9 +22,9 @@ The **Guided** tab asks for:
 - **Budget (optional)** — filter by price point (per-card or total deck budget)
 - **Additional notes (optional)** — free-text description of your strategy
 
-The tool queries all legal commanders, scores them against your inputs using Claude, and
-shows you a ranked shortlist with explanations. Click any result to jump to the builder
-with that commander pre-selected.
+The tool queries all legal commanders, scores them against your inputs using the LLM you've
+connected (Claude or Gemini), and shows you a ranked shortlist with explanations. Click any
+result to jump to the builder with that commander pre-selected.
 
 ### Custom discovery
 
@@ -51,15 +51,29 @@ any card to build a deck with that commander pre-selected in the builder.
 
 ### Before you start
 
-**An Anthropic API key.** The builder runs on your own key, billed to your account at
-pay-per-token rates. Create one at [console.anthropic.com](https://console.anthropic.com/settings/keys)
-(free to create, you only pay for usage). Paste it into the "Connect your Anthropic API key" card
-at the top of the builder. Check "Remember my key" and it will be saved as an encrypted cookie
-for 30 days so you only need to do this once. You can disconnect at any time.
+**An API key from one of the supported LLM providers.** The builder runs on your own key; you
+pick which provider to use.
 
-You can also pick which Claude model is used for card selection once connected — Haiku is the
-default (fast and cheap); Sonnet and Opus give better rationale quality at higher cost. The
-initial classification step always uses Haiku regardless.
+**Anthropic Claude** — Create a key at
+[console.anthropic.com](https://console.anthropic.com/settings/keys) (free to create, pay per
+token used). Once connected, pick which model is used for card selection: Haiku is the default
+(fast and cheap); Sonnet and Opus give better rationale quality at higher cost. Classification
+always uses Haiku regardless — it's the cheap batch step.
+
+**Google Gemini** — Create a key at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free tier available). Gemini's
+free tier has meaningful daily limits — as low as 20 requests per day on `Gemini 2.5 Flash` —
+so it's best suited for occasional builds or iteration on a lite model. The default is
+**Gemini 3.1 Flash Lite** because its free-tier daily budget (500 requests) is roughly 25×
+higher than the standard models', making it much better for testing and repeated builds.
+Heads-up: some models (notably `Gemini 2.0 Flash` and `2.0 Flash Lite`) only allocate free-tier
+quota when a billing account is attached to the Google Cloud project — even at $0 usage. If you
+see an error mentioning `limit: 0`, that's the cause. Attaching billing unlocks the free tier
+for those models; you won't be charged if you stay within the allowance.
+
+Paste your chosen provider's key into the "Connect your API key" card at the top of the builder.
+Check "Remember my key" and it will be saved as an encrypted cookie for 30 days so you only need
+to do this once. You can disconnect at any time.
 
 ### Required
 
@@ -158,12 +172,17 @@ filtered out before the build begins.
 **Card classification.** Every card in the pool is given a primary role (Ramp, Card Advantage,
 Targeted Disruption, etc.) and optional secondary roles (e.g. a card that both ramps and draws
 cards is classified as Ramp with a secondary Card Advantage contribution). This is the first
-LLM call — a fast, cheap batch classification.
+LLM call — a fast, cheap batch classification. Results are cached across builds so most cards
+only need to be classified once.
 
 **Card selection.** The tool fills each role bucket by asking the LLM to rank the classified
 candidates for this specific commander and strategy, then taking the top-ranked cards until the
 coverage target is met. Each selected card gets a written rationale — *why* it belongs in this
 deck. This is the second LLM call.
+
+After the build, a **token usage summary** is written to the console with per-call token counts
+and an estimated USD cost. The cost is the paid-tier estimate for the model you used — free-tier
+Gemini calls still show a number so you can see what usage would cost outside the free tier.
 
 **Color-fixing.** After the spell slots are filled, the tool upgrades some basic lands to
 non-basic color-fixing lands from the pool (dual lands, fetch lands, etc.), ranked by how much

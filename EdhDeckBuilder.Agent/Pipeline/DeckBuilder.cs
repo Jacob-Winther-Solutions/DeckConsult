@@ -43,10 +43,10 @@ public sealed class DeckBuilder(
             _usageTracker = value;
             if (value != null)
             {
-                if (classifier is LlmClassifier llmClassifier)
-                    llmClassifier.SetUsageTracker(value);
-                if (selector is LlmSelector llmSelector)
-                    llmSelector.SetUsageTracker(value);
+                if (classifier is IUsageTrackerAware trackedClassifier)
+                    trackedClassifier.SetUsageTracker(value);
+                if (selector is IUsageTrackerAware trackedSelector)
+                    trackedSelector.SetUsageTracker(value);
             }
         }
     }

@@ -17,24 +17,28 @@ public static class CommanderSelectionPrompt
 
     public const string SystemPrompt =
         """
-        You are an expert Magic: the Gathering Commander deck builder.
-        Evaluate the provided legendary creatures and return the top 10 commanders
-        that best fit the requested strategy. If there are 10 or fewer candidates total, return all of them.
+        You are an expert Magic: the Gathering Commander deck builder ranking legendary creatures for a specific strategy.
 
-        For each candidate consider:
-        - How directly the commander's abilities support the requested archetype and themes
-        - Whether the commander's color identity enables the key supporting cards the strategy needs
-        - The commander's fit with the target power bracket
-        - Budget considerations when a price ceiling is given
+        ## Output requirements (MANDATORY — read before deciding what to return)
+        - **If the input contains 10 or fewer candidates, you MUST include EVERY candidate in the output.** Do not omit any candidate for any reason, even if you think it is weak, off-theme, or a bad fit. Weak candidates get low ranks — they do not get omitted.
+        - If the input contains more than 10 candidates, return exactly the top 10.
+        - Ranks MUST be contiguous integers starting at 1 (1, 2, 3, …). Do not skip numbers. Do not treat rank as a rating or letter grade. Rank 1 is the best; the highest rank is the worst.
+        - Return ONLY commanders whose `oracle_id` appears in the provided list. Do not invent new ones.
 
-        Return ONLY commanders from the provided list. Do not invent new ones.
+        ## Evaluation criteria (apply in this order)
+        1. How directly the commander's abilities support the requested archetype and themes
+        2. Whether the commander's color identity enables the key supporting cards the strategy needs
+        3. The commander's fit with the target power bracket
+        4. Budget considerations when a price ceiling is given
+
+        A weak candidate is still ranked — at the bottom. Do not decide for the user which candidates are "worth" including.
         """;
 
     /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
     public static Tool Tool { get; } = new()
     {
         Name = ToolName,
-        Description = "Rank the candidate commanders from best (rank 1) to worst for the requested strategy.",
+        Description = "Rank EVERY provided candidate commander from best (rank 1) to worst; omit none when the input has 10 or fewer entries. Ranks must be contiguous 1..N.",
         InputSchema = BuildSchema(),
         Strict = true,
         CacheControl = new CacheControlEphemeral(),
@@ -69,7 +73,10 @@ public static class CommanderSelectionPrompt
             : request.Description);
 
         sb.AppendLine();
-        sb.AppendLine($"Evaluate the following {candidates.Count} commander candidates and return the top 5–10:");
+        var expectedCount = Math.Min(candidates.Count, 10);
+        sb.AppendLine(candidates.Count <= 10
+            ? $"Evaluate the following {candidates.Count} commander candidates and rank ALL {candidates.Count} of them. Do not omit any."
+            : $"Evaluate the following {candidates.Count} commander candidates and return the top {expectedCount}:");
 
         foreach (var card in candidates)
         {

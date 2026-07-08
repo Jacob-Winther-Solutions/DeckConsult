@@ -6,6 +6,7 @@ using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Llm.Gemini;
 using EdhDeckBuilder.Agent.Pipeline;
 using EdhDeckBuilder.Agent.Prompts;
+// GeminiRateLimiter lives in Llm.Gemini; imported above via that using.
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,7 +49,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClaudeApiKeyProvider>(sp => sp.GetRequiredService<SessionApiKeyProvider>());
 
         services.AddScoped<IClaudeClientFactory, ClaudeClientFactory>();
-        services.AddScoped<IGeminiClientFactory, GeminiClientFactory>();
+
+        // GeminiClientFactory needs a pooled HttpClient — register as a typed client so
+        // IHttpClientFactory manages lifetime. AddHttpClient defaults to Transient; we
+        // then re-expose it as Scoped via the interface so it composes with the other
+        // per-circuit services.
+        services.AddHttpClient<GeminiClientFactory>(c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(120);
+        });
+        services.AddScoped<IGeminiClientFactory>(sp => sp.GetRequiredService<GeminiClientFactory>());
+
+        // Per-circuit pacing state so each user's key gets its own RPM budget rather than
+        // sharing one throttle across the whole deployment.
+        services.AddScoped<GeminiRateLimiter>();
+
         services.AddScoped<IClaudeKeyTester, ClaudeKeyTester>();
 
         // ClassificationCache is global (cross-build, cross-circuit); LLM callers are scoped

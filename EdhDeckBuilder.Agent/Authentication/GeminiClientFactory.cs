@@ -1,24 +1,27 @@
-using OpenAI;
-using OpenAI.Chat;
-using System.ClientModel;
+using EdhDeckBuilder.Agent.Llm.Gemini;
+using Microsoft.Extensions.Logging;
 
 namespace EdhDeckBuilder.Agent.Authentication;
 
 /// <summary>
-/// Creates OpenAI ChatClient pointed at Google Gemini's OpenAI-compatible endpoint.
-/// Mirrors ClaudeClientFactory pattern but uses Gemini as the provider.
+/// Constructs a <see cref="GeminiRestClient"/> bound to the current circuit's API key and
+/// selected model. The <see cref="HttpClient"/> is injected via <c>IHttpClientFactory</c>
+/// (registered in <c>AddAgent</c>), which handles pooling and lifetime.
+/// <para>
+/// The per-circuit <see cref="GeminiRateLimiter"/> is shared across every client the factory
+/// hands out so pacing state persists across classifier + selector calls within a build.
+/// </para>
 /// </summary>
-public sealed class GeminiClientFactory(IClaudeApiKeyProvider keys) : IGeminiClientFactory
+public sealed class GeminiClientFactory(
+    HttpClient http,
+    IClaudeApiKeyProvider keys,
+    GeminiRateLimiter limiter,
+    ILogger<GeminiRestClient> logger) : IGeminiClientFactory
 {
-    public ChatClient CreateForCurrentUser()
+    public GeminiRestClient CreateForCurrentUser()
     {
         var key = keys.GetApiKey() ?? throw new MissingApiKeyException();
-        var options = new OpenAIClientOptions
-        {
-            Endpoint = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/")
-        };
-        var client = new OpenAIClient(new ApiKeyCredential(key), options);
-        return client.GetChatClient(keys.SelectedModel);
+        return new GeminiRestClient(http, key, keys.SelectedModel, limiter, logger);
     }
 
     public string SelectionModel => keys.SelectedModel;

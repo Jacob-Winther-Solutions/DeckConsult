@@ -59,6 +59,12 @@ internal sealed record CardSelectionDto
     public string Rationale { get; init; } = "";
 }
 
+internal sealed record CommanderRankingBatchDto
+{
+    [JsonPropertyName("rankings")]
+    public List<CommanderRankingDto> Rankings { get; init; } = [];
+}
+
 internal sealed record CommanderRankingDto
 {
     [JsonPropertyName("oracle_id")]

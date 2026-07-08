@@ -11,13 +11,15 @@ perspective of someone using the deck builder rather than building it.
 ## What this is
 
 An LLM-assisted Magic: the Gathering Commander (EDH) deck builder in C#/.NET 10, with a Blazor
-front end. The user drives it in natural language; an agent (Anthropic C# SDK) builds and validates
-decks using a pure domain core. `README.md` documents the architecture; `TODO/TODO.md` tracks deferred
-work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
+front end. The user drives it in natural language; an agent builds and validates decks against
+a pure domain core. Two LLM providers are wired: **Anthropic Claude** (via the Anthropic C# SDK)
+and **Google Gemini** (via a custom REST client). Runtime dispatch by `AiProvider` on the
+per-circuit `SessionApiKeyProvider`. `README.md` documents the architecture; `TODO/TODO.md`
+tracks deferred work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 281 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 328 tests, all green.
 
 | Project | Status |
 |---|---|
@@ -33,20 +35,62 @@ See `TODO/TODO.md` for remaining work (Commander Discovery, Deployment, etc.).
 `Pipeline/DeckBuilder.cs` is the entry point (`IDeckBuilder.BuildAsync`). It runs a 10-stage
 staged pipeline; the LLM is consulted at exactly two fixed points:
 
-1. **Classification** — `LlmClassifier` (`claude-haiku-4-5-20251001`, temperature 0.1, batched,
-   forced tool call). Assigns `CardRole` + secondary overlaps. Results cached globally by
-   `OracleId` except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
-   Always uses Haiku regardless of the user's model selection.
-2. **Selection** — `LlmSelector` (user-selected model via `IClaudeClientFactory.SelectionModel`,
-   default `claude-haiku-4-5-20251001`, temperature 0.6, per-role call, forced tool call).
+1. **Classification** — `ILlmClassifier` (temperature 0.1, batched at 30 cards, forced structured
+   output). Assigns `CardRole` + secondary overlaps. Results cached globally by `OracleId`
+   except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
+   - Anthropic path: `LlmClassifier` on `claude-haiku-4-5-20251001` regardless of selection.
+   - Gemini path: `GeminiClassifier` on the user's selected Gemini model.
+2. **Selection** — `ICardSelector` (temperature 0.6, per-role call, forced structured output).
    Returns a ranked list with per-card rationale. The fill engine decides count; the model never
    outputs counts.
+   - Anthropic path: `LlmSelector` on the user-selected Claude model, default Haiku.
+   - Gemini path: `GeminiSelector` on the user-selected Gemini model.
 
 Everything else — fill order, reconciliation, color-fixing, repair, basic distribution — is
 deterministic code in `Fill/` and `Pipeline/`.
 
 All open design decisions from `TODO/AGENT_PRINCIPLES.md` are now closed. Do not reopen them
 without an explicit user request.
+
+### Provider dispatch
+
+`SessionApiKeyProvider.ActiveProvider` (`Anthropic` / `GitHubModels` / `Google`) is set at the
+UI level and read at the DI factory lambdas in `ServiceCollectionExtensions.AddAgent`. Each
+interface (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`) resolves to either the
+Anthropic or Gemini concrete class at scope-resolution time. GitHubModels adapters are still
+deferred pending Azure.AI.Inference SDK stability — the UI wires the key and cookie for it, but
+the LLM interfaces fall through to the Anthropic implementation.
+
+### Gemini path — custom REST client
+
+The Gemini adapters do NOT wrap the OpenAI-compatible endpoint via the OpenAI C# SDK. Instead:
+
+- `GeminiRestClient` posts directly to
+  `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with a
+  `x-goog-api-key` header. Constructed per-call by `GeminiClientFactory` (Scoped) using an
+  `HttpClient` from `IHttpClientFactory` (registered via `AddHttpClient<GeminiClientFactory>`).
+- `GeminiSchemas` builds the `responseSchema` in Gemini's OpenAPI 3.0 subset — uppercase types
+  (`OBJECT` / `ARRAY` / `STRING` / etc.), `format: enum` for constrained strings, and
+  `propertyOrdering` set so reasoning fields precede the answer they justify.
+- `GeminiRateLimiter` (Scoped, per Blazor circuit) serializes calls with a minimum 1050ms
+  spacing. Free-tier RPM ceilings on 2.5 Flash and lite variants are as low as 5 RPM.
+- `GeminiRestClient` retries transient failures (429, 502, 503, 504) up to 3 times with
+  `Retry-After`-aware backoff. Google's error body (`RESOURCE_EXHAUSTED` + `QuotaFailure`
+  details) is parsed and surfaced in the exception message so free-tier `limit: 0` gating is
+  diagnosable at first glance.
+
+### Cost accounting
+
+`ModelPricing` (in `Instrumentation/`) is the single source of truth for per-model USD rates
+per 1M tokens. `UsageTracker` consults it via `ModelPricing.EstimateCost(modelId, in, out)` for
+both per-call rows and the summary aggregate — a mixed-provider run tallies correctly. Unknown
+model IDs return the zero rate rather than throwing, so a new model added to a picker without a
+matching pricing entry quietly reports $0 until priced.
+
+`IUsageTrackerAware` (marker interface in `Instrumentation/`) is implemented by all six adapters
+(three Anthropic + three Gemini). `DeckBuilder` and `CommanderDiscovery` wire the tracker
+through it — no type-specific `is LlmXxx` dispatch. Any future provider adapter that implements
+the marker will be picked up automatically.
 
 ## Guardrails — do not redesign Core
 
@@ -80,15 +124,45 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   `Tool.Strict = true`. Don't switch to plain-text parsing.
 - **Classification cache:** `ClassificationCache` is a singleton; Plan, Synergy, and Payoff are
   never served from it. Don't cache them.
-- **BYOK — scoped services:** `SessionApiKeyProvider`, `IClaudeClientFactory`, `IClaudeKeyTester`,
-  `ILlmClassifier`, `ICardSelector`, and `IDeckBuilder` are all Scoped (per Blazor Server circuit).
+- **BYOK — scoped services:** `SessionApiKeyProvider`, `IClaudeClientFactory`,
+  `IGeminiClientFactory`, `GeminiRateLimiter`, `IClaudeKeyTester`, `ILlmClassifier`,
+  `ICardSelector`, and `IDeckBuilder` are all Scoped (per Blazor Server circuit).
   `ClassificationCache` is the only Singleton in the Agent layer. Never register a Scoped LLM
-  service as Singleton — it would capture the per-circuit key.
-- **BYOK — SDK seam:** `ClaudeClientFactory` is the only place that calls `new AnthropicClient(...)`.
-  `LlmClassifier` and `LlmSelector` receive it via `IClaudeClientFactory`. Keep it that way.
-- **BYOK — 401 handling:** `AnthropicUnauthorizedException` is caught in the LLM callers and
-  rethrown as `ApiKeyRejectedException`. The UI catches this, calls `Keys.Clear()`, and shows a
-  reconnect prompt. Don't swallow it or convert it to a generic build failure.
+  service as Singleton — it would capture the per-circuit key or pacing state.
+- **BYOK — SDK seams:** `ClaudeClientFactory` is the only place that calls
+  `new AnthropicClient(...)`. `GeminiClientFactory` is the only place that constructs
+  `GeminiRestClient`. `LlmClassifier` / `LlmSelector` receive the Anthropic client via
+  `IClaudeClientFactory`; `GeminiClassifier` / `GeminiSelector` receive the REST client via
+  `IGeminiClientFactory`. Keep both seams intact — no LLM adapter should new up an HTTP client
+  or SDK client itself.
+- **BYOK — 401/403 handling:** Anthropic's `AnthropicUnauthorizedException` and Gemini's 401/403
+  responses (from `GeminiRestClient`) are both rethrown as `ApiKeyRejectedException`. The UI
+  catches this, calls `Keys.Clear()`, and shows a reconnect prompt. Don't swallow it or convert
+  it to a generic build failure.
+- **Gemini — free-tier `limit: 0` is a project setting, not our bug.** Some models
+  (currently `gemini-2.0-flash*`) return HTTP 429 with `status: RESOURCE_EXHAUSTED` and
+  `limit: 0` on projects without billing attached. The full error body (parsed by
+  `GeminiRestClient.ExtractErrorMessage`) makes this immediately diagnosable. Don't retry
+  around it — the retry loop will just re-fail. The label on `GeminiModels.SelectionModels`
+  notes which entries need billing.
+- **Gemini — MAX_TOKENS is not a JSON parse error.** `GeminiResponse.GetPayloadText()`
+  returns null when `finishReason` is `MAX_TOKENS`, `SAFETY`, `RECITATION`, or `OTHER`. If you
+  see truncation in classification, raise `MaxOutputTokens` on the adapter — do not add
+  partial-JSON recovery. Current ceilings: classifier 32768, selectors 8192. Gemini bills only
+  emitted tokens, not the ceiling.
+- **Gemini — rank normalization is centralized.** `CommanderDiscovery.BuildSuggestionsFromResults`
+  renumbers ranks to contiguous 1..N after ordering by the model's rank. This lets lite models
+  emit ranks like 1, 3, 5 (rank-as-rating) without breaking the display. Don't push
+  normalization into the selectors.
+- **Usage tracker wiring uses `IUsageTrackerAware`.** All six LLM adapters implement it;
+  `DeckBuilder.UsageTracker` setter and `CommanderDiscovery.SetUsageTracker` dispatch through
+  the marker interface. Don't add `is LlmXxx` / `is GeminiXxx` branches — any new provider that
+  implements `IUsageTrackerAware` is wired automatically.
+- **Cost accounting goes through `ModelPricing`.** `UsageTracker.GetSummary` and `FormatTable`
+  call `ModelPricing.EstimateCost(modelId, in, out)` — no hardcoded rates. When a new model is
+  added to a picker (`GeminiModels.SelectionModels` / `ClaudeModels.SelectionModels`), add a
+  corresponding row to `ModelPricing.Prices` in the same change; unknown models silently report
+  $0 which will surface as a suspicious total.
 - **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
   after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
   backward compatibility.
@@ -125,7 +199,9 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   in Razor markup.
 - Implement interfaces from `Core/Abstractions/` in the outer layers; don't add new abstractions
   to Core without a good reason.
-- Keep secrets (the Anthropic API key) out of source — use user-secrets or environment variables.
+- Keep secrets (API keys — Anthropic, Google, GitHub) out of source — use user-secrets or
+  environment variables (`Anthropic:ApiKey`, `Google:ApiKey`, `GitHub:ApiKey`,
+  `Provider:Default`).
 - Tests live in `Tests/`. No mocking libraries — manual mocks only (the project has no Moq/NSubstitute
   reference). Keep tests fast: LLM calls must be behind the `ILlmClassifier`/`ICardSelector`
   interfaces and replaced with mocks in tests.

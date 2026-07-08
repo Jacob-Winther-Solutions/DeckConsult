@@ -75,6 +75,9 @@ public static class ClassificationPrompt
         _options = options;
     }
 
+    /// <summary>Whether classification responses should include a per-card <c>reasoning</c> field.</summary>
+    public static bool IsReasoningEnabled => _options?.EnableClassificationReasoning == true;
+
     /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
     public static Tool Tool
     {
