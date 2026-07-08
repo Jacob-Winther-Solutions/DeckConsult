@@ -19,6 +19,11 @@ public static class ClaudeModels
         ("claude-3-5-sonnet", "Sonnet 3.5 (GitHub Models — free)"),
     ];
 
-    public static IReadOnlyList<(string Id, string Label)> GetSelectionModels(AiProvider provider)
-        => provider == AiProvider.GitHubModels ? GitHubSelectionModels : SelectionModels;
+    public static IReadOnlyList<(string Id, string Label)> GetSelectionModels(AiProvider provider) =>
+        provider switch
+        {
+            AiProvider.Google => GeminiModels.SelectionModels,
+            AiProvider.GitHubModels => GitHubSelectionModels,
+            _ => SelectionModels,
+        };
 }

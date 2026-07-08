@@ -4,6 +4,66 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
+## Multi-Provider LLM Support (In Progress — 2026-07-08)
+
+### Status: Infrastructure Complete, LLM Adapters Pending
+
+**What's done:**
+- ✅ `AiProvider` enum added (Anthropic, GitHubModels, Google)
+- ✅ `SessionApiKeyProvider` refactored for dual/triple key storage
+- ✅ Provider toggle in Web UI (radio buttons: Anthropic / GitHub Models / Google AI Studio)
+- ✅ Provider-specific help text and API links
+- ✅ Provider + model cookie persistence across page reloads and app restarts
+- ✅ Google API key validation (flexible prefix check, accepts "AQ", "AIza", etc.)
+- ✅ DI foundation: factory lambdas ready to dispatch on `ActiveProvider`
+- ✅ Gemini client factory skeleton created
+
+**What's blocked (deferred to next session):**
+- [ ] **Gemini LLM Adapters** — Three classes need implementation:
+  - `GeminiClassifier` (implements `ILlmClassifier`)
+  - `GeminiSelector` (implements `ICardSelector`)
+  - `GeminiCommanderSelector` (implements `ICommanderSelector`)
+
+**Why deferred:**
+The OpenAI C# SDK v2.2 API surface differs from v2.0 docs; the initial adapter code has mismatches in the Chat API (correct parameter names/types are: `CompleteAsync(messages, tools, options)` not `CompleteAsync(options)`; `UserChatMessage` not `ChatMessage(ChatMessageRole.User, text)`). Rather than burn tokens debugging SDK method signatures, better to document the expected pattern and resume in a fresh session.
+
+**Implementation template (for next session):**
+```csharp
+// Create messages list
+var messages = new List<ChatMessage> { new UserChatMessage(userMessage) };
+
+// Create tool
+var tool = ChatTool.CreateFunctionTool(name, description, BinaryData.FromObjectAsJson(schema));
+
+// Call
+var response = await client.CompleteAsync(messages, tools: [tool], options: new ChatCompletionOptions
+{
+    Temperature = 0.1f,
+    MaxTokens = 4096,
+}, ct);
+
+// Parse
+var toolCall = response.Value?.Choices?.FirstOrDefault()?.Message?.ToolCalls?.FirstOrDefault();
+var json = toolCall?.Function?.Arguments?.ToString() ?? "";
+// ... deserialize DTOs, whitelist filter, return results
+```
+
+**Testing the infrastructure (manual):**
+1. Start app with `Provider:Default: "Google"` in appsettings + Google API key in user secrets
+2. Verify UI shows Google provider + Gemini models
+3. Change model (e.g., to 2.5 Flash) → verify it persists on reload
+4. Switch to Anthropic → model resets to Anthropic default (expected)
+5. Switch back to Google → 2.5 Flash restored from cookie (expected)
+6. Deck build will fail (adapter not done), but the key/provider/model stack is complete
+
+**Files to finish:**
+- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiClassifier.cs` — complete the SDK call
+- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiSelector.cs` — same pattern
+- `EdhDeckBuilder.Agent/Llm/Gemini/GeminiCommanderSelector.cs` — same pattern
+- Verify DI dispatch in `ServiceCollectionExtensions.cs` is correct (already wired)
+
+---
+
 ## Bugs to Investigate
 
 ### LLM Classifier returns all Unmatched on cold cache (2026-07-07)

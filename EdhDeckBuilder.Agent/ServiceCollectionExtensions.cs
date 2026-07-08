@@ -3,6 +3,7 @@ using EdhDeckBuilder.Agent.Discovery;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm;
+using EdhDeckBuilder.Agent.Llm.Gemini;
 using EdhDeckBuilder.Agent.Pipeline;
 using EdhDeckBuilder.Agent.Prompts;
 using Microsoft.Extensions.Configuration;
@@ -47,17 +48,40 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClaudeApiKeyProvider>(sp => sp.GetRequiredService<SessionApiKeyProvider>());
 
         services.AddScoped<IClaudeClientFactory, ClaudeClientFactory>();
+        services.AddScoped<IGeminiClientFactory, GeminiClientFactory>();
         services.AddScoped<IClaudeKeyTester, ClaudeKeyTester>();
 
         // ClassificationCache is global (cross-build, cross-circuit); LLM callers are scoped
         // because they depend on the per-circuit client factory.
         services.AddSingleton<ClassificationCache>();
-        services.AddScoped<ILlmClassifier, LlmClassifier>();
-        services.AddScoped<ICardSelector, LlmSelector>();
+
+        // Register both Anthropic and Gemini implementations
+        services.AddScoped<LlmClassifier>();
+        services.AddScoped<GeminiClassifier>();
+        services.AddScoped<LlmSelector>();
+        services.AddScoped<GeminiSelector>();
+        services.AddScoped<LlmCommanderSelector>();
+        services.AddScoped<GeminiCommanderSelector>();
+
+        // Provider-aware dispatch via factory lambdas
+        services.AddScoped<ILlmClassifier>(sp =>
+            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
+                ? (ILlmClassifier)sp.GetRequiredService<GeminiClassifier>()
+                : sp.GetRequiredService<LlmClassifier>());
+
+        services.AddScoped<ICardSelector>(sp =>
+            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
+                ? (ICardSelector)sp.GetRequiredService<GeminiSelector>()
+                : sp.GetRequiredService<LlmSelector>());
+
+        services.AddScoped<ICommanderSelector>(sp =>
+            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
+                ? (ICommanderSelector)sp.GetRequiredService<GeminiCommanderSelector>()
+                : sp.GetRequiredService<LlmCommanderSelector>());
+
         services.AddScoped<IDeckBuilder, DeckBuilder>();
 
         // Commander discovery
-        services.AddScoped<ICommanderSelector, LlmCommanderSelector>();
         services.AddScoped<ICommanderDiscovery, CommanderDiscovery>();
 
         return services;

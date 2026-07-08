@@ -10,6 +10,8 @@ public partial class ApiKeySettings : ComponentBase
 {
     private const string CookieNameAnthropic = "edh_apikey";
     private const string CookieNameGitHub    = "edh_apikey_gh";
+    private const string CookieNameGoogle    = "edh_apikey_google";
+    private const string CookieNameModel     = "edh_selectedmodel";
     private const int    CookieDays          = 30;
 
     [Inject] private SessionApiKeyProvider   Keys       { get; set; } = default!;
@@ -52,12 +54,15 @@ public partial class ApiKeySettings : ComponentBase
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _connected)
+        if (!firstRender)
             return;
 
         // Try to restore keys from encrypted cookies (JS interop only works after render).
+        // Cookies override config defaults — if a cookie exists, use it; otherwise fall back to config.
         try
         {
+            var keysLoaded = false;
+
             // Try Anthropic cookie
             var anthropicCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameAnthropic);
             if (!string.IsNullOrEmpty(anthropicCookie))
@@ -67,31 +72,76 @@ public partial class ApiKeySettings : ComponentBase
                     var key = Protector.Unprotect(anthropicCookie);
                     Keys.ActiveProvider = AiProvider.Anthropic;
                     Keys.Set(key);
+                    _selectedProvider = AiProvider.Anthropic;
+                    _connected = true;
+                    keysLoaded = true;
                 }
                 catch { }
             }
 
-            // Try GitHub Models cookie
-            var gitHubCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameGitHub);
-            if (!string.IsNullOrEmpty(gitHubCookie))
+            // Try GitHub Models cookie (only if no Anthropic key found)
+            if (!keysLoaded)
             {
-                try
+                var gitHubCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameGitHub);
+                if (!string.IsNullOrEmpty(gitHubCookie))
                 {
-                    var key = Protector.Unprotect(gitHubCookie);
-                    Keys.ActiveProvider = AiProvider.GitHubModels;
-                    Keys.Set(key);
+                    try
+                    {
+                        var key = Protector.Unprotect(gitHubCookie);
+                        Keys.ActiveProvider = AiProvider.GitHubModels;
+                        Keys.Set(key);
+                        _selectedProvider = AiProvider.GitHubModels;
+                        _connected = true;
+                        keysLoaded = true;
+                    }
+                    catch { }
                 }
-                catch { }
             }
 
-            if (Keys.GetApiKey() is not null)
+            // Try Google cookie (only if no other key found)
+            if (!keysLoaded)
             {
-                _connected     = true;
+                var googleCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameGoogle);
+                if (!string.IsNullOrEmpty(googleCookie))
+                {
+                    try
+                    {
+                        var key = Protector.Unprotect(googleCookie);
+                        Keys.ActiveProvider = AiProvider.Google;
+                        Keys.Set(key);
+                        _selectedProvider = AiProvider.Google;
+                        _connected = true;
+                        keysLoaded = true;
+                    }
+                    catch { }
+                }
+            }
+
+            // If cookies were loaded, update UI and notify
+            if (keysLoaded)
+            {
                 _selectedModel = Keys.SelectedModel;
-                _selectedProvider = Keys.ActiveProvider;
                 await InvokeAsync(StateHasChanged);
                 ApiKeyState.NotifyChanged();
             }
+
+            // Try to restore saved model preference
+            try
+            {
+                var modelCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameModel);
+                if (!string.IsNullOrEmpty(modelCookie))
+                {
+                    // Model preference is not encrypted (just a model ID)
+                    var validModels = ClaudeModels.GetSelectionModels(_selectedProvider);
+                    if (validModels.Any(m => m.Id == modelCookie))
+                    {
+                        _selectedModel = modelCookie;
+                        Keys.SelectedModel = _selectedModel;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+            }
+            catch { }
         }
         catch
         {
@@ -139,7 +189,12 @@ public partial class ApiKeySettings : ComponentBase
         Keys.Clear();
         _connected = false;
         _message   = null;
-        var cookieName = _selectedProvider == AiProvider.GitHubModels ? CookieNameGitHub : CookieNameAnthropic;
+        var cookieName = _selectedProvider switch
+        {
+            AiProvider.Google => CookieNameGoogle,
+            AiProvider.GitHubModels => CookieNameGitHub,
+            _ => CookieNameAnthropic,
+        };
         await JS.InvokeVoidAsync("deleteCookie", cookieName);
         ApiKeyState.NotifyChanged();
     }
@@ -157,7 +212,7 @@ public partial class ApiKeySettings : ComponentBase
         }
     }
 
-    private void OnModelChanged(ChangeEventArgs e)
+    private async Task OnModelChanged(ChangeEventArgs e)
     {
         var model = e.Value?.ToString() ?? ClaudeModels.Haiku;
         var validModels = ClaudeModels.GetSelectionModels(_selectedProvider);
@@ -165,13 +220,28 @@ public partial class ApiKeySettings : ComponentBase
         {
             Keys.SelectedModel = model;
             _selectedModel     = model;
+            // Persist model choice to cookie (unencrypted, just the model ID)
+            await JS.InvokeVoidAsync("setCookie", CookieNameModel, model, CookieDays);
         }
     }
 
     private async Task WriteCookieAsync(string apiKey, AiProvider provider)
     {
         var encrypted = Protector.Protect(apiKey);
-        var cookieName = provider == AiProvider.GitHubModels ? CookieNameGitHub : CookieNameAnthropic;
+        var cookieName = provider switch
+        {
+            AiProvider.Google => CookieNameGoogle,
+            AiProvider.GitHubModels => CookieNameGitHub,
+            _ => CookieNameAnthropic,
+        };
         await JS.InvokeVoidAsync("setCookie", cookieName, encrypted, CookieDays);
     }
+
+    private string GetPlaceholder() =>
+        _selectedProvider switch
+        {
+            AiProvider.Google => "Paste your Google API key",
+            AiProvider.GitHubModels => "ghp_…",
+            _ => "sk-ant-…",
+        };
 }

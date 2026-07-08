@@ -7,7 +7,7 @@
         <select class="form-select form-select-sm"
                 style="width: auto; min-width: 200px;"
                 value="@_selectedModel"
-                @onchange="OnModelChanged">
+                @onchange="OnModelChanged" @key="_selectedModel">
             @foreach (var (id, label) in ClaudeModels.GetSelectionModels(_selectedProvider))
             {
                 <option value="@id" selected="@(_selectedModel == id)">@label</option>
@@ -42,7 +42,12 @@
                         <input type="radio" class="btn-check" id="provider-github"
                                checked="@(_selectedProvider == AiProvider.GitHubModels)"
                                @onchange="OnProviderChanged" value="@AiProvider.GitHubModels" />
-                        <label class="btn btn-outline-secondary" for="provider-github">GitHub Models (Free)</label>
+                        <label class="btn btn-outline-secondary" for="provider-github">GitHub Models</label>
+
+                        <input type="radio" class="btn-check" id="provider-google"
+                               checked="@(_selectedProvider == AiProvider.Google)"
+                               @onchange="OnProviderChanged" value="@AiProvider.Google" />
+                        <label class="btn btn-outline-secondary" for="provider-google">Google AI Studio</label>
                     </div>
                 </div>
 
@@ -53,19 +58,26 @@
                         Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
                     </p>
                 }
+                else if (_selectedProvider == AiProvider.GitHubModels)
+                {
+                    <p class="small text-muted mb-3">
+                        Free access to Claude via GitHub Models (requires Copilot subscription).
+                        Get a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>
+                        (no scopes needed, minimum permissions).
+                    </p>
+                }
                 else
                 {
                     <p class="small text-muted mb-3">
-                        Free access to Claude via GitHub Models.
-                        Get a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>
-                        (no scopes needed, minimum permissions).
+                        Free access to Gemini (completely free, no subscription needed).
+                        Get an API key at <a href="https://ai.google.dev" target="_blank" rel="noopener">ai.google.dev</a>.
                     </p>
                 }
 
                 <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
                     <input type="password" class="form-control form-control-sm"
                            style="min-width: 200px; flex: 1;"
-                           placeholder="@(_selectedProvider == AiProvider.Anthropic ? "sk-ant-…" : "ghp_…")"
+                           placeholder="@GetPlaceholder()"
                            autocomplete="off"
                            @bind="_keyInput" @bind:event="oninput" />
                     <button class="btn btn-primary btn-sm"

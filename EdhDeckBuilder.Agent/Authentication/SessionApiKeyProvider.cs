@@ -16,6 +16,7 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 {
     private string? _anthropicKey;
     private string? _gitHubKey;
+    private string? _googleKey;
     private AiProvider _activeProvider;
 
     public SessionApiKeyProvider(IConfiguration config)
@@ -28,11 +29,18 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
         if (!string.IsNullOrWhiteSpace(gitHubKey))
             _gitHubKey = gitHubKey.Trim();
 
-        // Read initial provider preference from config, default to GitHubModels
+        var googleKey = config["Google:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(googleKey))
+            _googleKey = googleKey.Trim();
+
+        // Read initial provider preference from config, default to Anthropic
         var providerSetting = config["Provider:Default"];
-        _activeProvider = providerSetting?.Equals("Anthropic", StringComparison.OrdinalIgnoreCase) == true
-            ? AiProvider.Anthropic
-            : AiProvider.GitHubModels;
+        _activeProvider = providerSetting switch
+        {
+            string s when s.Equals("Google", StringComparison.OrdinalIgnoreCase) => AiProvider.Google,
+            string s when s.Equals("GitHubModels", StringComparison.OrdinalIgnoreCase) => AiProvider.GitHubModels,
+            _ => AiProvider.Anthropic,
+        };
     }
 
     public AiProvider ActiveProvider
@@ -42,7 +50,12 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
     }
 
     public string? GetApiKey() =>
-        ActiveProvider == AiProvider.GitHubModels ? _gitHubKey : _anthropicKey;
+        ActiveProvider switch
+        {
+            AiProvider.Google => _googleKey,
+            AiProvider.GitHubModels => _gitHubKey,
+            _ => _anthropicKey,
+        };
 
     public string SelectedModel { get; set; } = ClaudeModels.Haiku;
 
@@ -54,7 +67,16 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 
         var trimmed = apiKey.Trim();
 
-        if (ActiveProvider == AiProvider.GitHubModels)
+        if (ActiveProvider == AiProvider.Google)
+        {
+            // Google API keys can start with AIza, AQ, or other prefixes
+            if (trimmed.Length < 20)
+                throw new ArgumentException(
+                    "That doesn't look like a valid Google API key (too short).",
+                    nameof(apiKey));
+            _googleKey = trimmed;
+        }
+        else if (ActiveProvider == AiProvider.GitHubModels)
         {
             if (!trimmed.StartsWith("ghp_", StringComparison.Ordinal) &&
                 !trimmed.StartsWith("github_pat_", StringComparison.Ordinal))
@@ -75,7 +97,9 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 
     public void Clear()
     {
-        if (ActiveProvider == AiProvider.GitHubModels)
+        if (ActiveProvider == AiProvider.Google)
+            _googleKey = null;
+        else if (ActiveProvider == AiProvider.GitHubModels)
             _gitHubKey = null;
         else
             _anthropicKey = null;

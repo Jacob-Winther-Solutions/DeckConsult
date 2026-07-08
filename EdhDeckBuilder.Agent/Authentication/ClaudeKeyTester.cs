@@ -15,10 +15,16 @@ public sealed class ClaudeKeyTester : IClaudeKeyTester
     {
         try
         {
-            // For now, only validate Anthropic keys. GitHub Models validation deferred.
-            if (provider == AiProvider.GitHubModels)
+            if (provider == AiProvider.Google)
             {
-                // Placeholder: accept any ghp_ or github_pat_ token as valid
+                // Placeholder: accept any reasonably-long token as valid (format check only)
+                if (apiKey.Trim().Length >= 20)
+                    return new KeyTestResult(true, null);
+                return new KeyTestResult(false, "Invalid Google API key format (too short)");
+            }
+            else if (provider == AiProvider.GitHubModels)
+            {
+                // Placeholder: accept any ghp_ or github_pat_ token as valid (format check only)
                 if (apiKey.Trim().StartsWith("ghp_") || apiKey.Trim().StartsWith("github_pat_"))
                     return new KeyTestResult(true, null);
                 return new KeyTestResult(false, "Invalid GitHub token format");
