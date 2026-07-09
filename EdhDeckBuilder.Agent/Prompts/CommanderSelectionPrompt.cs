@@ -9,7 +9,7 @@ namespace EdhDeckBuilder.Agent.Prompts;
 
 /// <summary>
 /// Versioned prompts and tool definition for the commander discovery step.
-/// Used by LlmCommanderSelector (user's chosen model, temperature 0.6, forced tool call).
+/// Used by ClaudeCommanderSelector (user's chosen model, temperature 0.6, forced tool call).
 /// </summary>
 public static class CommanderSelectionPrompt
 {

@@ -11,8 +11,7 @@ namespace EdhDeckBuilder.Agent.Interfaces;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The LLM implementation lives in <c>EdhDeckBuilder.Agent.Llm.LlmSelector</c>;
-/// a mock returning a stable sort (e.g. by EDHREC inclusion rate) is used in tests.
+/// A mock returning a stable sort (e.g. by EDHREC inclusion rate) is used in tests.
 /// </para>
 /// <para>
 /// Every <see cref="SelectionResult.OracleId"/> in the returned list must echo an id

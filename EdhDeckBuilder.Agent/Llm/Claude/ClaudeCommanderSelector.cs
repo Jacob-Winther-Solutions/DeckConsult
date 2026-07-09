@@ -8,14 +8,14 @@ using EdhDeckBuilder.Agent.Prompts;
 using EdhDeckBuilder.Core.Cards;
 using System.Text.Json;
 
-namespace EdhDeckBuilder.Agent.Llm;
+namespace EdhDeckBuilder.Agent.Llm.Claude;
 
 /// <summary>
 /// Ranks candidate commanders using the user's selected Claude model
 /// (moderate temperature for creative judgment). Uses a forced tool call so output is
 /// always structured JSON. Supports usage tracking for token accounting.
 /// </summary>
-public sealed class LlmCommanderSelector(IClaudeClientFactory factory) : ICommanderSelector, IUsageTrackerAware
+public sealed class ClaudeCommanderSelector(IClaudeClientFactory factory) : ICommanderSelector, IUsageTrackerAware
 {
     private const int MaxTokens = 2048;
     private UsageTracker? _usageTracker;

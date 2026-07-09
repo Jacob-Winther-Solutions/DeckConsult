@@ -1,4 +1,6 @@
-namespace EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Authentication.Gemini;
+
+namespace EdhDeckBuilder.Agent.Authentication.Claude;
 
 public static class ClaudeModels
 {

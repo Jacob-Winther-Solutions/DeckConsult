@@ -1,6 +1,7 @@
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Authentication.Claude;
 using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
@@ -9,7 +10,7 @@ using EdhDeckBuilder.Core.Cards;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace EdhDeckBuilder.Agent.Llm;
+namespace EdhDeckBuilder.Agent.Llm.Claude;
 
 /// <summary>
 /// Classifies a batch of card candidates using Claude Haiku (low temperature for determinism).
@@ -17,10 +18,10 @@ namespace EdhDeckBuilder.Agent.Llm;
 /// Results for non-commander-dependent roles (anything except Plan and Synergy) are cached in
 /// <see cref="ClassificationCache"/> across multiple builds in the same session.
 /// </summary>
-public sealed class LlmClassifier(
+public sealed class ClaudeClassifier(
     IClaudeClientFactory factory,
     ClassificationCache cache,
-    ILogger<LlmClassifier> logger) : ILlmClassifier, IUsageTrackerAware
+    ILogger<ClaudeClassifier> logger) : ILlmClassifier, IUsageTrackerAware
 {
     private const int MaxTokens = 4096;
     private const int BatchSize = 30;

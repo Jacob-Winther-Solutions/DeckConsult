@@ -1,6 +1,6 @@
 using EdhDeckBuilder.Agent.Llm.Gemini;
 
-namespace EdhDeckBuilder.Agent.Authentication;
+namespace EdhDeckBuilder.Agent.Interfaces;
 
 public interface IGeminiClientFactory
 {

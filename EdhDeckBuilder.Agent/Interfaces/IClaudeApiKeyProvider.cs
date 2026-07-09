@@ -1,4 +1,6 @@
-namespace EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Authentication;
+
+namespace EdhDeckBuilder.Agent.Interfaces;
 
 public interface IClaudeApiKeyProvider
 {

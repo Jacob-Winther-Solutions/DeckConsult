@@ -1,7 +1,8 @@
+using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm.Gemini;
 using Microsoft.Extensions.Logging;
 
-namespace EdhDeckBuilder.Agent.Authentication;
+namespace EdhDeckBuilder.Agent.Authentication.Gemini;
 
 /// <summary>
 /// Constructs a <see cref="GeminiRestClient"/> bound to the current circuit's API key and

@@ -1,4 +1,6 @@
 using EdhDeckBuilder.Agent.Authentication;
+using EdhDeckBuilder.Agent.Authentication.Claude;
+using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.DataProtection;
@@ -15,7 +17,7 @@ public partial class ApiKeySettings : ComponentBase
     private const int    CookieDays          = 30;
 
     [Inject] private SessionApiKeyProvider   Keys       { get; set; } = default!;
-    [Inject] private IClaudeKeyTester        Tester     { get; set; } = default!;
+    [Inject] private IKeyTester               Tester     { get; set; } = default!;
     [Inject] private IDataProtectionProvider DpProvider { get; set; } = default!;
     [Inject] private IJSRuntime              JS         { get; set; } = default!;
     [Inject] private IApiKeyStateService     ApiKeyState { get; set; } = default!;

@@ -5,8 +5,7 @@ namespace EdhDeckBuilder.Agent.Interfaces;
 
 /// <summary>
 /// Classifies candidate cards into functional roles, given the commander context.
-/// The LLM implementation lives in <c>EdhDeckBuilder.Agent.Llm.LlmClassifier</c>;
-/// a mock implementation is used in fill-engine tests to keep them fast and API-free.
+/// A mock implementation is used in fill-engine tests to keep them fast and API-free.
 /// </summary>
 /// <remarks>
 /// <para>

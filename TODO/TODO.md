@@ -20,37 +20,30 @@ Anthropic and Gemini adapters use.
 
 ## LLM Provider Layer Refactor — streamline the adapter shape
 
-Both provider adapters (Anthropic + Gemini) follow the same conceptual shape today: factory
+Both provider adapters (Claude + Gemini) follow the same conceptual shape today: factory
 hands out a client → format user message → call provider with structured-output schema →
 record usage → whitelist-parse response into DTOs. But the shape is enforced by convention
-only, not by code, and the Anthropic implementations still carry generic `Llm*` names that
-don't identify them as provider-specific. Adding a third provider (GitHub Models, or any future
-one) requires re-implementing all of it by copy-paste-modify, with no compile-time guarantee
-that new adapters conform to the same skeleton.
+only, not by code. Adding a third provider (GitHub Models, or any future one) requires
+re-implementing all of it by copy-paste-modify, with no compile-time guarantee that new
+adapters conform to the same skeleton.
 
 Goal: make adding a provider mostly about implementing a small provider-specific transport,
 not re-implementing batching / whitelist / cache / usage-recording per adapter.
 
-**Rename + relocate Anthropic files** (mechanical, low-risk — do this even if the streamlining
-below is deferred):
+**Rename + relocate — DONE (2026-07-09):**
 
-- [ ] `Llm/LlmClassifier.cs` → `Llm/Anthropic/AnthropicClassifier.cs`
-- [ ] `Llm/LlmSelector.cs` → `Llm/Anthropic/AnthropicSelector.cs`
-- [ ] `Llm/LlmCommanderSelector.cs` → `Llm/Anthropic/AnthropicCommanderSelector.cs`
-- [ ] Keep `Llm/LlmDtos.cs` and `Llm/ClassificationCache.cs` in `Llm/` root — they're shared
-      across providers. Consider a `Llm/Shared/` subfolder if the root gets cluttered.
-- [ ] Update DI wiring in `ServiceCollectionExtensions.cs`
-- [ ] Update `CLAUDE.md`, `README.md`, and memory references to the new names
-- [ ] Verify all 328 tests still pass
-
-**Also consider renaming the Authentication-layer `Claude*` files for symmetry with `Gemini*`**
-(open question — see decisions below):
-
-- `Authentication/ClaudeClientFactory.cs` → `AnthropicClientFactory.cs` (+ interface)
-- `Authentication/ClaudeModels.cs` → `AnthropicModels.cs` (or keep `Claude` since the enum
-  values are Haiku/Sonnet/Opus — model names, not company names)
-- `Authentication/ClaudeKeyTester.cs` currently handles all three providers — either rename to
-  `LlmKeyTester` (drop the Claude tag entirely) or split into provider-specific testers
+- [x] `Llm/LlmClassifier.cs` → `Llm/Claude/ClaudeClassifier.cs`
+- [x] `Llm/LlmSelector.cs` → `Llm/Claude/ClaudeSelector.cs`
+- [x] `Llm/LlmCommanderSelector.cs` → `Llm/Claude/ClaudeCommanderSelector.cs`
+- [x] `Llm/LlmDtos.cs` and `Llm/ClassificationCache.cs` stay in `Llm/` root (shared)
+- [x] `Authentication/ClaudeClientFactory.cs` → `Authentication/Claude/ClaudeClientFactory.cs`
+- [x] `Authentication/ClaudeModels.cs` → `Authentication/Claude/ClaudeModels.cs`
+- [x] `Authentication/GeminiClientFactory.cs` → `Authentication/Gemini/GeminiClientFactory.cs`
+- [x] `Authentication/GeminiModels.cs` → `Authentication/Gemini/GeminiModels.cs`
+- [x] `Authentication/ClaudeKeyTester.cs` → `Authentication/KeyTester.cs` (renamed to `KeyTester` / `IKeyTester` — generic across providers)
+- [x] All interface files (`IClaudeClientFactory`, `IClaudeApiKeyProvider`, `IGeminiClientFactory`, `IKeyTester`, `IUsageTrackerAware`) consolidated into `Interfaces/`
+- [x] DI wiring in `ServiceCollectionExtensions.cs` updated
+- [x] All 328 tests pass
 
 **Streamline the adapter shape (design decision needed before implementing):**
 

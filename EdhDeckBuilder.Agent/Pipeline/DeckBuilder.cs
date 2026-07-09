@@ -2,7 +2,6 @@ using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Agent.Fill;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
-using EdhDeckBuilder.Agent.Llm;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;

@@ -1,4 +1,3 @@
-using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
@@ -12,7 +11,7 @@ namespace EdhDeckBuilder.Agent.Llm.Gemini;
 
 /// <summary>
 /// Google Gemini implementation of <see cref="ICardSelector"/>. Shape mirrors
-/// <see cref="LlmSelector"/>: one call per role, no cache, whitelist by input OracleId.
+/// the Claude adapter: one call per role, no cache, whitelist by input OracleId.
 /// </summary>
 public sealed class GeminiSelector(
     IGeminiClientFactory factory,

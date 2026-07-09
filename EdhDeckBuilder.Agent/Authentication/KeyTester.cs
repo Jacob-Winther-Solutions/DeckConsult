@@ -1,15 +1,17 @@
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Authentication.Claude;
+using EdhDeckBuilder.Agent.Interfaces;
 
 namespace EdhDeckBuilder.Agent.Authentication;
 
 /// <summary>
 /// Fires a minimal 1-token call to validate a key before accepting it.
-/// Currently only supports Anthropic keys. GitHub Models support deferred pending SDK stabilization.
-/// Keeps the SDK constructor seam in one place alongside <see cref="ClaudeClientFactory"/>.
+/// GitHub Models support deferred pending SDK stabilization.
+/// Keeps the SDK constructor seam in one place alongside <see cref="Claude.ClaudeClientFactory"/>.
 /// </summary>
-public sealed class ClaudeKeyTester : IClaudeKeyTester
+public sealed class KeyTester : IKeyTester
 {
     public async Task<KeyTestResult> TestAsync(string apiKey, AiProvider provider, CancellationToken ct = default)
     {

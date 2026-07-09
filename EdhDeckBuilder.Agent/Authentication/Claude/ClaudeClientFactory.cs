@@ -1,7 +1,8 @@
 using Anthropic;
 using Anthropic.Core;
+using EdhDeckBuilder.Agent.Interfaces;
 
-namespace EdhDeckBuilder.Agent.Authentication;
+namespace EdhDeckBuilder.Agent.Authentication.Claude;
 
 public sealed class ClaudeClientFactory(IClaudeApiKeyProvider keys) : IClaudeClientFactory
 {

@@ -1,4 +1,6 @@
-namespace EdhDeckBuilder.Agent.Instrumentation;
+using EdhDeckBuilder.Agent.Instrumentation;
+
+namespace EdhDeckBuilder.Agent.Interfaces;
 
 /// <summary>
 /// Marker interface for LLM adapters that report token usage. Implementations expose a

@@ -1,3 +1,5 @@
+using EdhDeckBuilder.Agent.Authentication.Claude;
+using EdhDeckBuilder.Agent.Interfaces;
 using Microsoft.Extensions.Configuration;
 
 namespace EdhDeckBuilder.Agent.Authentication;

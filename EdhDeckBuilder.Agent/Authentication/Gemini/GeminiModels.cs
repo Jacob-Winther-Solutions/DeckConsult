@@ -1,4 +1,4 @@
-namespace EdhDeckBuilder.Agent.Authentication;
+namespace EdhDeckBuilder.Agent.Authentication.Gemini;
 
 /// <summary>
 /// Gemini model IDs offered in the UI. Ordering matters — the first entry is the default

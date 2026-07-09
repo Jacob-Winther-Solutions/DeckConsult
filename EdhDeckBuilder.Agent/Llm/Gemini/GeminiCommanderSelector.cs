@@ -1,4 +1,3 @@
-using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
@@ -11,7 +10,7 @@ namespace EdhDeckBuilder.Agent.Llm.Gemini;
 
 /// <summary>
 /// Google Gemini implementation of <see cref="ICommanderSelector"/>. Mirrors
-/// <see cref="LlmCommanderSelector"/>: one call, whitelist by input OracleId.
+/// the Claude adapter: one call, whitelist by input OracleId.
 /// </summary>
 public sealed class GeminiCommanderSelector(
     IGeminiClientFactory factory,

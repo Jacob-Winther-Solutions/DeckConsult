@@ -1,4 +1,3 @@
-using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Classification;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
@@ -11,7 +10,7 @@ namespace EdhDeckBuilder.Agent.Llm.Gemini;
 
 /// <summary>
 /// Google Gemini implementation of <see cref="ILlmClassifier"/>. Mirrors
-/// <see cref="LlmClassifier"/>: shared batching, caching, whitelist, and sanitization —
+/// the Claude adapter: shared batching, caching, whitelist, and sanitization —
 /// only the transport (REST via <see cref="GeminiRestClient"/>) and response shape differ.
 /// </summary>
 public sealed class GeminiClassifier(

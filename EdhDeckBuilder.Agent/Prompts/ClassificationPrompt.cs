@@ -8,7 +8,7 @@ namespace EdhDeckBuilder.Agent.Prompts;
 
 /// <summary>
 /// Versioned prompts and tool definition for the card classification step.
-/// Used by LlmClassifier (Haiku, temperature 0.1, forced tool call).
+/// Used by ClaudeClassifier (Haiku, temperature 0.1, forced tool call).
 /// </summary>
 public static class ClassificationPrompt
 {

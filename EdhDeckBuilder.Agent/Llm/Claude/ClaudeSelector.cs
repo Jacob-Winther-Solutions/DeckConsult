@@ -9,14 +9,14 @@ using EdhDeckBuilder.Agent.Selection;
 using EdhDeckBuilder.Core.Cards;
 using System.Text.Json;
 
-namespace EdhDeckBuilder.Agent.Llm;
+namespace EdhDeckBuilder.Agent.Llm.Claude;
 
 /// <summary>
 /// Ranks candidate cards for a specific role using the user's selected Claude model
 /// (moderate temperature for creative judgment). Uses a forced tool call so output is
 /// always structured JSON. Selection is always context-dependent, so results are never cached.
 /// </summary>
-public sealed class LlmSelector(IClaudeClientFactory factory) : ICardSelector, IUsageTrackerAware
+public sealed class ClaudeSelector(IClaudeClientFactory factory) : ICardSelector, IUsageTrackerAware
 {
     private const int MaxTokens = 2048;
     private UsageTracker? _usageTracker;

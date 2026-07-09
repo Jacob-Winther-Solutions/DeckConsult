@@ -10,7 +10,7 @@ namespace EdhDeckBuilder.Agent.Prompts;
 
 /// <summary>
 /// Versioned prompts and tool definition for the card selection step.
-/// Used by LlmSelector (Sonnet, temperature 0.6, forced tool call).
+/// Used by ClaudeSelector (Sonnet, temperature 0.6, forced tool call).
 /// </summary>
 public static class SelectionPrompt
 {

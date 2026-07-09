@@ -1,6 +1,6 @@
 using Anthropic;
 
-namespace EdhDeckBuilder.Agent.Authentication;
+namespace EdhDeckBuilder.Agent.Interfaces;
 
 /// <summary>
 /// The sole seam touching the Anthropic SDK constructor. Builds a client bound to the
@@ -8,7 +8,7 @@ namespace EdhDeckBuilder.Agent.Authentication;
 /// </summary>
 public interface IClaudeClientFactory
 {
-    /// <summary>Creates a client for the current user's key. Throws <see cref="MissingApiKeyException"/> if no key is set.</summary>
+    /// <summary>Creates a client for the current user's key. Throws <see cref="Authentication.MissingApiKeyException"/> if no key is set.</summary>
     AnthropicClient CreateForCurrentUser();
 
     /// <summary>The Claude model to use for card selection (user-configurable via settings).</summary>
