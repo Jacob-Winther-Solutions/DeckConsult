@@ -74,6 +74,7 @@ public static class ClassificationResponseLogger
                     UserMessageLength = userMessageLength,
                     InputTokens       = response.Usage.InputTokens,
                     OutputTokens      = response.Usage.OutputTokens,
+                    StopReason        = response.StopReason,
                     Tool              = toolUse?.ToolName,
                     ToolInputLength   = toolInputJson.Length,
                     ToolInputSample   = toolInputJson[..Math.Min(500, toolInputJson.Length)],

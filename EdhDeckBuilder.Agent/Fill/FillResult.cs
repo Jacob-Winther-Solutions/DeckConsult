@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Models;
+using EdhDeckBuilder.Core.Cards;
 
 namespace EdhDeckBuilder.Agent.Fill;
 
@@ -11,4 +12,5 @@ namespace EdhDeckBuilder.Agent.Fill;
 public sealed record FillResult(
     BuildState State,
     IReadOnlyList<string> Warnings,
-    IReadOnlyDictionary<Guid, string> SelectionRationales);
+    IReadOnlyDictionary<Guid, string> SelectionRationales,
+    IReadOnlyDictionary<CardRole, (int Input, int Ranked)> SelectorStats);

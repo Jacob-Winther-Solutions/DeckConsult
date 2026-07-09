@@ -144,12 +144,15 @@ internal static class RepairEngine
 
         var allWarnings = new List<string>();
 
-        // Add incomplete deck warning first (highest priority)
+        // Add incomplete deck warning first (highest priority).
+        // Use basicLandCounts.Sum() (actual distributed basics) rather than state.BasicCount,
+        // because state.BasicCount is reduced by MDFC land credits and would undercount.
         int targetCardCount = 100 - context.Commanders.Count;
-        int actualCardCount = state.Committed.Count + state.BasicCount;
+        int actualBasics    = basicLandCounts.Values.Sum();
+        int actualCardCount = state.Committed.Count + actualBasics;
         if (actualCardCount < targetCardCount)
         {
-            allWarnings.Add($"⚠️ Deck is incomplete: {actualCardCount}/{targetCardCount} cards total ({state.Committed.Count} non-basic + {state.BasicCount} basics). " +
+            allWarnings.Add($"⚠️ Deck is incomplete: {actualCardCount}/{targetCardCount} cards total ({state.Committed.Count} non-basic + {actualBasics} basics). " +
                 $"Could not find enough cards to complete the deck with these constraints. " +
                 $"Consider adjusting archetypes, themes, or budget parameters.");
         }

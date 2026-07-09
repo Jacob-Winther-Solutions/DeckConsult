@@ -18,38 +18,72 @@ Anthropic and Gemini adapters use.
 
 ---
 
+## GitHub Models LLM Adapters
+
+UI, cookie, and key storage for GitHub Models are already in place (`SessionApiKeyProvider`,
+`ApiKeySettings`, `AiProvider.GitHubModels`). The LLM interfaces currently fall through to the
+Anthropic implementation when GitHub Models is selected. This section tracks wiring the actual
+adapters.
+
+GitHub Models exposes an OpenAI-compatible endpoint at
+`https://models.inference.ai.azure.com` authenticated with a GitHub PAT (`ghp_…`).
+The three adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) are already
+provider-agnostic — only the `ILlmClient` implementation and factory need to be added.
+
+**Implementation tasks:**
+
+- [ ] Implement `GitHubModelsHttpLlmClient` in `EdhDeckBuilder.Agent/Llm/GitHubModels/`:
+      POST to `https://models.inference.ai.azure.com/chat/completions` with
+      `Authorization: Bearer {ghpToken}`. Reuse the same request/response shape as
+      `ClaudeHttpLlmClient` where the OpenAI-compatible format overlaps; handle differences
+      (tool choice format, finish reason, token usage field names).
+- [ ] Implement `GitHubModelsLlmClientFactory` implementing `ILlmClientFactory`; constructed
+      from `IHttpClientFactory` and `SessionApiKeyProvider`. Register via
+      `AddHttpClient<GitHubModelsLlmClientFactory>`.
+- [ ] Wire into `ServiceCollectionExtensions.AddAgent`: add the `AiProvider.GitHubModels`
+      case to all three DI factory lambdas (`ILlmClassifier`, `ICardSelector`,
+      `ICommanderSelector`) so they resolve to GitHub-backed adapters when selected.
+- [ ] Implement `IUsageTrackerAware` on `GitHubModelsHttpLlmClient` so cost tracking
+      picks it up automatically (no `is GitHubModels` branch needed in `DeckBuilder`).
+- [ ] Add `ModelPricing` entries for all models listed in `ClaudeModels.GitHubSelectionModels`.
+      Unknown models silently report $0 — adding pricing in the same change avoids a
+      confusingly zero cost summary.
+- [ ] Update `KeyTester` GitHub branch (currently a format-only check) to do a real
+      1-token probe against the GitHub Models endpoint, consistent with the Anthropic probe.
+- [ ] Handle 401/403 from the GitHub endpoint: wrap as `ApiKeyRejectedException` (same as
+      Anthropic and Gemini paths) so the UI clears the key and shows a reconnect prompt.
+- [ ] Add tests: manual mock for `GitHubModelsHttpLlmClient` following the same pattern as
+      the existing Anthropic and Gemini mock fixtures in `Tests/`.
+
 ---
 
 ## Bugs to Investigate
 
-### LLM Classifier returns all Unmatched on cold cache (2026-07-07)
+### LLM Classifier returns all Unmatched on cold cache (2026-07-07) — RESOLVED
 
-**Observed:** On first build after clearing the classification cache, the LLM classifier returns
-**all 257 cards as Unmatched**, resulting in 0 cards being filled. On the second identical build,
-the cache is warm and the classifier returns proper role assignments (56 valid roles, 201 Unmatched).
+**Root cause (confirmed via log analysis 2026-07-09):** Output token truncation. When a forced
+tool call hits `max_tokens`, Anthropic returns `input: {}` (empty object) rather than partial
+JSON. `ParseResponse` correctly logs "Tool response missing 'classifications' key" and returns
+`[]`, but silently — no retry, and the caller defaults every pool card to `Unmatched`.
 
-**Evidence:** Test logs show:
-```
-Run 1 (empty cache):  Unmatched: 257, FillEngine: 0 cards committed, Final: 35 cards
-Run 2 (warm cache):   Unmatched: 201, FillEngine: 47 cards committed, Final: 82 cards
-```
+**Evidence from session logs:**
+- `classification_session_2026-07-07_08-59-33.json`: batch size 100, `max_tokens=4096`. Every
+  pool batch shows `OutputTokens=4096, ToolInputLength=2, ToolInputSample="{}"` — all truncated.
+- `classification_session_2026-07-09_06-51-13.json`: batch size 30, `max_tokens=4096`. Three
+  batches still hit exactly 4096 tokens and return `{}` (0 classifications).
+- Sessions from 2026-07-09 07:13 onward: batch size 30, `max_tokens=8192`. Zero failures.
+  Highest observed output: 4657 tokens (well under the new ceiling).
 
-**Root cause hypothesis:** The LLM (Haiku) is consistently failing to parse or return valid role
-strings on the first batch when there's no prior cache context. Possible causes:
-- Tool schema not being honored (all cards falling through to default `Unmatched`)
-- LLM defaulting to unparseable role names (misspellings, inconsistent casing despite `ignoreCase`)
-- Prompt context is missing on cold start (system prompt not cached yet)
-- Response format breaking on large batches (~65 cards per batch)
+**Fixes applied:**
+1. `ClassifierMaxOutputTokens` raised from 4096 → 8192 (sufficient margin for current usage).
+2. `LlmClassifier.CallLlmAsync` now checks `response.StopReason == "max_tokens"` and
+   recursively splits the batch in half before retrying, so any future truncation recovers
+   automatically without silently dropping cards.
+3. `ParseResponse` logs a `Warning` (not just `Information`) when `dtos.Count == 0`.
+4. `ClassificationResponseLogger` now records `StopReason` in the per-session JSON files.
 
-**Impact:** Users who clear cache or start fresh get a broken deck build. Workaround: rebuild immediately (uses cached responses).
-
-**Next steps:**
-1. Add debug logging to `LlmClassifier.ParseRole()` to log each role string before/after parsing
-2. Log the raw tool response JSON to see what role strings are actually coming back
-3. Check if prompt caching (once SDK exposes `SystemBlockParam` API) fixes this
-4. Consider warming the classifier cache during app startup with a small batch
-
-**Blocked on:** Investigation — need to reproduce and inspect raw LLM responses.
+**Residual risk:** None anticipated. Peak output with reasoning enabled is ~4657 tokens against
+an 8192 ceiling. The retry logic covers any future batch that exceeds the limit.
 
 ---
 
@@ -244,6 +278,108 @@ but only 5 uncommons allowed in the 99). Similar community-managed status to Pau
 ---
 
 ## Partially deferred features
+
+### Gemini context caching
+
+`GeminiHttpLlmClient` currently ignores `LlmRequest.EnableCaching`. Gemini caching is a separate
+API call (not inline like Anthropic's `cache_control` blocks) and requires billing enabled.
+
+**How it works:** POST `systemInstruction` + `responseSchema` to `/v1beta/cachedContents` →
+get a `name` token → include `"cachedContent": name` in subsequent `generateContent` calls.
+Cached reads cost ~25% of normal input; there is a storage charge (~$1/1M tokens/hour). TTL
+is set per cache (1 min–1 hour).
+
+**Implementation gaps before this can land:**
+
+- [ ] Add `CreateCachedContentAsync` / `DeleteCachedContentAsync` to `GeminiRestClient`.
+      The `cachedContent` name field must be added to the `GeminiRequest` record (replaces
+      `systemInstruction`; the two are mutually exclusive in the request body).
+- [ ] Introduce a build-session concept (extend `GeminiRateLimiter` or add a new
+      `GeminiBuildSession` scoped service) to hold the 2–3 cache names (classifier schema +
+      selector schema + commander schema) across the multiple `SendAsync` calls within one build.
+- [ ] `GeminiHttpLlmClient.SendAsync`: on first call with `EnableCaching = true`, create the
+      cached content and store the name; on subsequent calls, include it. Clean up (delete or
+      let expire) after the build via `IAsyncDisposable` on the session service.
+- [ ] Add `CachedContentTokenCount` to `LlmUsage` (Gemini name differs from Anthropic's
+      `cache_read_input_tokens`) and add cached-read pricing tier to `ModelPricing`.
+- [ ] Verify minimum cached-content size threshold is met (1 024–4 096 tokens depending on
+      model); add graceful no-op fallback if the create call is rejected.
+
+**Blocked on:** paid Gemini account — context caching is not available on the free tier
+(same `RESOURCE_EXHAUSTED / limit: 0` gate as the billing issue already documented).
+
+---
+
+### Build result default tab
+
+The Build Result page defaults to the "By Role" view. Consider making "By Type" the default
+since it maps more closely to how players think about a deck (creatures / spells / lands) and
+is a more natural starting point before drilling into roles.
+
+- [ ] Change `_view = DeckView.ByRole` to `_view = DeckView.ByType` in `DeckResults.razor.cs`.
+      One-liner; save for a UI polish pass.
+
+---
+
+### Must-include cards (locked 99 slots)
+
+Let the user nominate cards that must appear in the generated deck regardless of the LLM's
+selection or cut suggestions. For pet cards, cards already owned, or staples the user always runs.
+
+**Specific constraint from design:** the LLM may still rank these cards low or include them
+in cut suggestions — that is fine and expected. The pipeline must **override** those signals
+and lock the cards in anyway. Cut suggestions for locked cards should either be suppressed or
+clearly labeled so the user understands they are advisory-only.
+
+This overlaps with the "Locked / Included Cards" item in the Deck Analysis track below, but
+the deck-builder entry point is different (form input before the build, not post-analysis).
+
+- [ ] Add a must-include card list input to the Builder UI (Guided + Custom tabs). Reuse the
+      same plain-text card-name ingestion from the Analyzer if that feature lands first.
+- [ ] Validate color identity before build starts; surface illegal cards as warnings, not errors
+      (let the user decide whether to remove or override).
+- [ ] Commit locked cards into `BuildState` at the start of the fill pass, before the greedy
+      loop. Each locked card is classified normally (`ILlmClassifier`) and counts toward its
+      role's coverage, reducing the ideal target the fill engine needs to hit.
+- [ ] Adjust `spellBudget` and `ReservedLandCount` so locked cards don't shrink the remaining
+      fill slots — they consume their own slot type (spell or land).
+- [ ] In `RepairEngine.Assemble`, mark locked `DeckSlot` entries so the UI can render them
+      distinctly (e.g. a padlock badge). Suppress cut-suggestion entries for locked cards or
+      label them "advisory (locked)".
+- [ ] Confirm interaction: locked land → counts as a utility land for ColorFixingPass cap;
+      locked MDFC → land credit still applied normally.
+- [ ] Confirm cap on locked cards: warn if locked cards alone exceed 99, or error before build.
+
+**Open questions:**
+- Budget semantics: exclude locked cards from total-budget enforcement, or deduct them first?
+- Should locked cards bypass the EDHREC pool entirely (user-supplied), or must they appear
+  in the pool to receive EDHREC-derived inclusion scores for sorting?
+
+---
+
+### LLM step progress reporting
+
+The Builder pipeline emits stage-level progress strings (10 stages, displayed in `BuildProgress`).
+Within the two LLM-heavy stages (`ClassifyPool` and `FillEngine`), there is no sub-step signal —
+the UI shows a spinner with no indication of which batch or role is running.
+
+Similarly, the Commander Discovery page (tracked separately below) has no step display at all.
+
+**Builder — sub-step progress:**
+
+- [ ] Extend `IProgress<string>` calls in `DeckBuilder.BuildAsync` inside ClassifyPool to
+      report each classification batch: `"Classifying cards (batch {i}/{total})…"`.
+- [ ] After each selector call in `FillEngine`, emit a progress event. Currently `FillEngine`
+      has no `IProgress<T>` parameter — add one (nullable; callers that don't care pass null).
+      Report: `"Selecting {Role} cards…"` for each of the 9 roles.
+- [ ] Consider a structured progress type (`(string Stage, int? PercentComplete)`) to drive a
+      percentage bar in the UI, rather than raw strings. The 10 fixed stages plus ~13 sub-steps
+      (4 classifier batches + 9 selector calls on average) give a reasonably granular 0–100%.
+
+**Scope:** Medium — requires threading `IProgress` through `FillEngine` (one new parameter) and
+updating `BuildProgress.razor` to render a percentage bar when a value is available.
+
+---
 
 ### Multi-role classification
 

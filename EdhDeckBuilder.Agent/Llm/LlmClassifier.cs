@@ -80,6 +80,19 @@ public sealed class LlmClassifier(
 
         ClassificationResponseLogger.LogResponse(candidates.Count, userMessage.Length, response);
 
+        // When a forced tool call hits max_tokens, Anthropic returns input:{} (empty object)
+        // instead of the partial JSON. Split and retry so no batch is silently lost.
+        if (response.StopReason == "max_tokens" && candidates.Count > 1)
+        {
+            logger.LogWarning(
+                "ClassifyBatch hit max_tokens ({Tokens} output tokens) for {Count} cards — splitting into sub-batches.",
+                response.Usage.OutputTokens, candidates.Count);
+            int half = candidates.Count / 2;
+            var partA = await CallLlmAsync(candidates.Take(half).ToList(), commanders, ct);
+            var partB = await CallLlmAsync(candidates.Skip(half).ToList(), commanders, ct);
+            return [.. partA, .. partB];
+        }
+
         return ParseResponse(response, candidates);
     }
 
@@ -106,6 +119,12 @@ public sealed class LlmClassifier(
 
         var dtos = classificationsNode.Deserialize<List<CardClassificationDto>>() ?? [];
 
+        if (dtos.Count == 0)
+            logger.LogWarning(
+                "Classification returned 0 results for {Count} cards (StopReason={StopReason}). Full tool input: {Json}",
+                candidates.Count, response.StopReason,
+                toolUse.Input.ToJsonString());
+
         logger.LogInformation(
             "Classification response: {InputCount} cards sent, {OutputCount} returned, {Bytes} bytes",
             candidates.Count, dtos.Count, toolUse.Input.ToJsonString().Length);
@@ -128,11 +147,20 @@ public sealed class LlmClassifier(
                 missing.Count, string.Join(", ", missing.Take(10)));
 
         var results = new List<ClassificationResult>(dtos.Count);
+        var seen    = new HashSet<Guid>();
 
         foreach (var dto in dtos)
         {
             if (!Guid.TryParse(dto.OracleId, out var id) || !batchIds.Contains(id))
                 continue;
+
+            if (!seen.Add(id))
+            {
+                logger.LogWarning(
+                    "LLM returned duplicate oracle_id {OracleId} ({CardName}) in classification response — keeping first occurrence.",
+                    id, cardsByOracle[id].Name);
+                continue;
+            }
 
             var card = cardsByOracle[id];
             var raw = new ClassificationResult

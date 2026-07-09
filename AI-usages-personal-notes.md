@@ -98,11 +98,3 @@ Sephiroth (third try):
 
 UI:
 - Coverages are shown as decimals, which can be confusing.
-
-
-Notes:
-- Check if it is possible to see how far each step has gotten when running the builder/LLM.
-- Consider adding a "must-include" feature to the builder, where the user can register cards to the 99 that must be in the deck. The LLM can suggest to cut them, but they must be classified, evaluated and included.
-- Consider having the "By Type" tab as the default one in the Results page.
-- Consider strengthing the usage of the raw text input in the Commander Discovery page
-- Coverage summary error: Lands (Utility) is not counting basics in the "Actual" column, which causes a coverage warning as well.

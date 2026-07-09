@@ -47,6 +47,7 @@ public sealed class FillEngine(ICardSelector selector)
         var state = new BuildState(context.ReservedLandCount);
         var committed = new HashSet<Guid>();
         var rationales = new Dictionary<Guid, string>();
+        var selectorStats = new Dictionary<CardRole, (int Input, int Ranked)>();
         int spellBudget = context.NonCommanderCount - context.ReservedLandCount;
 
         // ── Greedy fill ──────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ public sealed class FillEngine(ICardSelector selector)
             if (candidates.Count == 0) continue;
 
             var ranked = await selector.SelectAsync(role, candidates, context, state, ct);
+            selectorStats[role] = (candidates.Count, ranked.Count);
 
             var byId = candidates.ToDictionary(c => c.Card.OracleId);
             var validRanked = ranked
@@ -109,7 +111,7 @@ public sealed class FillEngine(ICardSelector selector)
         // ── Reconciliation ───────────────────────────────────────────────────
         var warnings = Reconcile(context, pool, state, committed, spellBudget);
 
-        return new FillResult(state, warnings, rationales);
+        return new FillResult(state, warnings, rationales, selectorStats);
     }
 
     // ── Reconciliation ────────────────────────────────────────────────────────

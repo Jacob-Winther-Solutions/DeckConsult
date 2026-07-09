@@ -134,6 +134,14 @@ public sealed class DeckBuilder(
             logger.LogInformation("  {Role}: {Count}", role, count);
         }
 
+        // Log fill pool entering the fill engine
+        int unmatchedCount = roleBreakdown.GetValueOrDefault(CardRole.Unmatched, 0);
+        int landCount      = roleBreakdown.GetValueOrDefault(CardRole.Land, 0);
+        int matchedNonLand = fillPool.Count - unmatchedCount - landCount;
+        logger.LogInformation(
+            "FillPool entering engine: {MatchedNonLand} role-matched non-land + {Land} land candidates ({Unmatched} Unmatched)",
+            matchedNonLand, landCount, unmatchedCount);
+
         // Log Unmatched cards with reasoning (debug mode only)
         var unmatchedCards = fillPool.Where(fc => fc.Roles.Primary == CardRole.Unmatched).ToList();
         if (unmatchedCards.Count > 0)
@@ -157,6 +165,8 @@ public sealed class DeckBuilder(
         stageTimer.Stop();
         logger.LogInformation("FillEngine: {FilledCount} cards committed, {ElapsedMs}ms",
             fillResult.State.Committed.Count, stageTimer.ElapsedMilliseconds);
+        foreach (var (role, (input, ranked)) in fillResult.SelectorStats.OrderBy(kv => kv.Key.ToString()))
+            logger.LogInformation("  Selector({Role}): {Input} candidates → {Ranked} ranked", role, input, ranked);
 
         // 8. Color-fixing pass (Pass C).
         progress?.Report("Applying color fixing");
@@ -176,10 +186,13 @@ public sealed class DeckBuilder(
             fillResult.State.Committed.Count, stageTimer.ElapsedMilliseconds);
 
         // 10. Distribute basic lands proportionally by pip demand.
+        // Use ReservedLandCount - UtilityLandCount (not BasicCount) so MDFC land credits
+        // don't reduce the physical card total below the required 98/99.
         progress?.Report("Distributing basic lands");
         stageTimer.Restart();
+        int basicsToDistribute = Math.Max(0, context.ReservedLandCount - fillResult.State.UtilityLandCount);
         var basicLandCounts = DistributeBasics(
-            fillResult.State.BasicCount, colorIdentity, fillResult.State);
+            basicsToDistribute, colorIdentity, fillResult.State);
         stageTimer.Stop();
         int totalBasics = basicLandCounts.Values.Sum();
         logger.LogInformation("DistributeBasics: {BasicCount} basics distributed, {ElapsedMs}ms",
