@@ -18,76 +18,6 @@ Anthropic and Gemini adapters use.
 
 ---
 
-## LLM Provider Layer Refactor — streamline the adapter shape
-
-Both provider adapters (Claude + Gemini) follow the same conceptual shape today: factory
-hands out a client → format user message → call provider with structured-output schema →
-record usage → whitelist-parse response into DTOs. But the shape is enforced by convention
-only, not by code. Adding a third provider (GitHub Models, or any future one) requires
-re-implementing all of it by copy-paste-modify, with no compile-time guarantee that new
-adapters conform to the same skeleton.
-
-Goal: make adding a provider mostly about implementing a small provider-specific transport,
-not re-implementing batching / whitelist / cache / usage-recording per adapter.
-
-**Rename + relocate — DONE (2026-07-09):**
-
-- [x] `Llm/LlmClassifier.cs` → `Llm/Claude/ClaudeClassifier.cs`
-- [x] `Llm/LlmSelector.cs` → `Llm/Claude/ClaudeSelector.cs`
-- [x] `Llm/LlmCommanderSelector.cs` → `Llm/Claude/ClaudeCommanderSelector.cs`
-- [x] `Llm/LlmDtos.cs` and `Llm/ClassificationCache.cs` stay in `Llm/` root (shared)
-- [x] `Authentication/ClaudeClientFactory.cs` → `Authentication/Claude/ClaudeClientFactory.cs`
-- [x] `Authentication/ClaudeModels.cs` → `Authentication/Claude/ClaudeModels.cs`
-- [x] `Authentication/GeminiClientFactory.cs` → `Authentication/Gemini/GeminiClientFactory.cs`
-- [x] `Authentication/GeminiModels.cs` → `Authentication/Gemini/GeminiModels.cs`
-- [x] `Authentication/ClaudeKeyTester.cs` → `Authentication/KeyTester.cs` (renamed to `KeyTester` / `IKeyTester` — generic across providers)
-- [x] All interface files (`IClaudeClientFactory`, `IClaudeApiKeyProvider`, `IGeminiClientFactory`, `IKeyTester`, `IUsageTrackerAware`) consolidated into `Interfaces/`
-- [x] DI wiring in `ServiceCollectionExtensions.cs` updated
-- [x] All 328 tests pass
-
-**Streamline the adapter shape (design decision needed before implementing):**
-
-Three options, roughly ordered by intrusiveness:
-
-- **(A) Convention-only.** Keep separate classes; document the required shape in `CLAUDE.md`
-  and a new `Llm/README.md`. No compiler enforcement, but the smallest surface change. Good if
-  new providers are added rarely.
-- **(B) Shared base class or helper.** Extract batching / cache lookup / whitelist / usage
-  recording into a base class (or a static helper); each provider adapter implements only the
-  provider-specific transport call and response-payload extraction. Reduces per-provider code
-  by ~30–40%. Base class can enforce the whitelist rule so bugs like "trusts model-returned
-  card names" become uncompilable.
-- **(C) Full transport abstraction.** Define `ILlmTransport` with
-  `SendStructuredRequestAsync(systemPrompt, userMessage, schema, config) → payloadString` that
-  each SDK/REST client implements once. `LlmClassifier` / `LlmSelector` / `LlmCommanderSelector`
-  become provider-agnostic — one implementation each, parameterized by the transport. Biggest
-  structural change; also the cleanest end-state, and it turns "add GitHub Models" into a
-  transport-only task.
-
-**Owner decisions needed:**
-
-- [ ] Which of (A) / (B) / (C) to pursue. (C) reduces future per-provider work most but
-      requires reworking the schema layer too — Anthropic uses `Tool` + `InputSchema`, Gemini
-      uses `responseSchema` — they'd need a common schema representation.
-- [ ] Whether Authentication-layer `Claude*` files should also rename for symmetry, or whether
-      `Claude` is fine there since it refers to the model family and not the API surface.
-- [ ] Whether to do the rename + relocation as one PR and the streamlining as a second, or
-      bundle them.
-
-**Constraints to preserve regardless of approach:**
-
-- `IUsageTrackerAware` seam — the marker interface + dispatch pattern must remain.
-- Whitelist rule — every `OracleId` echoed by the model must be verified against the input
-  batch before returning to callers.
-- Provider-specific error mapping — Anthropic's `AnthropicUnauthorizedException` and Gemini's
-  401/403/`limit: 0` handling both surface as `ApiKeyRejectedException`; whatever refactor
-  happens must keep the mapping close to the transport (not leaked into the classifier).
-- `ClassificationCache` is a Singleton; only `Plan`, `Synergy`, `Payoff` are excluded from
-  caching. This behavior stays.
-
-**Related:** GitHub Models adapters can slot in as the third implementation of whichever
-pattern is chosen — natural moment to unblock them if Azure.AI.Inference has stabilized by then.
-
 ---
 
 ## Bugs to Investigate
@@ -144,6 +74,24 @@ strings on the first batch when there's no prior cache context. Possible causes:
 4. If confirmed valid, update the index builder; if archival/errata, update EDHREC data source comment
 
 **Blocked on:** Investigation — need to manually verify affected partner pairs against Scryfall.
+
+---
+
+## Commander Discovery — progress step display
+
+The Deck Builder page streams its 10-stage pipeline progress to the user as it runs (stage names
++ spinner). The Commander Discovery page does not — it shows a static spinner with no indication
+of which step is running. Parity task: wire up the same progress-tracking pattern on the
+Discovery page so users can see the individual steps (e.g. "Fetching EDHREC pool…", "Ranking
+candidates…", "Building suggestions…") as they complete.
+
+**Implementation tasks:**
+
+- [ ] Define a discovery progress model (stage name + optional detail, e.g. candidate count)
+      mirroring the `BuildProgress` type used by the Deck Builder pipeline.
+- [ ] Instrument `CommanderDiscovery` to emit step events via a callback or `IProgress<T>`.
+- [ ] Update `DiscoveryPage.razor` / `DiscoveryPage.razor.cs` to subscribe to those events and
+      render them in a step list (spinner per step, checkmark when done).
 
 ---
 
@@ -522,11 +470,11 @@ All four projects compile; 328 tests pass.
 
 **Agent pipeline:** `LlmClassifier` (Haiku, forced tool call, batched, cached except Plan/Synergy/Payoff), `LlmSelector` (user model, forced tool call, per-build rationale). `FillEngine` (greedy + reconciliation, max 50 iterations), `ColorFixingPass` (pip-demand scoring). Deterministic `RepairEngine` + `DeckBuilder` (12-stage pipeline). Multi-role classification: role profiles, secondary contributions, coverage accounting.
 
-**Multi-provider LLM (Anthropic + Gemini):** Provider dispatch via `SessionApiKeyProvider.ActiveProvider`. Anthropic path via official C# SDK v12.35.1; Gemini path via custom `GeminiRestClient` posting directly to `generateContent` with `responseSchema` structured output. `GeminiSchemas` translates our schema shape to Gemini's OpenAPI 3.0 subset (uppercase types, `propertyOrdering`, `format: enum`). `GeminiRateLimiter` (Scoped) enforces per-circuit RPM pacing. `GeminiRestClient` retries 429/502/503/504 with `Retry-After`-aware backoff; parses Google's structured error body so free-tier `limit: 0` gating is diagnosable. MAX_TOKENS handled distinct from JSON parse errors. Model picker covers `2.5 Flash`, `2.5 Flash Lite`, `3.1 Flash Lite` (default — 500 RPD), `3 Flash`, `3.5 Flash`, `2.0 Flash*` (needs billing).
+**Multi-provider LLM (Anthropic + Gemini):** Three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) dispatch to one of two `ILlmClient` implementations via `ILlmClientFactory`. Anthropic path via `ClaudeHttpLlmClient` — direct HTTP to `api.anthropic.com/v1/messages`, no Anthropic C# SDK. Gemini path via `GeminiHttpLlmClient` wrapping `GeminiRestClient` — posts to `generateContent` with `responseSchema` structured output. `GeminiSchemas` translates our schema shape to Gemini's OpenAPI 3.0 subset (uppercase types, `propertyOrdering`, `format: enum`). `GeminiRateLimiter` (Scoped) enforces per-circuit RPM pacing. `GeminiRestClient` retries 429/502/503/504 with `Retry-After`-aware backoff; parses Google's structured error body so free-tier `limit: 0` gating is diagnosable. MAX_TOKENS handled distinct from JSON parse errors. Model picker covers `2.5 Flash`, `2.5 Flash Lite`, `3.1 Flash Lite` (default — 500 RPD), `3 Flash`, `3.5 Flash`, `2.0 Flash*` (needs billing).
 
-**Cost accounting:** `Instrumentation/ModelPricing.cs` — per-model USD rates per 1M tokens for both providers. `UsageTracker` uses it for per-call rows and summary totals; mixed-provider runs tally correctly. Free-tier Gemini calls show the "what you'd pay on paid tier" estimate. `IUsageTrackerAware` marker interface removes type-specific dispatch — all six LLM adapters implement it, `DeckBuilder` and `CommanderDiscovery` wire the tracker through it.
+**Cost accounting:** `Instrumentation/ModelPricing.cs` — per-model USD rates per 1M tokens for both providers. `UsageTracker` uses it for per-call rows and summary totals; mixed-provider runs tally correctly. Free-tier Gemini calls show the "what you'd pay on paid tier" estimate. `IUsageTrackerAware` marker interface removes type-specific dispatch — all three adapters implement it, `DeckBuilder` and `CommanderDiscovery` wire the tracker through it.
 
-**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit) with triple-key storage (Anthropic / GitHub / Google). `IClaudeClientFactory` (Anthropic SDK seam), `IGeminiClientFactory` (Gemini REST client seam). `ClaudeKeyTester` (1-token probe for Anthropic; format check for Google/GitHub). 401/403 → `ApiKeyRejectedException` wrapping on both provider paths. Data Protection-encrypted cookies (30-day expiry) for each provider plus a selected-model cookie; cookies win over `Provider:Default` in appsettings.
+**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit) with triple-key storage (Anthropic / GitHub / Google). `ClaudeHttpLlmClientFactory` (Anthropic HTTP seam), `GeminiLlmClientFactory` (Gemini REST client seam), both implementing `ILlmClientFactory`. `KeyTester` (1-token probe for Anthropic; format check for Google/GitHub). 401/403 → `ApiKeyRejectedException` wrapping on both provider paths. Data Protection-encrypted cookies (30-day expiry) for each provider plus a selected-model cookie; cookies win over `Provider:Default` in appsettings. Prompt caching implemented on the Anthropic path (`cache_control` on last tool definition); Gemini path ignores `EnableCaching`.
 
 **Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option. Provider toggle (Anthropic / GitHub Models / Google AI Studio) with per-provider help text and dynamic model dropdown.
 

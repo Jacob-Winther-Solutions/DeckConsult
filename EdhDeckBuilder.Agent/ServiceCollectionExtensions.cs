@@ -5,7 +5,6 @@ using EdhDeckBuilder.Agent.Discovery;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm;
-using EdhDeckBuilder.Agent.Llm.Claude;
 using EdhDeckBuilder.Agent.Llm.Gemini;
 using EdhDeckBuilder.Agent.Pipeline;
 using EdhDeckBuilder.Agent.Prompts;
@@ -40,9 +39,12 @@ public static class ServiceCollectionExtensions
                     options.EnableStructuredDeckBuildLogging = logDeckEnabled;
                 if (bool.TryParse(section["EnableClassificationReasoning"], out var reasoningEnabled))
                     options.EnableClassificationReasoning = reasoningEnabled;
+                if (bool.TryParse(section["LogRawLlmRequests"], out var logRawEnabled))
+                    options.LogRawLlmRequests = logRawEnabled;
             }
             ClassificationResponseLogger.Initialize(options);
             ClassificationPrompt.SetInstrumentationOptions(options);
+            InstrumentationOptions.SetCurrent(options);
         }
 
         // Per-circuit key holder — registered twice so settings UI (concrete) and agent
@@ -50,21 +52,31 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SessionApiKeyProvider>();
         services.AddScoped<IClaudeApiKeyProvider>(sp => sp.GetRequiredService<SessionApiKeyProvider>());
 
-        services.AddScoped<IClaudeClientFactory, ClaudeClientFactory>();
+        // Named HttpClient for both ClaudeHttpLlmClientFactory and KeyTester
+        services.AddHttpClient("claude", c => c.Timeout = TimeSpan.FromSeconds(120));
 
-        // GeminiClientFactory needs a pooled HttpClient — register as a typed client so
-        // IHttpClientFactory manages lifetime. AddHttpClient defaults to Transient; we
-        // then re-expose it as Scoped via the interface so it composes with the other
-        // per-circuit services.
-        services.AddHttpClient<GeminiClientFactory>(c =>
-        {
-            c.Timeout = TimeSpan.FromSeconds(120);
-        });
+        // ClaudeHttpLlmClientFactory — typed HttpClient so connection pooling is managed by
+        // IHttpClientFactory rather than creating a raw HttpClient per circuit.
+        services.AddHttpClient<ClaudeHttpLlmClientFactory>(c => c.Timeout = TimeSpan.FromSeconds(120));
+
+        // GeminiClientFactory needs a pooled HttpClient — same pattern as above.
+        services.AddHttpClient<GeminiClientFactory>(c => c.Timeout = TimeSpan.FromSeconds(120));
         services.AddScoped<IGeminiClientFactory>(sp => sp.GetRequiredService<GeminiClientFactory>());
 
-        // Per-circuit pacing state so each user's key gets its own RPM budget rather than
-        // sharing one throttle across the whole deployment.
+        // Per-circuit pacing state so each user's key gets its own RPM budget.
         services.AddScoped<GeminiRateLimiter>();
+
+        // GeminiLlmClientFactory wraps IGeminiClientFactory behind ILlmClientFactory.
+        services.AddScoped<GeminiLlmClientFactory>();
+
+        // Provider-dispatched ILlmClientFactory — resolved once per Blazor circuit.
+        services.AddScoped<ILlmClientFactory>(sp =>
+        {
+            var keys = sp.GetRequiredService<IClaudeApiKeyProvider>();
+            return keys.ActiveProvider == AiProvider.Google
+                ? (ILlmClientFactory)sp.GetRequiredService<GeminiLlmClientFactory>()
+                : sp.GetRequiredService<ClaudeHttpLlmClientFactory>();
+        });
 
         services.AddScoped<IKeyTester, KeyTester>();
 
@@ -72,29 +84,10 @@ public static class ServiceCollectionExtensions
         // because they depend on the per-circuit client factory.
         services.AddSingleton<ClassificationCache>();
 
-        // Register both Claude and Gemini implementations
-        services.AddScoped<ClaudeClassifier>();
-        services.AddScoped<GeminiClassifier>();
-        services.AddScoped<ClaudeSelector>();
-        services.AddScoped<GeminiSelector>();
-        services.AddScoped<ClaudeCommanderSelector>();
-        services.AddScoped<GeminiCommanderSelector>();
-
-        // Provider-aware dispatch via factory lambdas
-        services.AddScoped<ILlmClassifier>(sp =>
-            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
-                ? (ILlmClassifier)sp.GetRequiredService<GeminiClassifier>()
-                : sp.GetRequiredService<ClaudeClassifier>());
-
-        services.AddScoped<ICardSelector>(sp =>
-            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
-                ? (ICardSelector)sp.GetRequiredService<GeminiSelector>()
-                : sp.GetRequiredService<ClaudeSelector>());
-
-        services.AddScoped<ICommanderSelector>(sp =>
-            sp.GetRequiredService<IClaudeApiKeyProvider>().ActiveProvider == AiProvider.Google
-                ? (ICommanderSelector)sp.GetRequiredService<GeminiCommanderSelector>()
-                : sp.GetRequiredService<ClaudeCommanderSelector>());
+        // Three unified adapters replace the former six provider-specific classes.
+        services.AddScoped<ILlmClassifier, LlmClassifier>();
+        services.AddScoped<ICardSelector, LlmSelector>();
+        services.AddScoped<ICommanderSelector, LlmCommanderSelector>();
 
         services.AddScoped<IDeckBuilder, DeckBuilder>();
 

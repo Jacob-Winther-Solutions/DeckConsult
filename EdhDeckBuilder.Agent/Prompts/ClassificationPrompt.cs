@@ -1,8 +1,8 @@
-using Anthropic.Models.Messages;
 using EdhDeckBuilder.Agent.Instrumentation;
+using EdhDeckBuilder.Agent.Llm.Shared;
 using EdhDeckBuilder.Core.Cards;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace EdhDeckBuilder.Agent.Prompts;
 
@@ -17,7 +17,7 @@ public static class ClassificationPrompt
 
     public const string SystemPrompt =
         """
-        You are an expert Magic: the Gathering Commander (EDH) deck builder classifying cards for a specific deck.
+        You are an expert Magic: the Gathering deck builder classifying cards for a specific deck.
 
         ## Roles
         Each card has exactly one primary role — the role it is most often played for in this deck context.
@@ -36,17 +36,17 @@ public static class ClassificationPrompt
 
         **MassDisruption** — Board wipes, global effects, stax pieces (Ghostly Prison, Propaganda). Affects many permanents at once.
 
-        **Tutor** — Cards whose primary value is searching your library for a specific card.
+        **Tutor** — Cards whose primary value is searching your library for a specific card, either with or without certain criteria set, which for instance could include card type or color restrictions.
 
         **Protection** — Hexproof, indestructible, phasing, shroud, regeneration, and other effects that keep your permanents alive.
 
-        **Recursion** — Cards that return other cards from the graveyard: Regrowth, Eternal Witness, Animate Dead.
+        **Recursion** — Cards that return other cards from the graveyard to either your hand or the battlefield: Regrowth, Eternal Witness, Animate Dead.
 
         **Plan** — The core strategy cards that directly execute what this deck is trying to do. Highly commander-dependent. In a tokens deck, token makers are Plan; in voltron, equipment and auras are Plan; in spellslinger, the spells being cast are Plan.
 
         **Payoff** — Cards that reward or multiply the plan without being the plan itself: Purphoros in a tokens deck, Anointed Procession, damage doublers. Converts the plan into a win.
 
-        **Synergy** — Glue cards that support the deck broadly without fitting a more specific role.
+        **Synergy** — Glue cards that support the deck broadly without fitting a more specific role. Cards that fit the theme without driving it.
 
         ## Role Relations (for secondary roles only)
         Only assign secondary roles when the secondary effect is **mechanically core to the card's function in the deck**, not minor or incidental.
@@ -55,6 +55,47 @@ public static class ClassificationPrompt
         - **Transform**: The card transitions from one role to another over the course of a game (e.g. Hedron Archive ramps first, then sacrifices to draw).
 
         **Limit secondary roles:** Most cards should have 0–1 secondary role. Only add a second secondary if both are genuinely major to the card's value.
+
+        ## Role priority (when a card genuinely fits multiple roles)
+        Use this tiebreaker order to pick the primary role — assign the first role that clearly applies:
+        **Tutor > CardAdvantage > Ramp > TargetedDisruption > MassDisruption > Protection > Recursion > Plan > Payoff > Synergy > Land > Unmatched**
+
+        Override only when the deck context makes a lower-priority role clearly dominant. Example: a land-searching spell in a deck that needs one specific land for a combo is Tutor, not Ramp.
+
+        ## Disambiguating similar roles
+
+        **Ramp vs. Synergy — cost reducers:**
+        Permanent cost reducers for spells you cast regularly count as **Ramp**, not Synergy. Examples: Urza's Incubator, Herald's Horn, Semblance Anvil, Goblin Electromancer, Birgi, God of Storytelling. The test: does the card produce an ongoing mana advantage that lets you cast more or larger spells per turn? If yes, it is Ramp. Classify as Synergy only if the cost reduction is too narrow to matter in this specific deck.
+
+        **Plan vs. Payoff — action vs. reward:**
+        Plan cards *do* the deck's action. Payoff cards *score points for* doing the action.
+        In a combat-focused deck: equipment that makes your creature bigger is Plan; a card that deals damage to each opponent whenever your creature deals combat damage is Payoff.
+        Quick test — if you removed this card, would the deck still be able to execute its strategy? If yes, it is Payoff or Synergy. If no, it is Plan.
+
+        **Plan vs. Synergy — core vs. support:**
+        Plan cards are primary enablers of the strategy; taking them out makes the deck noticeably less functional. Synergy cards support the strategy without being central to it. In a spellslinger deck, every cheap instant that triggers storm is Plan; a cost reducer is Ramp; a creature that merely benefits from spells being cast is Synergy.
+
+        **Unmatched — off-strategy only:**
+        Use Unmatched for cards that are genuinely irrelevant to this deck's strategy — wrong colors, contradict the gameplan, or provide value the deck cannot use. Do NOT use Unmatched for weak or suboptimal cards. A mediocre Ramp card is still Ramp. A worse-than-average removal spell is still TargetedDisruption.
+
+        **TargetedDisruption vs. MassDisruption — versatile spells:**
+        Assign the role that matches how the card is *primarily* played in this deck context. Cyclonic Rift without overload is TargetedDisruption; with overload it is MassDisruption. For a deck that will almost always overload it, classify as MassDisruption and note the modal relation in secondary.
+
+        ## Role examples
+
+        | Role | Canonical examples |
+        |---|---|
+        | Land | Command Tower, Arcane Sanctum, Evolving Wilds, Ancient Tomb, Temple of Deceit |
+        | Ramp | Sol Ring, Arcane Signet, Cultivate, Kodama's Reach, Faeburrow Elder, Urza's Incubator |
+        | CardAdvantage | Rhystic Study, Phyrexian Arena, Harmonize, Painful Truths, Consecrated Sphinx |
+        | TargetedDisruption | Swords to Plowshares, Path to Exile, Counterspell, Beast Within, Chaos Warp |
+        | MassDisruption | Wrath of God, Cyclonic Rift (overloaded), Vandalblast, Ghostly Prison, Propaganda |
+        | Tutor | Demonic Tutor, Vampiric Tutor, Worldly Tutor, Enlightened Tutor, Mystical Tutor |
+        | Protection | Lightning Greaves, Swiftfoot Boots, Teferi's Protection, Heroic Intervention |
+        | Recursion | Eternal Witness, Regrowth, Animate Dead, Reanimate, Unearth |
+        | Plan | Token creators in token decks, equipment in voltron, mana-expensive creatures in reanimator |
+        | Payoff | Purphoros God of the Forge, Impact Tremors, Anointed Procession, Doubling Season |
+        | Synergy | Permanents with cast-triggers in spellslinger decks, discard outlets in reanimator |
 
         ## Land Credit (back face land quality)
         Assign a non-zero land_credit ONLY when the back face is a Land type (check the TypeLine for "// Land").
@@ -78,18 +119,15 @@ public static class ClassificationPrompt
     /// <summary>Whether classification responses should include a per-card <c>reasoning</c> field.</summary>
     public static bool IsReasoningEnabled => _options?.EnableClassificationReasoning == true;
 
-    /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
-    public static Tool Tool
+    /// <summary>
+    /// Tool definition re-evaluated each access so the schema reflects the current reasoning flag.
+    /// </summary>
+    public static LlmToolDefinition ToolDefinition => new()
     {
-        get => new()
-        {
-            Name = ToolName,
-            Description = "Classify each candidate card into its primary role and any secondary roles for this Commander deck.",
-            InputSchema = BuildSchema(),
-            Strict = true,
-            CacheControl = new CacheControlEphemeral(),
-        };
-    }
+        Name        = ToolName,
+        Description = "Classify each candidate card into its primary role and any secondary roles for this Commander deck.",
+        InputSchema = JsonNode.Parse(BuildSchemaJson())!,
+    };
 
     public static string FormatUserMessage(IReadOnlyList<CardCandidate> candidates, IReadOnlyList<Card> commanders)
     {
@@ -125,11 +163,10 @@ public static class ClassificationPrompt
         return sb.ToString();
     }
 
-    private static InputSchema BuildSchema()
+    private static string BuildSchemaJson()
     {
         const string roleEnum = """["Land","Ramp","CardAdvantage","TargetedDisruption","MassDisruption","Tutor","Protection","Recursion","Plan","Payoff","Synergy","Unmatched"]""";
 
-        // Build properties object dynamically based on whether reasoning is enabled
         var properties = new StringBuilder();
         properties.Append($$"""
               "oracle_id":    { "type": "string" },
@@ -151,11 +188,9 @@ public static class ClassificationPrompt
             """);
 
         if (_options?.EnableClassificationReasoning == true)
-        {
             properties.Append(",\n              \"reasoning\": { \"type\": \"string\" }");
-        }
 
-        var json = $$"""
+        return $$"""
             {
               "type": "object",
               "additionalProperties": false,
@@ -175,9 +210,6 @@ public static class ClassificationPrompt
               "required": ["classifications"]
             }
             """;
-
-        using var doc = JsonDocument.Parse(json);
-        return InputSchema.FromRawUnchecked(
-            doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()));
     }
+
 }

@@ -1,4 +1,4 @@
-API usage:
+Claude API usage:
 - Sephiroth, Aggro, Aristocrats, Bracket 3:                                                                                 5,00 -> 4,83 = 0,17 (1st try)
 - Sephiroth, Aggro, Aristocrats, Bracket 3:                                                                                 4,83 -> 4,42 = 0,41 (2nd try)
 - Sephiroth, Aggro, Aristocrats, Bracket 3:                                                                                 4,42 -> 4,20 = 0,22 (3rd try) (After this, classifications of non-plan cards are cached and saved to storage)
@@ -82,6 +82,15 @@ API usage:
 - Haiku, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                              1,66 -> 1,49 = 0,17 (76th try) (Improving batching logic)
 - Gemini Flash, Joel+Ellie, Aggro, Aristocrats, Bracket 3, No Budget:                                                       1,49 -> 1,49 = 0,00 (77th try) (Should be free on Antropic account as Google AI Studio should be used with a free account => was free for me! Estimated cost was $0,0064)
 - Haiku, Commander Discovery, WUGG (exactly), Combo, Counters, Bracket 3, No Budget, No angels                              1,49 -> 1,49 = 0,00 (78th try) (Compare Haiku costs with Gemini => $0,0079, but waaay slower to respond)
+- Haiku, Commander Discovery, WUGG (exactly), Combo, Counters, Bracket 3, No Budget, No angels                              1,49 -> 1,48 = 0,01 (79th try) (Test of Claude after refactoring)
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           1,48 -> 1,24 = 0,24 (80th try) (Test of Claude HTTP Client setup - Deck Builder - Failed)
+- Sonnet 5, Commander Discovery, WUGG (exactly), Combo, Counters, Bracket 3, No Budget, No angels                           1,24 -> 1,23 = 0,01 (81th try) (Re-test of Claude HTTP Client setup - Discovery)
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           1,23 -> 0,86 = 0,37 (82th try) (Re-test of Claude HTTP Client setup - Deck Builder - Success, but expensive on Sonnet 5 => $0,4833)
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           0,86 -> 0,58 = 0,28 (83th try) (Test of Claude Caching - Deck Builder - To be compared with above test => Only cached the selector, the classification cache was not big enough to be accepted)
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           0,58 -> 0,43 = 0,15 (84th try) (Test of Claude Caching on Classifier - Deck Builder => Failed)
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           0,43 -> 0,15 = 0,28 (85th try) (Re-test of Claude Caching on Classifier - Deck Builder => no fails but also no caching + expensive and a mediocre result)
+--------------- Funds refill -> +5 => 5.15 ------------------------                             
+- Sonnet 5, Kratos+Atreus, Aggro, Counters, Bracket 3, No Budget:                                                           5,15 -> 4,82 = 0,33 (86th try) (Re-test of Claude Caching on Classifier - Deck Builder => fail, now nothing cached)
 
 Bad classifications:
 Sephiroth (third try):
@@ -95,3 +104,5 @@ Notes:
 - Check if it is possible to see how far each step has gotten when running the builder/LLM.
 - Consider adding a "must-include" feature to the builder, where the user can register cards to the 99 that must be in the deck. The LLM can suggest to cut them, but they must be classified, evaluated and included.
 - Consider having the "By Type" tab as the default one in the Results page.
+- Consider strengthing the usage of the raw text input in the Commander Discovery page
+- Coverage summary error: Lands (Utility) is not counting basics in the "Actual" column, which causes a coverage warning as well.

@@ -1,5 +1,3 @@
-using Anthropic.Models.Messages;
-
 namespace EdhDeckBuilder.Agent.Instrumentation;
 
 /// <summary>
@@ -11,25 +9,6 @@ public sealed class UsageTracker
     private readonly List<CallRecord> _calls = [];
     private int _callCounter = 0;
 
-    /// <summary>
-    /// Records a single LLM call with its usage metadata.
-    /// </summary>
-    public void RecordCall(string stage, string model, Usage usage)
-    {
-        RecordCall(
-            stage,
-            model,
-            inputTokens: (int)usage.InputTokens,
-            outputTokens: (int)usage.OutputTokens,
-            cacheCreationInputTokens: (int)(usage.CacheCreationInputTokens ?? 0),
-            cacheReadInputTokens: (int)(usage.CacheReadInputTokens ?? 0));
-    }
-
-    /// <summary>
-    /// Records a single LLM call from a provider whose SDK doesn't expose Anthropic's
-    /// <see cref="Usage"/> shape (Gemini, GitHub Models). Cache-token fields default to zero
-    /// since those providers don't report them today.
-    /// </summary>
     public void RecordCall(
         string stage,
         string model,

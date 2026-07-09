@@ -29,4 +29,21 @@ public sealed class InstrumentationOptions
     /// Adds token cost; only enabled in Development.
     /// </summary>
     public bool EnableClassificationReasoning { get; set; } = false;
+
+    /// <summary>
+    /// Log the raw outgoing JSON request body and raw incoming JSON response body for every
+    /// LLM call. Off by default; enable in Development to diagnose serialization issues,
+    /// prompt-caching behaviour, or unexpected model responses.
+    /// </summary>
+    public bool LogRawLlmRequests { get; set; } = false;
+
+    // ── Static accessor ──────────────────────────────────────────────────────────────────
+    // Set once at startup by ServiceCollectionExtensions so LLM adapters can read the flags
+    // without requiring constructor injection.
+
+    private static InstrumentationOptions _current = new();
+
+    public static InstrumentationOptions Current => _current;
+
+    internal static void SetCurrent(InstrumentationOptions options) => _current = options;
 }

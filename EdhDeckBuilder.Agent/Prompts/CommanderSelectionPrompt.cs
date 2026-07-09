@@ -1,9 +1,9 @@
-using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Llm.Shared;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace EdhDeckBuilder.Agent.Prompts;
 
@@ -17,7 +17,7 @@ public static class CommanderSelectionPrompt
 
     public const string SystemPrompt =
         """
-        You are an expert Magic: the Gathering Commander deck builder ranking legendary creatures for a specific strategy.
+        You are an expert Magic: the Gathering deck builder ranking legendary creatures for a specific strategy.
 
         ## Output requirements (MANDATORY — read before deciding what to return)
         - **If the input contains 10 or fewer candidates, you MUST include EVERY candidate in the output.** Do not omit any candidate for any reason, even if you think it is weak, off-theme, or a bad fit. Weak candidates get low ranks — they do not get omitted.
@@ -34,14 +34,11 @@ public static class CommanderSelectionPrompt
         A weak candidate is still ranked — at the bottom. Do not decide for the user which candidates are "worth" including.
         """;
 
-    /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
-    public static Tool Tool { get; } = new()
+    public static LlmToolDefinition ToolDefinition { get; } = new()
     {
-        Name = ToolName,
+        Name        = ToolName,
         Description = "Rank EVERY provided candidate commander from best (rank 1) to worst; omit none when the input has 10 or fewer entries. Ranks must be contiguous 1..N.",
-        InputSchema = BuildSchema(),
-        Strict = true,
-        CacheControl = new CacheControlEphemeral(),
+        InputSchema = JsonNode.Parse(SchemaJson)!,
     };
 
     public static string FormatUserMessage(IReadOnlyList<Card> candidates, CommanderDiscoveryRequest request)
@@ -113,33 +110,27 @@ public static class CommanderSelectionPrompt
         return string.Join(", ", colors);
     }
 
-    private static InputSchema BuildSchema()
-    {
-        const string json = """
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "rankings": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "oracle_id": { "type": "string" },
-                      "rank":      { "type": "integer" },
-                      "rationale": { "type": "string" }
-                    },
-                    "required": ["oracle_id","rank","rationale"]
-                  }
-                }
-              },
-              "required": ["rankings"]
+    private const string SchemaJson = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rankings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "oracle_id": { "type": "string" },
+                  "rank":      { "type": "integer" },
+                  "rationale": { "type": "string" }
+                },
+                "required": ["oracle_id","rank","rationale"]
+              }
             }
-            """;
+          },
+          "required": ["rankings"]
+        }
+        """;
 
-        using var doc = JsonDocument.Parse(json);
-        return InputSchema.FromRawUnchecked(
-            doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()));
-    }
 }

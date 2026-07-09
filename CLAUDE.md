@@ -12,10 +12,12 @@ perspective of someone using the deck builder rather than building it.
 
 An LLM-assisted Magic: the Gathering Commander (EDH) deck builder in C#/.NET 10, with a Blazor
 front end. The user drives it in natural language; an agent builds and validates decks against
-a pure domain core. Two LLM providers are wired: **Anthropic Claude** (via the Anthropic C# SDK)
-and **Google Gemini** (via a custom REST client). Runtime dispatch by `AiProvider` on the
-per-circuit `SessionApiKeyProvider`. `README.md` documents the architecture; `TODO/TODO.md`
-tracks deferred work; `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
+a pure domain core. Two LLM providers are wired: **Anthropic Claude** (via direct HTTP —
+`ClaudeHttpLlmClient`) and **Google Gemini** (via `GeminiRestClient`). Both implement `ILlmClient`
+so the three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`)
+are shared. Runtime dispatch by `AiProvider` on the per-circuit `SessionApiKeyProvider`.
+`README.md` documents the architecture; `TODO/TODO.md` tracks deferred work;
+`TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
 
 ## Current state
 
@@ -35,16 +37,17 @@ See `TODO/TODO.md` for remaining work (Commander Discovery, Deployment, etc.).
 `Pipeline/DeckBuilder.cs` is the entry point (`IDeckBuilder.BuildAsync`). It runs a 10-stage
 staged pipeline; the LLM is consulted at exactly two fixed points:
 
-1. **Classification** — `ILlmClassifier` (temperature 0.1, batched at 30 cards, forced structured
-   output). Assigns `CardRole` + secondary overlaps. Results cached globally by `OracleId`
-   except `Plan`, `Synergy`, and `Payoff`, which are re-classified per build.
-   - Anthropic path: `LlmClassifier` on `claude-haiku-4-5-20251001` regardless of selection.
-   - Gemini path: `GeminiClassifier` on the user's selected Gemini model.
-2. **Selection** — `ICardSelector` (temperature 0.6, per-role call, forced structured output).
-   Returns a ranked list with per-card rationale. The fill engine decides count; the model never
-   outputs counts.
-   - Anthropic path: `LlmSelector` on the user-selected Claude model, default Haiku.
-   - Gemini path: `GeminiSelector` on the user-selected Gemini model.
+1. **Classification** — `ILlmClassifier` / `LlmClassifier` (temperature 0.1, batched at 30
+   cards, forced structured output, prompt caching enabled). Assigns `CardRole` + secondary
+   overlaps. Results cached globally by `OracleId` except `Plan`, `Synergy`, and `Payoff`,
+   which are re-classified per build.
+   - Anthropic path: `claude-haiku-4-5-20251001` regardless of user selection (fast + cheap).
+   - Gemini path: user's selected Gemini model (higher token ceiling: 32 768).
+2. **Selection** — `ICardSelector` / `LlmSelector` (temperature 0.6, per-role call, forced
+   structured output, prompt caching enabled). Returns a ranked list with per-card rationale.
+   The fill engine decides count; the model never outputs counts.
+   - Anthropic path: user-selected Claude model, default Haiku.
+   - Gemini path: user's selected Gemini model.
 
 Everything else — fill order, reconciliation, color-fixing, repair, basic distribution — is
 deterministic code in `Fill/` and `Pipeline/`.
@@ -120,21 +123,19 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
 
 - **Whitelist rule:** every `OracleId` in an LLM response must echo an id from the input batch.
   Filter before returning to callers. Code that trusts model-returned card names directly is a bug.
-- **Forced tool call only:** both LLM calls use `ToolChoiceTool { Name = "..." }` with
-  `Tool.Strict = true`. Don't switch to plain-text parsing.
+- **Forced tool call only:** both LLM calls use `tool_choice: {type: "tool", name: "..."}` with
+  the tool schema `required` constraint enforced. Don't switch to plain-text parsing.
 - **Classification cache:** `ClassificationCache` is a singleton; Plan, Synergy, and Payoff are
   never served from it. Don't cache them.
-- **BYOK — scoped services:** `SessionApiKeyProvider`, `IClaudeClientFactory`,
-  `IGeminiClientFactory`, `GeminiRateLimiter`, `IClaudeKeyTester`, `ILlmClassifier`,
+- **BYOK — scoped services:** `SessionApiKeyProvider`, `ILlmClientFactory`,
+  `IGeminiClientFactory`, `GeminiRateLimiter`, `IKeyTester`, `ILlmClassifier`,
   `ICardSelector`, and `IDeckBuilder` are all Scoped (per Blazor Server circuit).
   `ClassificationCache` is the only Singleton in the Agent layer. Never register a Scoped LLM
   service as Singleton — it would capture the per-circuit key or pacing state.
-- **BYOK — SDK seams:** `ClaudeClientFactory` is the only place that calls
-  `new AnthropicClient(...)`. `GeminiClientFactory` is the only place that constructs
-  `GeminiRestClient`. `LlmClassifier` / `LlmSelector` receive the Anthropic client via
-  `IClaudeClientFactory`; `GeminiClassifier` / `GeminiSelector` receive the REST client via
-  `IGeminiClientFactory`. Keep both seams intact — no LLM adapter should new up an HTTP client
-  or SDK client itself.
+- **BYOK — HTTP seams:** `ClaudeHttpLlmClientFactory` is the only place that constructs
+  `ClaudeHttpLlmClient` (no Anthropic SDK — direct HTTP to `api.anthropic.com/v1/messages`).
+  `GeminiClientFactory` is the only place that constructs `GeminiRestClient`. Both implement
+  `ILlmClientFactory`. No LLM adapter should construct an HTTP client itself.
 - **BYOK — 401/403 handling:** Anthropic's `AnthropicUnauthorizedException` and Gemini's 401/403
   responses (from `GeminiRestClient`) are both rethrown as `ApiKeyRejectedException`. The UI
   catches this, calls `Keys.Clear()`, and shows a reconnect prompt. Don't swallow it or convert
@@ -154,7 +155,7 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   renumbers ranks to contiguous 1..N after ordering by the model's rank. This lets lite models
   emit ranks like 1, 3, 5 (rank-as-rating) without breaking the display. Don't push
   normalization into the selectors.
-- **Usage tracker wiring uses `IUsageTrackerAware`.** All six LLM adapters implement it;
+- **Usage tracker wiring uses `IUsageTrackerAware`.** All three unified adapters implement it;
   `DeckBuilder.UsageTracker` setter and `CommanderDiscovery.SetUsageTracker` dispatch through
   the marker interface. Don't add `is LlmXxx` / `is GeminiXxx` branches — any new provider that
   implements `IUsageTrackerAware` is wired automatically.
@@ -163,33 +164,23 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   added to a picker (`GeminiModels.SelectionModels` / `ClaudeModels.SelectionModels`), add a
   corresponding row to `ModelPricing.Prices` in the same change; unknown models silently report
   $0 which will surface as a suspicious total.
-- **Temperature warning:** `MessageCreateParams.Temperature` is deprecated (`CS0618`) for models
-  after Opus 4.6. The current values (0.1, 0.6) work but will need migration if the SDK removes
-  backward compatibility.
-- **Prompt caching — awaiting SDK API exposure:** Anthropic SDK v12.35.1 is now current (upgraded
-  from v12.30.0). Prompt caching via `SystemBlockParam` is not yet exposed in the public C# SDK API,
-  despite being supported by the API. Monitor Anthropic SDK releases — when `SystemBlockParam` is
-  added to the public API (likely in a future v12.x release), apply this fix to both
-  `LlmClassifier.cs` and `LlmSelector.cs`:
-  ```csharp
-  var systemBlock = new SystemBlockParam
-  {
-      Text = ClassificationPrompt.SystemPrompt,
-      CacheControl = new CacheControlEphemeral(),
-  };
-  var request = new MessageCreateParams
-  {
-      System = new MessageCreateParamsSystem([systemBlock]),
-      // ... rest of params
-  };
-  ```
-  **Why:** System prompt caching reduces input token cost on repeated calls (e.g., multi-build sessions).
-  **Impact:** ~25–30% cost reduction per cached call.
-  **Verification:** After implementing, check usage report — `CacheCreationInputTokens` and
-  `CacheReadInputTokens` should be > 0 on multi-build runs.
-- **SDK versioning:** Anthropic package is now v12.35.1 in `EdhDeckBuilder.Agent.csproj`.
-  Review release notes before updating; notify the team of any API changes that affect `LlmClassifier.cs`
-  or `LlmSelector.cs`. Check for `SystemBlockParam` public API availability.
+- **Temperature — model-gated:** `ClaudeHttpLlmClient.ModelSupportsTemperature` controls whether
+  the `temperature` field is included in the request. Haiku 4.5 and `claude-3-*` variants accept
+  it; Sonnet 5 and Opus 4.8 reject it with HTTP 400. Do not send temperature for newly added
+  models until confirmed — just omit it and let the model default.
+- **Prompt caching — implemented:** `ClaudeHttpLlmClient.BuildRequestJson` serializes the system
+  prompt as a structured content block and marks the last tool definition with
+  `"cache_control": {"type": "ephemeral"}` when `LlmRequest.EnableCaching = true`. All three
+  adapters set this flag. Caching only fires when the combined system+tool tokens exceed
+  Anthropic's per-model minimum (~1024 tokens for Sonnet/Opus, ~2048 for Haiku). Verify by
+  checking `CacheCreationInputTokens` / `CacheReadInputTokens` in the usage summary after a
+  second build run — they will be > 0 when caching is active. The Gemini path ignores
+  `EnableCaching` (Gemini uses a different caching mechanism not yet integrated).
+  **Known limitation:** classification batches (Haiku) show CacheCreate = 0 even though the
+  system+tool prefix exceeds 2048 tokens. Root cause is unclear — Haiku 4.5 may have a higher
+  minimum or treat the two-breakpoint prefix differently. The selector (Sonnet 5) caches
+  correctly at the system-prompt breakpoint. Classification caching is deferred pending further
+  investigation.
 
 ## Conventions
 

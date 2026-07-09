@@ -1,17 +1,19 @@
-using Anthropic;
-using Anthropic.Core;
-using Anthropic.Models.Messages;
 using EdhDeckBuilder.Agent.Authentication.Claude;
 using EdhDeckBuilder.Agent.Interfaces;
+using EdhDeckBuilder.Agent.Llm.Claude;
+using EdhDeckBuilder.Agent.Llm.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace EdhDeckBuilder.Agent.Authentication;
 
 /// <summary>
 /// Fires a minimal 1-token call to validate a key before accepting it.
-/// GitHub Models support deferred pending SDK stabilization.
-/// Keeps the SDK constructor seam in one place alongside <see cref="Claude.ClaudeClientFactory"/>.
+/// Uses <see cref="ClaudeHttpLlmClient"/> for Anthropic so the test goes through the same
+/// HTTP path as live calls. Google and GitHub keys are validated by format only.
 /// </summary>
-public sealed class KeyTester : IKeyTester
+public sealed class KeyTester(
+    IHttpClientFactory httpFactory,
+    ILogger<ClaudeHttpLlmClient> logger) : IKeyTester
 {
     public async Task<KeyTestResult> TestAsync(string apiKey, AiProvider provider, CancellationToken ct = default)
     {
@@ -19,27 +21,34 @@ public sealed class KeyTester : IKeyTester
         {
             if (provider == AiProvider.Google)
             {
-                // Placeholder: accept any reasonably-long token as valid (format check only)
                 if (apiKey.Trim().Length >= 20)
                     return new KeyTestResult(true, null);
                 return new KeyTestResult(false, "Invalid Google API key format (too short)");
             }
-            else if (provider == AiProvider.GitHubModels)
+
+            if (provider == AiProvider.GitHubModels)
             {
-                // Placeholder: accept any ghp_ or github_pat_ token as valid (format check only)
-                if (apiKey.Trim().StartsWith("ghp_") || apiKey.Trim().StartsWith("github_pat_"))
+                var trimmed = apiKey.Trim();
+                if (trimmed.StartsWith("ghp_") || trimmed.StartsWith("github_pat_"))
                     return new KeyTestResult(true, null);
                 return new KeyTestResult(false, "Invalid GitHub token format");
             }
 
-            var client = new AnthropicClient(new ClientOptions { ApiKey = apiKey.Trim() });
-            await client.Messages.Create(new MessageCreateParams
+            var http   = httpFactory.CreateClient("claude");
+            var client = new ClaudeHttpLlmClient(http, apiKey.Trim(), logger);
+
+            await client.SendAsync(new LlmRequest
             {
                 Model     = ClaudeModels.Haiku,
                 MaxTokens = 1,
-                Messages  = [new() { Role = Role.User, Content = "hi" }],
+                Messages  = [new LlmMessage { Role = LlmRole.User, Content = [new LlmTextBlock { Text = "hi" }] }],
             }, ct);
+
             return new KeyTestResult(true, null);
+        }
+        catch (ApiKeyRejectedException ex)
+        {
+            return new KeyTestResult(false, ex.InnerException?.Message ?? ex.Message);
         }
         catch (Exception ex)
         {

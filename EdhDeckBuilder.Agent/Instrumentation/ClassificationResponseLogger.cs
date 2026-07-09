@@ -1,5 +1,6 @@
-using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Llm.Shared;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace EdhDeckBuilder.Agent.Instrumentation;
 
@@ -48,12 +49,11 @@ public static class ClassificationResponseLogger
     }
 
     /// <summary>Log a single classification API call response.</summary>
-    public static void LogResponse(int cardCount, int userMessageLength, Message response, long outputTokens)
+    public static void LogResponse(int cardCount, int userMessageLength, LlmResponse response)
     {
         if (_options?.LogClassificationResponses != true)
             return;
 
-        // Lazy initialize session on first call
         if (_currentSessionLogFile is null)
             InitializeSessionLogging();
 
@@ -64,36 +64,24 @@ public static class ClassificationResponseLogger
         {
             lock (_logLock)
             {
-                ToolUseBlock? toolUse = null;
-                foreach (var block in response.Content)
-                {
-                    if (block.TryPickToolUse(out var tu))
-                    {
-                        toolUse = tu;
-                        break;
-                    }
-                }
-
-                var toolInputJson = toolUse?.Input != null
-                    ? JsonSerializer.Serialize(toolUse.Input)
-                    : "(null)";
+                var toolUse     = response.Content.OfType<LlmToolUseBlock>().FirstOrDefault();
+                var toolInputJson = toolUse?.Input?.ToJsonString() ?? "(null)";
 
                 var callRecord = new
                 {
-                    Timestamp = DateTime.UtcNow.ToString("o"),
-                    CardCount = cardCount,
+                    Timestamp         = DateTime.UtcNow.ToString("o"),
+                    CardCount         = cardCount,
                     UserMessageLength = userMessageLength,
-                    InputTokens = response.Usage.InputTokens,
-                    OutputTokens = outputTokens,
-                    Tool = toolUse?.Name,
-                    ToolInputLength = toolInputJson.Length,
-                    ToolInputSample = toolInputJson[..Math.Min(500, toolInputJson.Length)],
+                    InputTokens       = response.Usage.InputTokens,
+                    OutputTokens      = response.Usage.OutputTokens,
+                    Tool              = toolUse?.ToolName,
+                    ToolInputLength   = toolInputJson.Length,
+                    ToolInputSample   = toolInputJson[..Math.Min(500, toolInputJson.Length)],
                     ClassificationsCount = GetClassificationsCount(toolUse?.Input),
                 };
 
-                // Read existing array, add new record, write back
                 var existingJson = File.ReadAllText(_currentSessionLogFile);
-                var records = JsonSerializer.Deserialize<List<object>>(existingJson) ?? [];
+                var records      = JsonSerializer.Deserialize<List<object>>(existingJson) ?? [];
                 records.Add(callRecord);
 
                 var updatedJson = JsonSerializer.Serialize(records, new JsonSerializerOptions { WriteIndented = true });
@@ -106,20 +94,14 @@ public static class ClassificationResponseLogger
         }
     }
 
-    private static int GetClassificationsCount(IReadOnlyDictionary<string, JsonElement>? toolInput)
+    private static int GetClassificationsCount(JsonNode? toolInput)
     {
-        if (toolInput == null)
+        if (toolInput is null)
             return 0;
-
         try
         {
-            if (toolInput.TryGetValue("classifications", out var elem) && elem.ValueKind == System.Text.Json.JsonValueKind.Array)
-            {
-                return elem.GetArrayLength();
-            }
+            return toolInput["classifications"]?.AsArray().Count ?? 0;
         }
-        catch { }
-
-        return 0;
+        catch { return 0; }
     }
 }

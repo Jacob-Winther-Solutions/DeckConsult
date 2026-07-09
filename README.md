@@ -1,8 +1,8 @@
 # EdhDeckBuilder
 
 An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end. Supports both
-Anthropic Claude (via the official C# SDK) and Google Gemini (via a custom REST client) as the
-LLM backend, chosen per user session.
+Anthropic Claude (via direct HTTP — `ClaudeHttpLlmClient`) and Google Gemini (via a custom REST
+client — `GeminiHttpLlmClient`) as the LLM backend, chosen per user session.
 
 ## Solution layout
 
@@ -90,28 +90,39 @@ Input: role-filtered classified pool + current build state + soft constraints.
 Output: `[{oracleId, rank, rationale}]` — ranked picks only; the fill engine decides count.  
 The model is configurable per session via the settings UI.
 
-Both calls use forced structured output (Anthropic: `ToolChoiceTool` with `Tool.Strict = true`;
-Gemini: `responseSchema` with `responseMimeType: "application/json"`). The model can never emit
-a card name not in the input batch; all responses are filtered against a whitelist of known
-oracle ids.
+Both calls use forced structured output (Anthropic: `tool_choice: {type: "tool", name: "..."}` in
+the raw HTTP body; Gemini: `responseSchema` with `responseMimeType: "application/json"`). The
+model can never emit a card name not in the input batch; all responses are filtered against a
+whitelist of known oracle ids.
 
 ### Provider adapters
 
-Two provider paths are wired in `EdhDeckBuilder.Agent/Llm/`, dispatched at DI resolution time
-against `SessionApiKeyProvider.ActiveProvider`:
+Three **provider-agnostic** adapters in `EdhDeckBuilder.Agent/Llm/` hold all business logic:
 
-**Anthropic Claude** (`Llm/LlmClassifier.cs`, `Llm/LlmSelector.cs`, `Llm/LlmCommanderSelector.cs`)  
-Uses the official Anthropic C# SDK (v12.35.1). Classification always runs on
-`claude-haiku-4-5-20251001` regardless of user selection; selection uses the user's chosen model
-(Haiku / Sonnet 5 / Opus 4.8). Both use a forced tool call — `Tool.Strict = true`.
+| Adapter | Interface | What it does |
+|---|---|---|
+| `LlmClassifier` | `ILlmClassifier` | Classifies cards in 30-card batches, caches results |
+| `LlmSelector` | `ICardSelector` | Ranks candidates per role for the fill engine |
+| `LlmCommanderSelector` | `ICommanderSelector` | Ranks commander candidates for Discovery |
 
-**Google Gemini** (`Llm/Gemini/GeminiClassifier.cs`, `GeminiSelector.cs`, `GeminiCommanderSelector.cs`)  
-Uses a custom REST client (`GeminiRestClient`) posting directly to
-`https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`. No OpenAI SDK
-wrapping — Gemini's OpenAI-compatible endpoint has enough quirks that a direct implementation
-is cleaner. Structured output is requested via `generationConfig.responseSchema` (Gemini's
-OpenAPI 3.0 subset with `propertyOrdering` to stabilize output key order). Both classifier and
-selector run on the user's chosen Gemini model.
+Each adapter calls `ILlmClientFactory.CreateForCurrentUser()` to get the active provider's
+HTTP client, then formats a provider-agnostic `LlmRequest` and parses the `LlmResponse`. Two
+concrete `ILlmClient` implementations handle the actual wire format:
+
+**`Llm/Claude/ClaudeHttpLlmClient`** — posts directly to `api.anthropic.com/v1/messages` with
+`x-api-key` and `anthropic-version` headers. No Anthropic C# SDK; pure `HttpClient`. Handles
+retries (429/50x with `Retry-After`-aware backoff), maps 401/403 to `ApiKeyRejectedException`,
+and serializes prompt-cache breakpoints when `LlmRequest.EnableCaching = true` (system prompt
+is marked ephemeral; cache fires when the system+tool token count exceeds the per-model minimum).
+Classification always runs on `claude-haiku-4-5-20251001`; selection uses the user's chosen
+model (Haiku / Sonnet 5 / Opus 4.8).
+
+**`Llm/Gemini/GeminiHttpLlmClient`** — wraps `GeminiRestClient`, which posts directly to
+`https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with a
+`x-goog-api-key` header. No OpenAI SDK. Structured output is requested via
+`generationConfig.responseSchema` (Gemini's OpenAPI 3.0 subset). The client simulates a
+`LlmToolUseBlock` in the response so all three adapters can treat both providers uniformly.
+Both classifier and selector run on the user's chosen Gemini model.
 
 Supporting pieces on the Gemini path:
 
@@ -136,9 +147,8 @@ Free-tier Gemini usage still reports a cost figure: it's the "what you'd pay on 
 estimate. When a new model is added to a picker, add its row to `ModelPricing.Prices` in the
 same change; unknown models silently report $0.
 
-`IUsageTrackerAware` is a marker interface implemented by all six adapters (three Anthropic +
-three Gemini). `DeckBuilder` and `CommanderDiscovery` dispatch through it — no type-specific
-`is LlmXxx` branches.
+`IUsageTrackerAware` is a marker interface implemented by all three adapters. `DeckBuilder` and
+`CommanderDiscovery` dispatch through it — no type-specific `is LlmXxx` branches.
 
 ### Slot accounting invariant
 

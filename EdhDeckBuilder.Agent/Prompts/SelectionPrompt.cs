@@ -1,10 +1,10 @@
-using Anthropic.Models.Messages;
+using EdhDeckBuilder.Agent.Llm.Shared;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Core.Rules;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace EdhDeckBuilder.Agent.Prompts;
 
@@ -18,7 +18,7 @@ public static class SelectionPrompt
 
     public const string SystemPrompt =
         """
-        You are an expert Magic: the Gathering Commander (EDH) deck builder. Your task is to rank candidate cards for a specific role in a Commander deck, from best to worst.
+        You are an expert Magic: the Gathering deck builder. Your task is to rank candidate cards for a specific role in a Commander deck, from best to worst.
 
         ## Ranking criteria (apply in this order)
         1. **Role fulfillment** — How directly and reliably the card performs the requested function in this specific deck
@@ -35,14 +35,11 @@ public static class SelectionPrompt
         - Return the oracle_id values exactly as provided — do not invent or modify any.
         """;
 
-    /// <summary>Tool definition with cache control so Anthropic can cache the schema across calls.</summary>
-    public static Tool Tool { get; } = new()
+    public static LlmToolDefinition ToolDefinition { get; } = new()
     {
-        Name = ToolName,
+        Name        = ToolName,
         Description = "Rank the candidate cards from best (rank 1) to worst for the requested role in this Commander deck.",
-        InputSchema = BuildSchema(),
-        Strict = true,
-        CacheControl = new CacheControlEphemeral(),
+        InputSchema = JsonNode.Parse(SchemaJson)!,
     };
 
     public static string FormatUserMessage(
@@ -161,33 +158,27 @@ public static class SelectionPrompt
         }
     }
 
-    private static InputSchema BuildSchema()
-    {
-        const string json = """
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "selections": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "oracle_id": { "type": "string" },
-                      "rank":      { "type": "integer" },
-                      "rationale": { "type": "string" }
-                    },
-                    "required": ["oracle_id","rank","rationale"]
-                  }
-                }
-              },
-              "required": ["selections"]
+    private const string SchemaJson = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "selections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "oracle_id": { "type": "string" },
+                  "rank":      { "type": "integer" },
+                  "rationale": { "type": "string" }
+                },
+                "required": ["oracle_id","rank","rationale"]
+              }
             }
-            """;
+          },
+          "required": ["selections"]
+        }
+        """;
 
-        using var doc = JsonDocument.Parse(json);
-        return InputSchema.FromRawUnchecked(
-            doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()));
-    }
 }
