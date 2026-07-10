@@ -89,14 +89,16 @@ usage summary — not a crash, but misleading.
 
 ### 5. A key tester
 
-Implement `IKeyTester` for your provider. The interface has one method:
+Add a branch for your provider inside `KeyTester.TestAsync` in
+`EdhDeckBuilder.Agent/Authentication/KeyTester.cs`. The interface:
 
 ```csharp
-Task<bool> TestKeyAsync(string apiKey, CancellationToken ct = default);
+Task<KeyTestResult> TestAsync(string apiKey, AiProvider provider, CancellationToken ct = default);
 ```
 
-Make the smallest API call that will return 401 for a bad key and 200 for a good one —
-typically a single-token completion or a models-list endpoint.
+Add an `if (provider == AiProvider.YourProvider)` block before the Anthropic path. Make the
+smallest API call that will return 401 for a bad key and 200 for a good one — typically a
+single-token completion. For now a format-only check is acceptable as a placeholder.
 
 ---
 

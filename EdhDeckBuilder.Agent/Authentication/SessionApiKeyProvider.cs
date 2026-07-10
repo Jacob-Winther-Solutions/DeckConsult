@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 namespace EdhDeckBuilder.Agent.Authentication;
 
 /// <summary>
-/// Per-circuit in-memory holder for the user's Anthropic API key. Register as Scoped.
+/// Per-circuit in-memory holder for the user's API key. Register as Scoped.
 /// The settings component calls <see cref="Set"/> and <see cref="Clear"/>; the agent
 /// reads through <see cref="IClaudeApiKeyProvider"/>.
 /// </summary>
@@ -17,7 +17,7 @@ namespace EdhDeckBuilder.Agent.Authentication;
 public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 {
     private string? _anthropicKey;
-    private string? _gitHubKey;
+    private string? _openAiKey;
     private string? _googleKey;
     private AiProvider _activeProvider;
 
@@ -27,9 +27,9 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
         if (!string.IsNullOrWhiteSpace(anthropicKey))
             _anthropicKey = anthropicKey.Trim();
 
-        var gitHubKey = config["GitHub:ApiKey"];
-        if (!string.IsNullOrWhiteSpace(gitHubKey))
-            _gitHubKey = gitHubKey.Trim();
+        var openAiKey = config["OpenAI:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(openAiKey))
+            _openAiKey = openAiKey.Trim();
 
         var googleKey = config["Google:ApiKey"];
         if (!string.IsNullOrWhiteSpace(googleKey))
@@ -40,7 +40,7 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
         _activeProvider = providerSetting switch
         {
             string s when s.Equals("Google", StringComparison.OrdinalIgnoreCase) => AiProvider.Google,
-            string s when s.Equals("GitHubModels", StringComparison.OrdinalIgnoreCase) => AiProvider.GitHubModels,
+            string s when s.Equals("OpenAI",  StringComparison.OrdinalIgnoreCase) => AiProvider.OpenAI,
             _ => AiProvider.Anthropic,
         };
     }
@@ -55,7 +55,7 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
         ActiveProvider switch
         {
             AiProvider.Google => _googleKey,
-            AiProvider.GitHubModels => _gitHubKey,
+            AiProvider.OpenAI => _openAiKey,
             _ => _anthropicKey,
         };
 
@@ -71,21 +71,19 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
 
         if (ActiveProvider == AiProvider.Google)
         {
-            // Google API keys can start with AIza, AQ, or other prefixes
             if (trimmed.Length < 20)
                 throw new ArgumentException(
                     "That doesn't look like a valid Google API key (too short).",
                     nameof(apiKey));
             _googleKey = trimmed;
         }
-        else if (ActiveProvider == AiProvider.GitHubModels)
+        else if (ActiveProvider == AiProvider.OpenAI)
         {
-            if (!trimmed.StartsWith("ghp_", StringComparison.Ordinal) &&
-                !trimmed.StartsWith("github_pat_", StringComparison.Ordinal))
+            if (!trimmed.StartsWith("sk-", StringComparison.Ordinal))
                 throw new ArgumentException(
-                    "That doesn't look like a GitHub Personal Access Token (expected 'ghp_' or 'github_pat_' prefix).",
+                    "That doesn't look like an OpenAI API key (expected 'sk-' prefix).",
                     nameof(apiKey));
-            _gitHubKey = trimmed;
+            _openAiKey = trimmed;
         }
         else
         {
@@ -101,8 +99,8 @@ public sealed class SessionApiKeyProvider : IClaudeApiKeyProvider
     {
         if (ActiveProvider == AiProvider.Google)
             _googleKey = null;
-        else if (ActiveProvider == AiProvider.GitHubModels)
-            _gitHubKey = null;
+        else if (ActiveProvider == AiProvider.OpenAI)
+            _openAiKey = null;
         else
             _anthropicKey = null;
     }

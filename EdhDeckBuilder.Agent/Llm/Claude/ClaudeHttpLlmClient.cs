@@ -245,7 +245,7 @@ public sealed class ClaudeHttpLlmClient(
     }
 
     // Anthropic deprecated the temperature parameter for models newer than claude-opus-4-6.
-    // Haiku 4.5 and claude-3 variants (used via GitHub Models) still accept it.
+    // Haiku 4.5 and claude-3 variants still accept it.
     private static bool ModelSupportsTemperature(string modelId) =>
         modelId.Contains("haiku-4-5", StringComparison.OrdinalIgnoreCase) ||
         modelId.Contains("claude-3",  StringComparison.OrdinalIgnoreCase);

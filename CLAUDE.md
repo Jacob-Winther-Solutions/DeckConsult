@@ -57,12 +57,12 @@ without an explicit user request.
 
 ### Provider dispatch
 
-`SessionApiKeyProvider.ActiveProvider` (`Anthropic` / `GitHubModels` / `Google`) is set at the
+`SessionApiKeyProvider.ActiveProvider` (`Anthropic` / `Google` / `OpenAI`) is set at the
 UI level and read at the DI factory lambdas in `ServiceCollectionExtensions.AddAgent`. Each
 interface (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`) resolves to either the
-Anthropic or Gemini concrete class at scope-resolution time. GitHubModels adapters are still
-deferred pending Azure.AI.Inference SDK stability — the UI wires the key and cookie for it, but
-the LLM interfaces fall through to the Anthropic implementation.
+Anthropic or Gemini concrete class at scope-resolution time. OpenAI adapters are still
+deferred — the UI wires the key and cookie for it, but the LLM interfaces fall through to
+the Anthropic implementation until `OpenAiHttpLlmClient` is implemented.
 
 ### Gemini path — custom REST client
 
@@ -190,8 +190,8 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   in Razor markup.
 - Implement interfaces from `Core/Abstractions/` in the outer layers; don't add new abstractions
   to Core without a good reason.
-- Keep secrets (API keys — Anthropic, Google, GitHub) out of source — use user-secrets or
-  environment variables (`Anthropic:ApiKey`, `Google:ApiKey`, `GitHub:ApiKey`,
+- Keep secrets (API keys — Anthropic, Google, OpenAI) out of source — use user-secrets or
+  environment variables (`Anthropic:ApiKey`, `Google:ApiKey`, `OpenAI:ApiKey`,
   `Provider:Default`).
 - Tests live in `Tests/`. No mocking libraries — manual mocks only (the project has no Moq/NSubstitute
   reference). Keep tests fast: LLM calls must be behind the `ILlmClassifier`/`ICardSelector`

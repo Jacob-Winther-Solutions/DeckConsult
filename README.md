@@ -172,10 +172,10 @@ reads them on construction so the UI shows "Connected" automatically:
 |---|---|
 | Anthropic | `Anthropic:ApiKey` |
 | Google Gemini | `Google:ApiKey` |
-| GitHub Models | `GitHub:ApiKey` |
+| OpenAI | `OpenAI:ApiKey` |
 
 The startup provider can be selected via `Provider:Default` (`Anthropic` / `Google` /
-`GitHubModels`). **Note:** the provider is also persisted per-user in a browser cookie, so once
+`OpenAI`). **Note:** the provider is also persisted per-user in a browser cookie, so once
 you connect through the UI the cookie wins on subsequent loads. To force a config change to take
 effect, clear the cookie or use an incognito window.
 

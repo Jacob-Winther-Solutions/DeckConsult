@@ -4,56 +4,52 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## Multi-Provider LLM Support — Gemini LIVE (2026-07-08)
+## Multi-Provider LLM Support — Anthropic + Gemini LIVE (2026-07-08)
 
 Anthropic and Google Gemini are both fully wired end-to-end. The Gemini adapters use a custom
 REST client (not the OpenAI-compatible SDK path) posting directly to `generateContent` with a
 structured `responseSchema`. See `README.md` and `CLAUDE.md` for the architecture; the archived
 `TODO/Archive/GEMINI_IMPLEMENTATION_NOTES.md` records the original blocked state for context.
 
-**Still deferred:** GitHub Models LLM adapters — the Azure.AI.Inference SDK type surface is still
-in beta. UI, cookie, and key storage for GitHub Models remain in place; when the SDK stabilizes,
-the three adapters can slot in following the same `IUsageTrackerAware` + factory pattern the
-Anthropic and Gemini adapters use.
-
 ---
 
-## GitHub Models LLM Adapters
+## OpenAI Direct Client
 
-UI, cookie, and key storage for GitHub Models are already in place (`SessionApiKeyProvider`,
-`ApiKeySettings`, `AiProvider.GitHubModels`). The LLM interfaces currently fall through to the
-Anthropic implementation when GitHub Models is selected. This section tracks wiring the actual
-adapters.
+UI, cookie, and key storage for OpenAI are already in place (`SessionApiKeyProvider`,
+`ApiKeySettings`, `AiProvider.OpenAI`, `OpenAiModels`). The LLM interfaces currently fall through
+to the Anthropic implementation when OpenAI is selected. This section tracks wiring the actual
+HTTP client and adapters.
 
-GitHub Models exposes an OpenAI-compatible endpoint at
-`https://models.inference.ai.azure.com` authenticated with a GitHub PAT (`ghp_…`).
-The three adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) are already
-provider-agnostic — only the `ILlmClient` implementation and factory need to be added.
+OpenAI's chat endpoint: `POST https://api.openai.com/v1/chat/completions` with
+`Authorization: Bearer {sk-…}`. The request/response shape differs from Anthropic's but
+tool-use and forced tool calls are well-supported. The three provider-agnostic adapters
+(`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) need only the `ILlmClient`
+implementation and factory — nothing else changes.
 
 **Implementation tasks:**
 
-- [ ] Implement `GitHubModelsHttpLlmClient` in `EdhDeckBuilder.Agent/Llm/GitHubModels/`:
-      POST to `https://models.inference.ai.azure.com/chat/completions` with
-      `Authorization: Bearer {ghpToken}`. Reuse the same request/response shape as
-      `ClaudeHttpLlmClient` where the OpenAI-compatible format overlaps; handle differences
-      (tool choice format, finish reason, token usage field names).
-- [ ] Implement `GitHubModelsLlmClientFactory` implementing `ILlmClientFactory`; constructed
-      from `IHttpClientFactory` and `SessionApiKeyProvider`. Register via
-      `AddHttpClient<GitHubModelsLlmClientFactory>`.
-- [ ] Wire into `ServiceCollectionExtensions.AddAgent`: add the `AiProvider.GitHubModels`
-      case to all three DI factory lambdas (`ILlmClassifier`, `ICardSelector`,
-      `ICommanderSelector`) so they resolve to GitHub-backed adapters when selected.
-- [ ] Implement `IUsageTrackerAware` on `GitHubModelsHttpLlmClient` so cost tracking
-      picks it up automatically (no `is GitHubModels` branch needed in `DeckBuilder`).
-- [ ] Add `ModelPricing` entries for all models listed in `ClaudeModels.GitHubSelectionModels`.
-      Unknown models silently report $0 — adding pricing in the same change avoids a
-      confusingly zero cost summary.
-- [ ] Update `KeyTester` GitHub branch (currently a format-only check) to do a real
-      1-token probe against the GitHub Models endpoint, consistent with the Anthropic probe.
-- [ ] Handle 401/403 from the GitHub endpoint: wrap as `ApiKeyRejectedException` (same as
-      Anthropic and Gemini paths) so the UI clears the key and shows a reconnect prompt.
-- [ ] Add tests: manual mock for `GitHubModelsHttpLlmClient` following the same pattern as
-      the existing Anthropic and Gemini mock fixtures in `Tests/`.
+- [ ] Implement `OpenAiHttpLlmClient` in `EdhDeckBuilder.Agent/Llm/OpenAI/`:
+      POST to `https://api.openai.com/v1/chat/completions` with `Authorization: Bearer {key}`.
+      Map `LlmRequest` → OpenAI request body (note: tool choice format is
+      `{"type": "function", "function": {"name": "…"}}`, finish reason is `"tool_calls"` not
+      `"tool_use"`, and token fields are `prompt_tokens`/`completion_tokens`).
+      Handle `o1`/`o3`/`o4-mini` reasoning models: these reject `temperature` — apply the same
+      `ModelSupportsTemperature` gate used in `ClaudeHttpLlmClient`.
+- [ ] Implement `OpenAiLlmClientFactory` implementing `ILlmClientFactory`; constructed from
+      `IHttpClientFactory` and `SessionApiKeyProvider`. Register via
+      `AddHttpClient<OpenAiLlmClientFactory>`.
+- [ ] Wire into `ServiceCollectionExtensions.AddAgent`: add the `AiProvider.OpenAI` case to
+      all three DI factory lambdas (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`).
+- [ ] Implement `IUsageTrackerAware` on `OpenAiHttpLlmClient` so cost tracking picks it up
+      automatically (no `is OpenAiXxx` branch needed in `DeckBuilder`).
+- [ ] Add `ModelPricing` entries for all models in `OpenAiModels.SelectionModels`.
+      Unknown models silently report $0 — add pricing in the same change.
+- [ ] Update `KeyTester` OpenAI branch (currently format-only) to do a real 1-token probe
+      against the OpenAI endpoint, consistent with the Anthropic probe.
+- [ ] Handle 401 from the OpenAI endpoint: wrap as `ApiKeyRejectedException` so the UI clears
+      the key and shows a reconnect prompt.
+- [ ] Add tests: manual mock for `OpenAiHttpLlmClient` following the same pattern as the
+      existing Anthropic and Gemini mock fixtures in `Tests/`.
 
 ---
 
@@ -612,9 +608,9 @@ All four projects compile; 327 tests pass.
 
 **Cost accounting:** `Instrumentation/ModelPricing.cs` — per-model USD rates per 1M tokens for both providers. `UsageTracker` uses it for per-call rows and summary totals; mixed-provider runs tally correctly. Free-tier Gemini calls show the "what you'd pay on paid tier" estimate. `IUsageTrackerAware` marker interface removes type-specific dispatch — all three adapters implement it, `DeckBuilder` and `CommanderDiscovery` wire the tracker through it.
 
-**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit) with triple-key storage (Anthropic / GitHub / Google). `ClaudeHttpLlmClientFactory` (Anthropic HTTP seam), `GeminiLlmClientFactory` (Gemini REST client seam), both implementing `ILlmClientFactory`. `KeyTester` (1-token probe for Anthropic; format check for Google/GitHub). 401/403 → `ApiKeyRejectedException` wrapping on both provider paths. Data Protection-encrypted cookies (30-day expiry) for each provider plus a selected-model cookie; cookies win over `Provider:Default` in appsettings. Prompt caching implemented on the Anthropic path (`cache_control` on last tool definition); Gemini path ignores `EnableCaching`.
+**BYOK & authentication:** `SessionApiKeyProvider` (scoped per-circuit) with triple-key storage (Anthropic / OpenAI / Google). `ClaudeHttpLlmClientFactory` (Anthropic HTTP seam), `GeminiLlmClientFactory` (Gemini REST client seam), both implementing `ILlmClientFactory`. `KeyTester` (1-token probe for Anthropic; format check for Google/OpenAI). 401/403 → `ApiKeyRejectedException` wrapping on both live provider paths. Data Protection-encrypted cookies (30-day expiry) for each provider plus a selected-model cookie; cookies win over `Provider:Default` in appsettings. Prompt caching implemented on the Anthropic path (`cache_control` on last tool definition); Gemini path ignores `EnableCaching`.
 
-**Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option. Provider toggle (Anthropic / GitHub Models / Google AI Studio) with per-provider help text and dynamic model dropdown.
+**Web UI:** Commander search + deck builder. Three deck views (by role / by type / all cards). Coverage summary, runner-up panel, cut suggestions. Budget input & enforcement (per-card + total). Archetype/theme picker with weight sliders; 29 themes + custom escape hatch. Bracket selection. Export build report (`.md` download). Color identity picker with exact-match option. Provider toggle (Anthropic / OpenAI / Google AI Studio) with per-provider help text and dynamic model dropdown.
 
 **Commander Discovery:** Standalone `/discover` page with two tabs: Guided (LLM-assisted, archetype/theme-driven) and Custom (free-text strategy description). Ranked commander suggestions with art, rationale, and power level. Contiguous rank normalization in `BuildSuggestionsFromResults` — display is always 1..N regardless of what the model emits. Partner-pair support (all 8 variants: Partner, Partner with, Background, Friends Forever, Doctor's Companion, Survivors, Character Select, Father & Son). EDHREC partner index integrated. Deck builder pool gathering queries partner-pair endpoints with redirect handling and canonical caching. Graceful fallback to merged single-commander pools.
 

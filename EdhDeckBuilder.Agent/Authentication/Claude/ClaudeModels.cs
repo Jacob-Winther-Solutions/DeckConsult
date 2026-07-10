@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Authentication.Gemini;
+using EdhDeckBuilder.Agent.Authentication.OpenAI;
 
 namespace EdhDeckBuilder.Agent.Authentication.Claude;
 
@@ -15,17 +16,11 @@ public static class ClaudeModels
         (Opus,   "Opus 4.8 — highest quality"),
     ];
 
-    public static readonly IReadOnlyList<(string Id, string Label)> GitHubSelectionModels =
-    [
-        ("claude-3-5-haiku",  "Haiku 3.5 (GitHub Models — free)"),
-        ("claude-3-5-sonnet", "Sonnet 3.5 (GitHub Models — free)"),
-    ];
-
     public static IReadOnlyList<(string Id, string Label)> GetSelectionModels(AiProvider provider) =>
         provider switch
         {
             AiProvider.Google => GeminiModels.SelectionModels,
-            AiProvider.GitHubModels => GitHubSelectionModels,
+            AiProvider.OpenAI => OpenAiModels.SelectionModels,
             _ => SelectionModels,
         };
 }

@@ -11,7 +11,7 @@ namespace EdhDeckBuilder.Web.Components.Shared;
 public partial class ApiKeySettings : ComponentBase
 {
     private const string CookieNameAnthropic = "edh_apikey";
-    private const string CookieNameGitHub    = "edh_apikey_gh";
+    private const string CookieNameOpenAI    = "edh_apikey_openai";
     private const string CookieNameGoogle    = "edh_apikey_google";
     private const string CookieNameModel     = "edh_selectedmodel";
     private const int    CookieDays          = 30;
@@ -40,8 +40,7 @@ public partial class ApiKeySettings : ComponentBase
         _connected         = Keys.GetApiKey() is not null;
         _selectedProvider  = Keys.ActiveProvider;
 
-        // If provider doesn't have the currently selected model, pick the first valid model for this provider
-        var validModels = ClaudeModels.GetSelectionModels(_selectedProvider);
+        var validModels  = ClaudeModels.GetSelectionModels(_selectedProvider);
         var currentModel = Keys.SelectedModel;
         if (validModels.Any(m => m.Id == currentModel))
         {
@@ -59,13 +58,10 @@ public partial class ApiKeySettings : ComponentBase
         if (!firstRender)
             return;
 
-        // Try to restore keys from encrypted cookies (JS interop only works after render).
-        // Cookies override config defaults — if a cookie exists, use it; otherwise fall back to config.
         try
         {
             var keysLoaded = false;
 
-            // Try Anthropic cookie
             var anthropicCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameAnthropic);
             if (!string.IsNullOrEmpty(anthropicCookie))
             {
@@ -81,18 +77,17 @@ public partial class ApiKeySettings : ComponentBase
                 catch { }
             }
 
-            // Try GitHub Models cookie (only if no Anthropic key found)
             if (!keysLoaded)
             {
-                var gitHubCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameGitHub);
-                if (!string.IsNullOrEmpty(gitHubCookie))
+                var openAiCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameOpenAI);
+                if (!string.IsNullOrEmpty(openAiCookie))
                 {
                     try
                     {
-                        var key = Protector.Unprotect(gitHubCookie);
-                        Keys.ActiveProvider = AiProvider.GitHubModels;
+                        var key = Protector.Unprotect(openAiCookie);
+                        Keys.ActiveProvider = AiProvider.OpenAI;
                         Keys.Set(key);
-                        _selectedProvider = AiProvider.GitHubModels;
+                        _selectedProvider = AiProvider.OpenAI;
                         _connected = true;
                         keysLoaded = true;
                     }
@@ -100,7 +95,6 @@ public partial class ApiKeySettings : ComponentBase
                 }
             }
 
-            // Try Google cookie (only if no other key found)
             if (!keysLoaded)
             {
                 var googleCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameGoogle);
@@ -119,7 +113,6 @@ public partial class ApiKeySettings : ComponentBase
                 }
             }
 
-            // If cookies were loaded, update UI and notify
             if (keysLoaded)
             {
                 _selectedModel = Keys.SelectedModel;
@@ -127,13 +120,11 @@ public partial class ApiKeySettings : ComponentBase
                 ApiKeyState.NotifyChanged();
             }
 
-            // Try to restore saved model preference
             try
             {
                 var modelCookie = await JS.InvokeAsync<string?>("getCookie", CookieNameModel);
                 if (!string.IsNullOrEmpty(modelCookie))
                 {
-                    // Model preference is not encrypted (just a model ID)
                     var validModels = ClaudeModels.GetSelectionModels(_selectedProvider);
                     if (validModels.Any(m => m.Id == modelCookie))
                     {
@@ -194,7 +185,7 @@ public partial class ApiKeySettings : ComponentBase
         var cookieName = _selectedProvider switch
         {
             AiProvider.Google => CookieNameGoogle,
-            AiProvider.GitHubModels => CookieNameGitHub,
+            AiProvider.OpenAI => CookieNameOpenAI,
             _ => CookieNameAnthropic,
         };
         await JS.InvokeVoidAsync("deleteCookie", cookieName);
@@ -207,7 +198,6 @@ public partial class ApiKeySettings : ComponentBase
         {
             _selectedProvider = provider;
             Keys.ActiveProvider = provider;
-            // Reset model to default for the new provider
             var models = ClaudeModels.GetSelectionModels(provider);
             _selectedModel = models.First().Id;
             Keys.SelectedModel = _selectedModel;
@@ -222,7 +212,6 @@ public partial class ApiKeySettings : ComponentBase
         {
             Keys.SelectedModel = model;
             _selectedModel     = model;
-            // Persist model choice to cookie (unencrypted, just the model ID)
             await JS.InvokeVoidAsync("setCookie", CookieNameModel, model, CookieDays);
         }
     }
@@ -233,7 +222,7 @@ public partial class ApiKeySettings : ComponentBase
         var cookieName = provider switch
         {
             AiProvider.Google => CookieNameGoogle,
-            AiProvider.GitHubModels => CookieNameGitHub,
+            AiProvider.OpenAI => CookieNameOpenAI,
             _ => CookieNameAnthropic,
         };
         await JS.InvokeVoidAsync("setCookie", cookieName, encrypted, CookieDays);
@@ -243,7 +232,7 @@ public partial class ApiKeySettings : ComponentBase
         _selectedProvider switch
         {
             AiProvider.Google => "Paste your Google API key",
-            AiProvider.GitHubModels => "ghp_…",
+            AiProvider.OpenAI => "sk-…",
             _ => "sk-ant-…",
         };
 }

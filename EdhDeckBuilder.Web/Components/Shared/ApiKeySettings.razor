@@ -40,10 +40,10 @@
                                @onchange="OnProviderChanged" value="@AiProvider.Anthropic" />
                         <label class="btn btn-outline-secondary" for="provider-anthropic">Anthropic</label>
 
-                        <input type="radio" class="btn-check" id="provider-github"
-                               checked="@(_selectedProvider == AiProvider.GitHubModels)"
-                               @onchange="OnProviderChanged" value="@AiProvider.GitHubModels" />
-                        <label class="btn btn-outline-secondary" for="provider-github">GitHub Models</label>
+                        <input type="radio" class="btn-check" id="provider-openai"
+                               checked="@(_selectedProvider == AiProvider.OpenAI)"
+                               @onchange="OnProviderChanged" value="@AiProvider.OpenAI" />
+                        <label class="btn btn-outline-secondary" for="provider-openai">OpenAI</label>
 
                         <input type="radio" class="btn-check" id="provider-google"
                                checked="@(_selectedProvider == AiProvider.Google)"
@@ -59,12 +59,11 @@
                         Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
                     </p>
                 }
-                else if (_selectedProvider == AiProvider.GitHubModels)
+                else if (_selectedProvider == AiProvider.OpenAI)
                 {
                     <p class="small text-muted mb-3">
-                        Free access to Claude via GitHub Models (requires Copilot subscription).
-                        Get a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>
-                        (no scopes needed, minimum permissions).
+                        Builds run on your own key, billed to your account.
+                        Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.
                     </p>
                 }
                 else
