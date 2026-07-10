@@ -1,16 +1,13 @@
-@using EdhDeckBuilder.Core.Cards
-@using EdhDeckBuilder.Core.Decks
-@using EdhDeckBuilder.Agent.Models
-
 <div class="card">
     <div class="card-body">
         @if (_isRunning)
         {
-            <div class="spinner-border mb-3" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p>@_currentStage</p>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Cancel())">Cancel</button>
+            <BuildProgress AllStages="AllStages"
+                           CurrentStage="@_currentStage"
+                           CurrentStageDetail="@_currentDetail"
+                           CompletedStages="_completedStages"
+                           Title="Discovering commanders…"
+                           OnCancel="Cancel" />
         }
         else if (_result != null && _result.Suggestions.Count > 0)
         {

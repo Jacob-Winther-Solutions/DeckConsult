@@ -7,13 +7,20 @@ using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components.Tabs;
+namespace EdhDeckBuilder.Web.Components.Pages.Discovery;
 
-public partial class DiscoveryTab : IDisposable
+public partial class GuidedDiscoveryTab : IDisposable
 {
     [Inject] private ICommanderDiscovery Discovery { get; set; } = default!;
     [Inject] private SessionApiKeyProvider Keys { get; set; } = default!;
     [Inject] private IApiKeyStateService ApiKeyState { get; set; } = default!;
+
+    private static readonly string[] AllStages =
+    [
+        "Gathering candidates",
+        "Ranking commanders",
+        "Assembling results",
+    ];
 
     private Color? _colorFilter = null;
     private bool _exactColorMatch = false;
@@ -24,7 +31,9 @@ public partial class DiscoveryTab : IDisposable
     private string _description = "";
 
     private bool _isRunning = false;
-    private string _currentStage = "";
+    private string? _currentStage;
+    private string? _currentDetail;
+    private readonly List<string> _completedStages = [];
     private string _errorMessage = "";
     private CancellationTokenSource? _cts;
     private CommanderDiscoveryResult? _result;
@@ -78,8 +87,16 @@ public partial class DiscoveryTab : IDisposable
                 MaxCardPriceUsd = _budget.MaxCardPriceUsd,
             };
 
-            var progress = new Progress<string>(OnStageReport);
-            _result = await Discovery.DiscoverAsync(request, progress, _cts.Token);
+            _result = await Discovery.DiscoverAsync(request, OnStageReport, _cts.Token);
+
+            await InvokeAsync(() =>
+            {
+                if (_currentStage is not null) _completedStages.Add(_currentStage);
+                _currentStage = null;
+                _currentDetail = null;
+                StateHasChanged();
+            });
+            await Task.Yield();
 
             if (tracker != null)
             {
@@ -106,14 +123,23 @@ public partial class DiscoveryTab : IDisposable
         finally
         {
             _isRunning = false;
+            _currentStage = null;
+            _currentDetail = null;
+            _completedStages.Clear();
             _cts?.Dispose();
         }
     }
 
-    private void OnStageReport(string message)
+    private async Task OnStageReport(DiscoveryProgress p)
     {
-        _currentStage = message;
-        StateHasChanged();
+        await InvokeAsync(() =>
+        {
+            if (_currentStage is not null) _completedStages.Add(_currentStage);
+            _currentStage = p.Stage;
+            _currentDetail = p.Detail;
+            StateHasChanged();
+        });
+        await Task.Yield();
     }
 
     private async Task Cancel()
@@ -133,7 +159,9 @@ public partial class DiscoveryTab : IDisposable
         _description = "";
         _result = null;
         _errorMessage = "";
-        _currentStage = "";
+        _currentStage = null;
+        _currentDetail = null;
+        _completedStages.Clear();
     }
 
     void IDisposable.Dispose()

@@ -186,7 +186,7 @@ effect, clear the cookie or use an incognito window.
 dotnet restore
 dotnet build
 
-# Run all 328 tests:
+# Run all 327 tests:
 dotnet test Tests
 
 # Run the app:
@@ -229,9 +229,9 @@ architectural pieces in `Services/` are:
 
   To wire this to a subscription tier: resolve the limit from wherever tiers are stored
   (e.g. `_subscriptionService.GetDeckResultLimit(userId)`) and pass it to
-  `JS.InvokeVoidAsync("saveDeckResult", key, json, resolvedLimit)` in `GuidedTab` and
-  `CustomTab`. The JavaScript function already accepts it as a parameter — no JS changes
-  needed.
+  `JS.InvokeVoidAsync("saveDeckResult", key, json, resolvedLimit)` in
+  `GuidedCommanderBuilderTab` and `CustomCommanderBuilderTab`. The JavaScript function
+  already accepts it as a parameter — no JS changes needed.
 
 - **`DeckResultStore`** — a singleton in-memory cache (`ConcurrentDictionary<string, StoredDeckResult>`)
   that lets the results page retrieve a just-built deck without any JS interop. The builder
@@ -267,10 +267,12 @@ Blazor components in `EdhDeckBuilder.Web/Components/` are organized into logical
 
 ```
 Components/
-├── Pages/              # Route-level entry points (CommanderBuilder, CommanderDiscovery, DeckResultsPage, etc.)
+├── Pages/
+│   ├── CommanderBuilder/  # CommanderBuilder page + GuidedCommanderBuilderTab + CustomCommanderBuilderTab
+│   ├── Discovery/          # CommanderDiscovery page + GuidedDiscoveryTab + CustomDiscoveryTab
+│   └── (other pages)       # DeckResultsPage, Home, etc.
 ├── Forms/              # Input controls & pickers (ArchetypePicker, BracketPicker, BudgetPicker, ColorIdentityPicker, CommanderPicker, ThemePicker)
 ├── Shared/             # Reusable UI components (ApiKeySettings, ColorIdentityPips, CommanderSuggestionCard)
-├── Tabs/               # Tab content areas (CustomTab, DiscoveryTab, GuidedTab)
 ├── Results/            # Deck display components (BuildProgress, DeckExportPanel, DeckResults)
 ├── Layout/             # Navigation chrome (MainLayout, NavMenu, ReconnectModal)
 └── _Imports.razor      # Global usings for all components

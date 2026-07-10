@@ -40,7 +40,7 @@ public interface IDeckBuilder
         IReadOnlyList<WeightedTheme>? themes = null,
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
-        IProgress<string>? progress = null,
+        Func<string, Task>? progress = null,
         CancellationToken ct = default,
         bool isLegalPartnerPair = false);
 }

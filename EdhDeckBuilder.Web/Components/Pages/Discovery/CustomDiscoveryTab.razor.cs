@@ -7,7 +7,7 @@ using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components.Tabs;
+namespace EdhDeckBuilder.Web.Components.Pages.Discovery;
 
 public partial class CustomDiscoveryTab : ComponentBase, IDisposable
 {
@@ -21,47 +21,22 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
     private BudgetSelection _budget = new(null, null);
     private string _description = "";
 
+    private static readonly string[] AllStages =
+    [
+        "Gathering candidates",
+        "Ranking commanders",
+        "Assembling results",
+    ];
+
     private bool _isRunning = false;
-    private string _currentStage = "";
+    private string? _currentStage;
+    private string? _currentDetail;
+    private readonly List<string> _completedStages = [];
     private string? _errorMessage;
     private CancellationTokenSource? _cts;
     private CommanderDiscoveryResult? _result;
 
     private int _budgetResetKey = 0;
-
-    // ── Static form metadata ───────────────────────────────────────────────
-
-    private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
-        DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);
-
-    private static readonly CardRole[] FormRoles =
-        Enum.GetValues<CardRole>().Where(r => r != CardRole.Unclassified).ToArray();
-
-    private static Dictionary<CardRole, int> BuildDefaultTemplateValues() =>
-        FormRoles.ToDictionary(r => r,
-            r => DeckTemplate.Balanced.Targets.TryGetValue(r, out var t) ? t.Ideal : 0);
-
-    private Dictionary<CardRole, int> _customTemplateValues = BuildDefaultTemplateValues();
-
-    private static readonly IReadOnlyDictionary<CardRole, string> RoleDescriptions =
-        new Dictionary<CardRole, string>
-        {
-            [CardRole.Land]               = "Lands and mana-producing permanents",
-            [CardRole.Ramp]               = "Accelerants — rocks, dorks, rituals, land-fetch spells",
-            [CardRole.CardAdvantage]      = "Draw, impulse draw, and hand-refill effects",
-            [CardRole.TargetedDisruption] = "Single-target removal for creatures, artifacts, enchantments",
-            [CardRole.MassDisruption]     = "Board wipes and mass-bounce effects",
-            [CardRole.Protection]         = "Counterspells, hexproof, indestructibility",
-            [CardRole.Tutor]              = "Search effects that find specific cards",
-            [CardRole.Recursion]          = "Graveyard recursion and reanimation effects",
-            [CardRole.Plan]               = "Engines and threats that execute your core strategy",
-            [CardRole.Payoff]             = "Cards that close out or greatly accelerate a win",
-            [CardRole.Synergy]            = "Pieces that interact favorably with your commander or strategy",
-        };
-
-    internal static string RoleLabel(CardRole role) => CardRoleDisplay.FormLabel(role);
-
-    // ── Callbacks ──────────────────────────────────────────────────────────
 
     private void OnColorFilterChanged(ColorFilterSelection selection)
     {
@@ -78,8 +53,6 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
     {
         _budget = budget;
     }
-
-    // ── Build ──────────────────────────────────────────────────────────────
 
     private async Task StartBuildAsync()
     {
@@ -106,8 +79,16 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
                 MaxCardPriceUsd = _budget.MaxCardPriceUsd,
             };
 
-            var progress = new Progress<string>(OnStageReport);
-            _result = await Discovery.DiscoverAsync(request, progress, _cts.Token);
+            _result = await Discovery.DiscoverAsync(request, OnStageReport, _cts.Token);
+
+            await InvokeAsync(() =>
+            {
+                if (_currentStage is not null) _completedStages.Add(_currentStage);
+                _currentStage = null;
+                _currentDetail = null;
+                StateHasChanged();
+            });
+            await Task.Yield();
 
             if (tracker != null)
             {
@@ -134,14 +115,23 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
         finally
         {
             _isRunning = false;
+            _currentStage = null;
+            _currentDetail = null;
+            _completedStages.Clear();
             _cts?.Dispose();
         }
     }
 
-    private void OnStageReport(string message)
+    private async Task OnStageReport(DiscoveryProgress p)
     {
-        _currentStage = message;
-        StateHasChanged();
+        await InvokeAsync(() =>
+        {
+            if (_currentStage is not null) _completedStages.Add(_currentStage);
+            _currentStage = p.Stage;
+            _currentDetail = p.Detail;
+            StateHasChanged();
+        });
+        await Task.Yield();
     }
 
     private async Task Cancel()
@@ -159,8 +149,9 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
         _description = "";
         _result = null;
         _errorMessage = null;
-        _currentStage = "";
-        _customTemplateValues = BuildDefaultTemplateValues();
+        _currentStage = null;
+        _currentDetail = null;
+        _completedStages.Clear();
     }
 
     void IDisposable.Dispose()

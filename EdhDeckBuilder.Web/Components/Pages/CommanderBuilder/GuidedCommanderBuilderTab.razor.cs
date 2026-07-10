@@ -10,9 +10,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 
-namespace EdhDeckBuilder.Web.Components.Tabs;
+namespace EdhDeckBuilder.Web.Components.Pages.CommanderBuilder;
 
-public partial class CustomTab : ComponentBase, IDisposable
+public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 {
     [Inject] private IDeckBuilder          DeckBuilder { get; set; } = default!;
     [Inject] private SessionApiKeyProvider Keys        { get; set; } = default!;
@@ -21,6 +21,13 @@ public partial class CustomTab : ComponentBase, IDisposable
     [Inject] private NavigationManager     Navigation  { get; set; } = default!;
     [Inject] private DeckResultStore       ResultStore { get; set; } = default!;
     [Inject] private IConfiguration        Config      { get; set; } = default!;
+    [Inject] private ICardRepository       CardRepository { get; set; } = default!;
+
+    [Parameter] public Card? InitialCommander { get; set; }
+    [Parameter] public IReadOnlyDictionary<Archetype, double>? InitialArchetypeWeights { get; set; }
+    [Parameter] public IReadOnlyList<WeightedTheme>? InitialThemes { get; set; }
+    [Parameter] public BracketSelection? InitialBracket { get; set; }
+    [Parameter] public BudgetSelection? InitialBudget { get; set; }
 
     private static readonly string[] AllStages =
     [
@@ -41,42 +48,17 @@ public partial class CustomTab : ComponentBase, IDisposable
     private IReadOnlyList<Card> _selectedCommanders = [];
     private int _commanderResetKey = 0;
 
-    private string _customDescription = "";
+    private IReadOnlyDictionary<Archetype, double> _archetypeWeights = new Dictionary<Archetype, double>();
+    private int _archetypeResetKey = 0;
 
-    private Dictionary<CardRole, int> _customTemplateValues = BuildDefaultTemplateValues();
+    private IReadOnlyList<WeightedTheme> _themes = [];
+    private int _themeResetKey = 0;
+
+    private BracketSelection _bracketSelection = new(Bracket.Three, true);
+    private int _bracketResetKey = 0;
 
     private BudgetSelection _budget = new(null, null);
     private int _budgetResetKey = 0;
-
-    // ── Static form metadata ───────────────────────────────────────────────
-
-    private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
-        DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);
-
-    private static readonly CardRole[] FormRoles =
-        Enum.GetValues<CardRole>().Where(r => r != CardRole.Unclassified).ToArray();
-
-    private static Dictionary<CardRole, int> BuildDefaultTemplateValues() =>
-        FormRoles.ToDictionary(r => r,
-            r => DeckTemplate.Balanced.Targets.TryGetValue(r, out var t) ? t.Ideal : 0);
-
-    private static readonly IReadOnlyDictionary<CardRole, string> RoleDescriptions =
-        new Dictionary<CardRole, string>
-        {
-            [CardRole.Land]               = "Lands and mana-producing permanents",
-            [CardRole.Ramp]               = "Accelerants — rocks, dorks, rituals, land-fetch spells",
-            [CardRole.CardAdvantage]      = "Draw, impulse draw, and hand-refill effects",
-            [CardRole.TargetedDisruption] = "Single-target removal for creatures, artifacts, enchantments",
-            [CardRole.MassDisruption]     = "Board wipes and mass-bounce effects",
-            [CardRole.Protection]         = "Counterspells, hexproof, indestructibility",
-            [CardRole.Tutor]              = "Search effects that find specific cards",
-            [CardRole.Recursion]          = "Graveyard recursion and reanimation effects",
-            [CardRole.Plan]               = "Engines and threats that execute your core strategy",
-            [CardRole.Payoff]             = "Cards that close out or greatly accelerate a win",
-            [CardRole.Synergy]            = "Pieces that interact favorably with your commander or strategy",
-        };
-
-    internal static string RoleLabel(CardRole role) => CardRoleDisplay.FormLabel(role);
 
     // ── Build state ────────────────────────────────────────────────────────
 
@@ -84,12 +66,30 @@ public partial class CustomTab : ComponentBase, IDisposable
     private string? _currentStage;
     private readonly List<string> _completedStages = [];
     private string? _errorMessage;
+    private string? _partnerWarning;
     private CancellationTokenSource? _buildCts;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         ApiKeyState.OnChange += OnApiKeyStateChanged;
+
+        if (InitialCommander is not null)
+            _selectedCommanders = [InitialCommander];
+
+        if (InitialArchetypeWeights is not null)
+            _archetypeWeights = InitialArchetypeWeights;
+
+        if (InitialThemes is not null)
+            _themes = InitialThemes;
+
+        if (InitialBracket is not null)
+            _bracketSelection = InitialBracket;
+
+        if (InitialBudget is not null)
+            _budget = InitialBudget;
+    }
 
     private void OnApiKeyStateChanged() => InvokeAsync(StateHasChanged);
 
@@ -97,18 +97,63 @@ public partial class CustomTab : ComponentBase, IDisposable
 
     // ── Callbacks ──────────────────────────────────────────────────────────
 
-    private void OnCommandersChanged(IReadOnlyList<Card> commanders) =>
+    private void OnCommandersChanged(IReadOnlyList<Card> commanders)
+    {
         _selectedCommanders = commanders;
+        _partnerWarning = null;
+
+        if (commanders.Count == 2)
+        {
+            _ = ValidateAndShowWarningAsync(commanders);
+        }
+    }
+
+    private async Task ValidateAndShowWarningAsync(IReadOnlyList<Card> commanders)
+    {
+        bool isLegalPair = await ValidatePartnerPairAsync(commanders, CancellationToken.None);
+        if (!isLegalPair)
+        {
+            _partnerWarning = "⚠️ This is not a legal partner pair. Recommendations will be merged from individual commanders. " +
+                "You can still build a deck, but it may not be optimized for the combination.";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnArchetypesChanged(IReadOnlyDictionary<Archetype, double> weights) =>
+        _archetypeWeights = weights;
+
+    private void OnThemesChanged(IReadOnlyList<WeightedTheme> themes) =>
+        _themes = themes;
+
+    private void OnBracketChanged(BracketSelection selection) =>
+        _bracketSelection = selection;
 
     private void OnBudgetChanged(BudgetSelection budget) =>
         _budget = budget;
 
     // ── Build ──────────────────────────────────────────────────────────────
 
+    private async Task<bool> ValidatePartnerPairAsync(IReadOnlyList<Card> commanders, CancellationToken ct)
+    {
+        if (commanders.Count != 2)
+            return false;
+
+        var combos = await CardRepository.GetPartnerCombosAsync(
+            colorFilter: null,
+            exactMatch: false,
+            ct);
+
+        var first = commanders[0];
+        var second = commanders[1];
+
+        return combos.Any(c =>
+            (c.FirstCardId == first.OracleId && c.SecondCardId == second.OracleId)
+            || (c.FirstCardId == second.OracleId && c.SecondCardId == first.OracleId));
+    }
+
     private async Task StartBuildAsync()
     {
         if (_selectedCommanders.Count == 0) return;
-        if (string.IsNullOrWhiteSpace(_customDescription)) return;
 
         _isBuilding = true;
         _currentStage = null;
@@ -116,15 +161,19 @@ public partial class CustomTab : ComponentBase, IDisposable
         _errorMessage = null;
         _buildCts = new CancellationTokenSource();
 
-        var p = BuildRequestFactory.ForCustom(_customDescription, _customTemplateValues, _budget);
+        var p = BuildRequestFactory.ForGuided(_archetypeWeights, _themes, _bracketSelection, _budget);
 
-        // Enable token tracking if configured
+        bool isLegalPartnerPair = _selectedCommanders.Count == 2 && _partnerWarning is null;
+
         var enableTracking = Config.GetValue<bool>("Features:EnableTokenUsageTracking");
         if (enableTracking)
         {
             var tracker = new UsageTracker();
             DeckBuilder.UsageTracker = tracker;
         }
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
 
         try
         {
@@ -135,10 +184,10 @@ public partial class CustomTab : ComponentBase, IDisposable
                 p.Themes,
                 p.BracketProfile,
                 p.Constraints,
-                new Progress<string>(OnStageReport),
-                _buildCts.Token);
+                OnStageReport,
+                _buildCts.Token,
+                isLegalPartnerPair);
 
-            // Log usage if tracking was enabled
             if (enableTracking && DeckBuilder.UsageTracker != null)
             {
                 var summary = DeckBuilder.UsageTracker.GetSummary();
@@ -157,9 +206,9 @@ public partial class CustomTab : ComponentBase, IDisposable
                 var stored = new StoredDeckResult(
                     buildResult,
                     _selectedCommanders,
-                    new Dictionary<Archetype, double>(),
-                    null,
-                    Bracket.Three,
+                    _archetypeWeights,
+                    _themes,
+                    _bracketSelection.Enabled ? _bracketSelection.Bracket : Bracket.Three,
                     _budget.MaxCardPriceUsd,
                     _budget.TotalBudgetUsd,
                     DateOnly.FromDateTime(DateTime.Today));
@@ -207,14 +256,15 @@ public partial class CustomTab : ComponentBase, IDisposable
         }
     }
 
-    private void OnStageReport(string stage)
+    private async Task OnStageReport(string stage)
     {
-        _ = InvokeAsync(() =>
+        await InvokeAsync(() =>
         {
             if (_currentStage is not null) _completedStages.Add(_currentStage);
             _currentStage = stage;
             StateHasChanged();
         });
+        await Task.Yield();
     }
 
     private void CancelBuild() => _buildCts?.Cancel();

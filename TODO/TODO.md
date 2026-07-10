@@ -111,21 +111,35 @@ an 8192 ceiling. The retry logic covers any future batch that exceeds the limit.
 
 ---
 
-## Commander Discovery — progress step display
+## Commander Discovery — progress step display + component restructure — DONE (2026-07-10)
 
-The Deck Builder page streams its 10-stage pipeline progress to the user as it runs (stage names
-+ spinner). The Commander Discovery page does not — it shows a static spinner with no indication
-of which step is running. Parity task: wire up the same progress-tracking pattern on the
-Discovery page so users can see the individual steps (e.g. "Fetching EDHREC pool…", "Ranking
-candidates…", "Building suggestions…") as they complete.
+Progress wired end-to-end on both pages, component folder restructure complete.
 
-**Implementation tasks:**
+**Progress model:** `DiscoveryProgress` record (`Stage` + optional `Detail`) as the typed
+model. `ICommanderDiscovery.DiscoverAsync` and `IDeckBuilder.BuildAsync` both now take
+`Func<T, Task>?` callbacks (not `IProgress<T>`) so callers can `await` each stage report.
+All tab components call `StateHasChanged()` then `await Task.Yield()` inside the callback,
+forcing a render before the pipeline resumes — ensuring each stage label appears in the UI
+as it starts. Discovery: three stages ("Gathering candidates", "Ranking commanders" with
+candidate count as detail, "Assembling results"). Builder: existing ten stages, unchanged.
 
-- [ ] Define a discovery progress model (stage name + optional detail, e.g. candidate count)
-      mirroring the `BuildProgress` type used by the Deck Builder pipeline.
-- [ ] Instrument `CommanderDiscovery` to emit step events via a callback or `IProgress<T>`.
-- [ ] Update `DiscoveryPage.razor` / `DiscoveryPage.razor.cs` to subscribe to those events and
-      render them in a step list (spinner per step, checkmark when done).
+**Timing fixes:** Two separate bugs corrected.
+- _First stage not visible on the Builder page:_ both builder tabs now call
+  `await InvokeAsync(StateHasChanged); await Task.Yield()` before `BuildAsync`, so the
+  progress panel is rendered (all stages pending) before the pipeline touches the UI.
+- _"Assembling results" never shown as done on the Discovery page:_ after `DiscoverAsync`
+  returns, tabs explicitly mark the last stage complete and yield before `_isRunning = false`
+  transitions to the results view.
+
+**Component restructure:** `Components/Tabs/` folder removed. Tab components now live beside
+their host pages: `Components/Pages/CommanderBuilder/` holds `GuidedCommanderBuilderTab` and
+`CustomCommanderBuilderTab`; `Components/Pages/Discovery/` holds `GuidedDiscoveryTab` and
+`CustomDiscoveryTab`. `BuildProgress` extended with `Title` and `CurrentStageDetail`
+parameters; `_Imports.razor` updated accordingly.
+
+**Color-fixing cap warning removed:** "Color-fixing land cap reached" no longer appears in
+`CoverageWarnings`. The cap is still enforced; hitting it is expected normal behaviour, not
+user-actionable. The floor warning ("stopped at 8-basic floor") is kept — it is actionable.
 
 ---
 
@@ -357,27 +371,19 @@ the deck-builder entry point is different (form input before the build, not post
 
 ---
 
-### LLM step progress reporting
+### LLM step progress reporting — sub-steps deferred
 
-The Builder pipeline emits stage-level progress strings (10 stages, displayed in `BuildProgress`).
-Within the two LLM-heavy stages (`ClassifyPool` and `FillEngine`), there is no sub-step signal —
-the UI shows a spinner with no indication of which batch or role is running.
+The Builder and Discovery pages both show named stages with correct timing (done 2026-07-10).
+Sub-step granularity within the two LLM-heavy Builder stages is still deferred:
 
-Similarly, the Commander Discovery page (tracked separately below) has no step display at all.
+- [ ] Inside `ClassifyPool`, report each 30-card batch: `"Classifying cards (batch {i}/{total})…"`.
+- [ ] Inside `FillEngine`, report each per-role selector call: `"Selecting {Role} cards…"`.
+      `FillEngine` currently has no progress parameter — add one (nullable).
+- [ ] Consider a structured `(string Stage, int? PercentComplete)` type to drive a percentage
+      bar in `BuildProgress.razor`; the 10 fixed stages plus ~13 sub-steps give granular 0–100%.
 
-**Builder — sub-step progress:**
-
-- [ ] Extend `IProgress<string>` calls in `DeckBuilder.BuildAsync` inside ClassifyPool to
-      report each classification batch: `"Classifying cards (batch {i}/{total})…"`.
-- [ ] After each selector call in `FillEngine`, emit a progress event. Currently `FillEngine`
-      has no `IProgress<T>` parameter — add one (nullable; callers that don't care pass null).
-      Report: `"Selecting {Role} cards…"` for each of the 9 roles.
-- [ ] Consider a structured progress type (`(string Stage, int? PercentComplete)`) to drive a
-      percentage bar in the UI, rather than raw strings. The 10 fixed stages plus ~13 sub-steps
-      (4 classifier batches + 9 selector calls on average) give a reasonably granular 0–100%.
-
-**Scope:** Medium — requires threading `IProgress` through `FillEngine` (one new parameter) and
-updating `BuildProgress.razor` to render a percentage bar when a value is available.
+**Scope:** Medium — one new `Func<string, Task>?` parameter on `FillEngine`, wired from
+`DeckBuilder`, plus a `BuildProgress` percentage bar.
 
 ---
 
@@ -404,8 +410,8 @@ Base storage complete. Subscription-aware limits deferred:
       The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
       as a parameter — no JS changes needed. On the C# side, resolve the limit from a subscription
       or feature-flag service and pass it to `JS.InvokeVoidAsync("saveDeckResult", key, json,
-      resolvedLimit)` in `GuidedTab.razor.cs` and `CustomTab.razor.cs`. The two call sites are the
-      only places that need updating.
+      resolvedLimit)` in `GuidedCommanderBuilderTab.razor.cs` and `CustomCommanderBuilderTab.razor.cs`.
+      The two call sites are the only places that need updating.
 
 ---
 
@@ -600,7 +606,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 328 tests pass.
+All four projects compile; 327 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 

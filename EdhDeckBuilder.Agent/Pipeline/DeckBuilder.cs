@@ -57,7 +57,7 @@ public sealed class DeckBuilder(
         IReadOnlyList<WeightedTheme>? themes = null,
         BracketProfile? bracket = null,
         SoftConstraints? constraints = null,
-        IProgress<string>? progress = null,
+        Func<string, Task>? progress = null,
         CancellationToken ct = default,
         bool isLegalPartnerPair = false)
     {
@@ -66,18 +66,18 @@ public sealed class DeckBuilder(
         logger.LogInformation("DeckBuild_Start: Commanders={CommanderNames}", commanderNames);
 
         // 1. Resolve template.
-        progress?.Report("Resolving template");
+        await (progress?.Invoke("Resolving template") ?? Task.CompletedTask);
         var resolved = TemplateResolver.Resolve(template, archetypes, themes, bracket);
 
         // 2. Gather candidate pool from EDHREC (one call per commander; merged or partner-pair).
-        progress?.Report("Gathering card pool");
+        await (progress?.Invoke("Gathering card pool") ?? Task.CompletedTask);
         var stageTimer = Stopwatch.StartNew();
         var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, ct);
         stageTimer.Stop();
         logger.LogInformation("GatherPool: {PoolSize} cards, {ElapsedMs}ms", rawPool.Count, stageTimer.ElapsedMilliseconds);
 
         // 3. Filter pool: legal, CI ⊆ commander CI, not a commander card, within budget.
-        progress?.Report("Filtering pool");
+        await (progress?.Invoke("Filtering pool") ?? Task.CompletedTask);
         stageTimer.Restart();
         var colorIdentity   = commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
         var commanderIds    = commanders.Select(c => c.OracleId).ToHashSet();
@@ -89,7 +89,7 @@ public sealed class DeckBuilder(
             rawPool.Count, filteredPool.Count, filtered, stageTimer.ElapsedMilliseconds);
 
         // 4. Classify commanders → profiles → net targets.
-        progress?.Report("Classifying commanders");
+        await (progress?.Invoke("Classifying commanders") ?? Task.CompletedTask);
         stageTimer.Restart();
         var commanderCandidates = commanders
             .Select(c => new CardCandidate(c, 1.0, "Commanders"))
@@ -118,7 +118,7 @@ public sealed class DeckBuilder(
         };
 
         // 6. Classify pool → FillCandidates.
-        progress?.Report("Classifying card pool");
+        await (progress?.Invoke("Classifying card pool") ?? Task.CompletedTask);
         stageTimer.Restart();
         var (fillPool, classifications) = await ClassifyPoolAsync(filteredPool, commanders, ct);
         stageTimer.Stop();
@@ -158,7 +158,7 @@ public sealed class DeckBuilder(
         }
 
         // 7. Fill engine (Passes A + B: greedy fill + reconciliation).
-        progress?.Report("Filling deck");
+        await (progress?.Invoke("Filling deck") ?? Task.CompletedTask);
         stageTimer.Restart();
         var engine     = new FillEngine(selector);
         var fillResult = await engine.FillAsync(context, fillPool, ct);
@@ -169,7 +169,7 @@ public sealed class DeckBuilder(
             logger.LogInformation("  Selector({Role}): {Input} candidates → {Ranked} ranked", role, input, ranked);
 
         // 8. Color-fixing pass (Pass C).
-        progress?.Report("Applying color fixing");
+        await (progress?.Invoke("Applying color fixing") ?? Task.CompletedTask);
         stageTimer.Restart();
         var fixingWarnings = ColorFixingPass.Apply(context, fillResult.State, fillPool);
         stageTimer.Stop();
@@ -177,7 +177,7 @@ public sealed class DeckBuilder(
             fillResult.State.Committed.Count, stageTimer.ElapsedMilliseconds);
 
         // 9. Repair illegal cards (post-fill safety net).
-        progress?.Report("Repairing illegal cards");
+        await (progress?.Invoke("Repairing illegal cards") ?? Task.CompletedTask);
         stageTimer.Restart();
         RepairEngine.RepairIllegalCards(context, fillResult.State, fillPool);
         RepairEngine.RepairBudgetExcess(context, fillResult.State, fillPool);
@@ -188,7 +188,7 @@ public sealed class DeckBuilder(
         // 10. Distribute basic lands proportionally by pip demand.
         // Use ReservedLandCount - UtilityLandCount (not BasicCount) so MDFC land credits
         // don't reduce the physical card total below the required 98/99.
-        progress?.Report("Distributing basic lands");
+        await (progress?.Invoke("Distributing basic lands") ?? Task.CompletedTask);
         stageTimer.Restart();
         int basicsToDistribute = Math.Max(0, context.ReservedLandCount - fillResult.State.UtilityLandCount);
         var basicLandCounts = DistributeBasics(
@@ -199,7 +199,7 @@ public sealed class DeckBuilder(
             totalBasics, stageTimer.ElapsedMilliseconds);
 
         // 11. Assemble result.
-        progress?.Report("Assembling result");
+        await (progress?.Invoke("Assembling result") ?? Task.CompletedTask);
         stageTimer.Restart();
         var result = RepairEngine.Assemble(
             context, fillResult, fixingWarnings, fillPool, resolved, basicLandCounts);

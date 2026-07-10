@@ -6,7 +6,7 @@ using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
-namespace EdhDeckBuilder.Web.Components.Pages;
+namespace EdhDeckBuilder.Web.Components.Pages.CommanderBuilder;
 
 public partial class CommanderBuilder : IDisposable
 {

@@ -58,7 +58,7 @@ public static class ColorFixingPass
             state.Commit(candidate);
         }
 
-        return BuildWarnings(state, fixingCap, totalLandBase, floorHit, capHit);
+        return BuildWarnings(state, floorHit);
     }
 
     /// <summary>
@@ -97,12 +97,7 @@ public static class ColorFixingPass
         return score;
     }
 
-    private static IReadOnlyList<string> BuildWarnings(
-        BuildState state,
-        int fixingCap,
-        int totalLandBase,
-        bool floorHit,
-        bool capHit)
+    private static IReadOnlyList<string> BuildWarnings(BuildState state, bool floorHit)
     {
         var warnings = new List<string>();
 
@@ -110,11 +105,6 @@ public static class ColorFixingPass
             warnings.Add(
                 $"Color-fixing pass stopped at the {MinBasics}-basic floor " +
                 $"({state.BasicCount} basics remaining). Consider adding more color-fixing lands to the candidate pool.");
-
-        if (capHit)
-            warnings.Add(
-                $"Color-fixing land cap reached: {state.UtilityLandCount} non-basic lands (cap = {fixingCap}, " +
-                $"50% of {totalLandBase}-land base), {state.BasicCount} basics remaining.");
 
         return warnings;
     }

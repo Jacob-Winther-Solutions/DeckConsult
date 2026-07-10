@@ -7,7 +7,7 @@ public interface ICommanderDiscovery
 {
     Task<CommanderDiscoveryResult> DiscoverAsync(
         CommanderDiscoveryRequest request,
-        IProgress<string>? progress = null,
+        Func<DiscoveryProgress, Task>? progress = null,
         CancellationToken ct = default);
 
     void SetUsageTracker(UsageTracker tracker);

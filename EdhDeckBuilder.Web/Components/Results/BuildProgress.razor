@@ -1,5 +1,5 @@
 <div style="max-width: 860px; padding: 1.5rem;">
-    <h2 class="mb-4">Building your deck&hellip;</h2>
+    <h2 class="mb-4">@Title</h2>
     <div class="list-group list-group-flush mb-4">
         @foreach (var stage in AllStages)
         {
@@ -21,6 +21,10 @@
                     <span class="text-muted fs-5">&#9675;</span>
                 }
                 <span class="@(isDone ? "text-success" : isCurrent ? "" : "text-muted")">@stage</span>
+                @if (isCurrent && CurrentStageDetail is not null)
+                {
+                    <span class="text-muted small">@CurrentStageDetail</span>
+                }
             </div>
         }
     </div>

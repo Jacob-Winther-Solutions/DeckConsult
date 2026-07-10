@@ -32,7 +32,7 @@
             </ul>
 
             <div style="@(_activeTab != "guided" ? "display:none;" : "")">
-                <GuidedTab @key="_guidedTabKey"
+                <GuidedCommanderBuilderTab @key="_guidedTabKey"
                            InitialCommander="_preCommander"
                            InitialArchetypeWeights="_preArchetypes"
                            InitialThemes="_preThemes"
@@ -40,7 +40,7 @@
                            InitialBudget="_preBudget" />
             </div>
             <div style="@(_activeTab != "custom" ? "display:none;" : "")">
-                <CustomTab />
+                <CustomCommanderBuilderTab />
             </div>
         </div>
     }

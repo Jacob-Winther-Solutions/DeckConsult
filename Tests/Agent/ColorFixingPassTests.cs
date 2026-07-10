@@ -359,21 +359,6 @@ public sealed class ColorFixingPassTests
     }
 
     [Fact]
-    public void Apply_emits_cap_warning_when_fifty_percent_cap_hit_with_remaining_candidates()
-    {
-        // 20 basics → cap = 10 (binding over floor of 12) → capped with 10 candidates left.
-        var state = new BuildState(20);
-        var context = MakeContext(Color.Blue | Color.Black);
-        var pool = Enumerable.Range(1, 15)
-            .Select(i => MakeLand($"Fixing {i}", Color.Blue | Color.Black))
-            .ToList();
-
-        var warnings = ColorFixingPass.Apply(context, state, pool);
-
-        Assert.Contains(warnings, w => w.Contains("50") || w.Contains("cap"));
-    }
-
-    [Fact]
     public void Apply_returns_no_warnings_when_pool_exhausted_without_hitting_caps()
     {
         var state = new BuildState(38);

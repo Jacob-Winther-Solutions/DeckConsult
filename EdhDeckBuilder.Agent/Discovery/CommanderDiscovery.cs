@@ -32,19 +32,21 @@ public sealed class CommanderDiscovery(
 
     public async Task<CommanderDiscoveryResult> DiscoverAsync(
         CommanderDiscoveryRequest request,
-        IProgress<string>? progress = null,
+        Func<DiscoveryProgress, Task>? progress = null,
         CancellationToken ct = default)
     {
-        progress?.Report("Gathering commander candidates...");
+        await (progress?.Invoke(new DiscoveryProgress("Gathering candidates")) ?? Task.CompletedTask);
 
         var (allCandidates, partnerMap) = await GatherCandidatesAsync(request, ct);
 
         if (allCandidates.Count == 0)
             return new CommanderDiscoveryResult { Suggestions = [] };
 
-        progress?.Report($"Evaluating {allCandidates.Count} commanders...");
+        await (progress?.Invoke(new DiscoveryProgress("Ranking commanders", $"{allCandidates.Count} candidates")) ?? Task.CompletedTask);
 
         var results = await EvaluateAsync(allCandidates, request, ct);
+
+        await (progress?.Invoke(new DiscoveryProgress("Assembling results")) ?? Task.CompletedTask);
 
         var suggestions = BuildSuggestionsFromResults(results, allCandidates, partnerMap);
 

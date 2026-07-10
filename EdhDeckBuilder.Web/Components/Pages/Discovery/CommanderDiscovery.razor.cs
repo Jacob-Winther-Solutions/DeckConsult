@@ -1,7 +1,7 @@
 using EdhDeckBuilder.Agent.Authentication;
 using Microsoft.AspNetCore.Components;
 
-namespace EdhDeckBuilder.Web.Components.Pages;
+namespace EdhDeckBuilder.Web.Components.Pages.Discovery;
 
 public partial class CommanderDiscovery : ComponentBase
 {
