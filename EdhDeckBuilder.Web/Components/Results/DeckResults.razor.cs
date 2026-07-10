@@ -23,7 +23,7 @@ public partial class DeckResults
     // ── View state ─────────────────────────────────────────────────────────
 
     private enum DeckView { ByRole, AllCards, ByType }
-    private DeckView _view = DeckView.ByRole;
+    private DeckView _view = DeckView.AllCards;
 
     private bool _showCoverage  = true;
     private bool _showBasics    = true;

@@ -77,8 +77,8 @@ internal static class PartnershipIndexBuilder
 
         return tag switch
         {
-            // Partner with: pairs are listed sequentially [A, B, C, D] → [(A,B), (C,D)]
-            "partnerwith" => ExtractSequentialPairs(cardNames),
+            // Partner with: each entry is already a complete pair "Card1 // Card2"
+            "partnerwith" => ExtractSplitNamePairs(cardNames),
 
             // Generic Partner: all cards can pair with each other
             "partners" => ExtractAllPairs(cardNames),
@@ -112,15 +112,17 @@ internal static class PartnershipIndexBuilder
     }
 
     /// <summary>
-    /// Extracts sequential pairs: [A, B, C, D] → [(A,B), (C,D)]
-    /// Used for "Partner with" where pairs are explicitly listed in order.
+    /// Extracts pairs where each entry name encodes both halves as "Card1 // Card2".
+    /// Used for "Partner with" where EDHREC lists each pair as a single combined entry.
     /// </summary>
-    private static List<(string, string)> ExtractSequentialPairs(List<string> cardNames)
+    private static List<(string, string)> ExtractSplitNamePairs(List<string> cardNames)
     {
         var pairs = new List<(string, string)>();
-        for (int i = 0; i < cardNames.Count - 1; i += 2)
+        foreach (var name in cardNames)
         {
-            pairs.Add((cardNames[i], cardNames[i + 1]));
+            var parts = name.Split(" // ", 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2)
+                pairs.Add((parts[0], parts[1]));
         }
         return pairs;
     }

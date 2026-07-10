@@ -87,27 +87,27 @@ an 8192 ceiling. The retry logic covers any future batch that exceeds the limit.
 
 ---
 
-### Partner pair data mismatches in EDHREC (2026-07-08)
+### Partner pair data mismatches in EDHREC (2026-07-08) — RESOLVED (2026-07-10)
 
-**Observed:** During CardRepository initialization, debug logs show `dbug: ... Partner pair not found in card repository` for ~10 EDHREC partner pairs. Example: `Alisaie Leveilleur // Alphinaud Leveilleur + Amy Pond // Rory Williams`.
+**Root cause (confirmed via cached `partners.json` inspection):** EDHREC's `partnerwith`
+cardlist encodes each pair as a single entry with the combined name `"Card1 // Card2"` —
+e.g. `"Alisaie Leveilleur // Alphinaud Leveilleur"`. The old code used `ExtractSequentialPairs`
+which paired entry[0] with entry[1], entry[2] with entry[3], etc. — producing 10 wrong
+cross-pairings (e.g. pairing Alisaie+Alphinaud _entry_ with Amy+Rory _entry_) instead of
+splitting within each entry.
 
-**Context:** `PartnershipIndexBuilder.BuildFromEdhrec()` attempts to resolve each EDHREC partner combo by card name. If either card is not found in the Scryfall index (by name match), the combo is silently dropped and logged as debug.
+**Fixes applied:**
+1. `PartnershipIndexBuilder.ExtractPairsFromCardlist`: `"partnerwith"` now calls
+   `ExtractSplitNamePairs` which splits each entry name on ` // ` to get both card names.
+   `ExtractSequentialPairs` removed (was only used for this case).
+2. `EdhrecPartnerMapper.ExtractPartnerWithPairs`: same ` // ` split logic applied
+   (was unused but had the identical bug).
+3. `CardRepositoryTests.MockEdhrecClient`: updated the `partnerwith` fixture to use the real
+   EDHREC format (`"Rograkh, Son of Rohgadh // Drana, Liberator of Zendikar"` as one entry)
+   so the test now validates the correct parsing path.
 
-**Root cause candidates:**
-- EDHREC uses card names that don't exactly match Scryfall (e.g. "Alisaie" vs. a full front-face name)
-- EDHREC lists double-faced cards by a specific face, Scryfall stores them differently
-- EDHREC partner list is stale relative to Scryfall (rare)
-- EDHREC cards use Scryfall IDs but the index-builder is name-based (brittle seam)
-
-**Impact:** Low — affected pairs don't reach the partnership index, so they won't appear as suggestions in Discovery. If a user manually enters them as commanders, the builder falls back to merged single-commander pools (graceful).
-
-**Next steps:**
-1. Audit the ~10 missing pairs: check if they exist in Scryfall by exact name, partial name, or ID
-2. If name-matching is the issue, consider migrating `PartnershipIndexBuilder` to ID-based lookup (EDHREC provides IDs; infrastructure already supports `GetByScryfallIdAsync`)
-3. Confirm whether the affected pairs are valid EDH partnerships (legal, indexed on EDHREC for a reason)
-4. If confirmed valid, update the index builder; if archival/errata, update EDHREC data source comment
-
-**Blocked on:** Investigation — need to manually verify affected partner pairs against Scryfall.
+All 327 tests pass. Any remaining "pair not found" debug logs after this fix indicate stale
+Scryfall bulk data (newer sets not yet downloaded) — not a code defect.
 
 ---
 
@@ -324,14 +324,10 @@ is set per cache (1 min–1 hour).
 
 ---
 
-### Build result default tab
+### Build result default tab — DONE (2026-07-10)
 
-The Build Result page defaults to the "By Role" view. Consider making "By Type" the default
-since it maps more closely to how players think about a deck (creatures / spells / lands) and
-is a more natural starting point before drilling into roles.
-
-- [ ] Change `_view = DeckView.ByRole` to `_view = DeckView.ByType` in `DeckResults.razor.cs`.
-      One-liner; save for a UI polish pass.
+Default changed to "All Cards". Tab order is now All Cards → By Type → Coverage Report
+(formerly "By Role"). `DeckResults.razor.cs`: `_view = DeckView.AllCards`.
 
 ---
 

@@ -36,11 +36,12 @@ internal static class EdhrecPartnerMapper
             return result;
         }
 
-        // Pairs are listed sequentially: [A, B, C, D] means A+B and C+D
-        var cards = partnerWithList.Cardviews.Select(v => v.Name).ToList();
-        for (int i = 0; i < cards.Count - 1; i += 2)
+        // Each entry encodes a complete pair as "Card1 // Card2"
+        foreach (var view in partnerWithList.Cardviews)
         {
-            result.Add((cards[i], cards[i + 1]));
+            var parts = view.Name.Split(" // ", 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2)
+                result.Add((parts[0], parts[1]));
         }
 
         logger.LogInformation("Extracted {Count} 'Partner with' pairs from EDHREC", result.Count);

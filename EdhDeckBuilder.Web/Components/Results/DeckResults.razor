@@ -28,16 +28,16 @@
     <!-- ── View tabs ──────────────────────────────────────────────────────── -->
     <ul class="nav nav-tabs px-3 mb-3">
         <li class="nav-item">
-            <button class="nav-link @(_view == DeckView.ByRole ? "active" : "")"
-                    @onclick="() => _view = DeckView.ByRole">By Role</button>
+            <button class="nav-link @(_view == DeckView.AllCards ? "active" : "")"
+                    @onclick="() => _view = DeckView.AllCards">All Cards</button>
         </li>
         <li class="nav-item">
             <button class="nav-link @(_view == DeckView.ByType ? "active" : "")"
                     @onclick="() => _view = DeckView.ByType">By Type</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link @(_view == DeckView.AllCards ? "active" : "")"
-                    @onclick="() => _view = DeckView.AllCards">All Cards</button>
+            <button class="nav-link @(_view == DeckView.ByRole ? "active" : "")"
+                    @onclick="() => _view = DeckView.ByRole">Coverage Report</button>
         </li>
     </ul>
 

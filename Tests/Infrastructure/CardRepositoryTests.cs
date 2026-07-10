@@ -281,15 +281,14 @@ public sealed class CardRepositoryTests : IDisposable
                                     new EdhrecPartnerCardView { Name = "Tymna the Weaver", Id = Fixtures.TymnaId.ToString() },
                                 ]
                             },
-                            // Partner with cardlist (Rograkh + Drana)
+                            // Partner with cardlist: each entry is "Card1 // Card2" (real EDHREC format)
                             new EdhrecPartnerCardlist
                             {
                                 Header = "Partner with",
                                 Tag = "partnerwith",
                                 Cardviews =
                                 [
-                                    new EdhrecPartnerCardView { Name = "Rograkh, Son of Rohgadh", Id = Fixtures.RograkId.ToString() },
-                                    new EdhrecPartnerCardView { Name = "Drana, Liberator of Zendikar", Id = Fixtures.DranaId.ToString() },
+                                    new EdhrecPartnerCardView { Name = "Rograkh, Son of Rohgadh // Drana, Liberator of Zendikar" },
                                 ]
                             },
                         ]
