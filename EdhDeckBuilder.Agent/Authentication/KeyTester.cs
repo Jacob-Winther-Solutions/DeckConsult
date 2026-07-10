@@ -1,6 +1,8 @@
 using EdhDeckBuilder.Agent.Authentication.Claude;
+using EdhDeckBuilder.Agent.Authentication.OpenAI;
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Llm.Claude;
+using EdhDeckBuilder.Agent.Llm.OpenAI;
 using EdhDeckBuilder.Agent.Llm.Shared;
 using Microsoft.Extensions.Logging;
 
@@ -8,12 +10,14 @@ namespace EdhDeckBuilder.Agent.Authentication;
 
 /// <summary>
 /// Fires a minimal 1-token call to validate a key before accepting it.
-/// Uses <see cref="ClaudeHttpLlmClient"/> for Anthropic so the test goes through the same
-/// HTTP path as live calls. Google and OpenAI keys are validated by format only.
+/// Uses <see cref="ClaudeHttpLlmClient"/> for Anthropic and <see cref="OpenAiHttpLlmClient"/>
+/// for OpenAI so both go through the same HTTP path as live calls.
+/// Google keys are validated by format only (no free-tier probe endpoint).
 /// </summary>
 public sealed class KeyTester(
     IHttpClientFactory httpFactory,
-    ILogger<ClaudeHttpLlmClient> logger) : IKeyTester
+    ILogger<ClaudeHttpLlmClient> claudeLogger,
+    ILogger<OpenAiHttpLlmClient> openAiLogger) : IKeyTester
 {
     public async Task<KeyTestResult> TestAsync(string apiKey, AiProvider provider, CancellationToken ct = default)
     {
@@ -28,16 +32,23 @@ public sealed class KeyTester(
 
             if (provider == AiProvider.OpenAI)
             {
-                var trimmed = apiKey.Trim();
-                if (trimmed.StartsWith("sk-", StringComparison.Ordinal))
-                    return new KeyTestResult(true, null);
-                return new KeyTestResult(false, "Invalid OpenAI API key format (expected 'sk-' prefix)");
+                var http   = httpFactory.CreateClient("openai");
+                var client = new OpenAiHttpLlmClient(http, apiKey.Trim(), openAiLogger);
+
+                await client.SendAsync(new LlmRequest
+                {
+                    Model    = OpenAiModels.Gpt4oMini,
+                    MaxTokens = 1,
+                    Messages  = [new LlmMessage { Role = LlmRole.User, Content = [new LlmTextBlock { Text = "hi" }] }],
+                }, ct);
+
+                return new KeyTestResult(true, null);
             }
 
-            var http   = httpFactory.CreateClient("claude");
-            var client = new ClaudeHttpLlmClient(http, apiKey.Trim(), logger);
+            var claudeHttp   = httpFactory.CreateClient("claude");
+            var claudeClient = new ClaudeHttpLlmClient(claudeHttp, apiKey.Trim(), claudeLogger);
 
-            await client.SendAsync(new LlmRequest
+            await claudeClient.SendAsync(new LlmRequest
             {
                 Model     = ClaudeModels.Haiku,
                 MaxTokens = 1,
@@ -48,7 +59,11 @@ public sealed class KeyTester(
         }
         catch (ApiKeyRejectedException ex)
         {
-            return new KeyTestResult(false, ex.InnerException?.Message ?? ex.Message);
+            return new KeyTestResult(false, $"Key rejected — {ex.InnerException?.Message ?? ex.Message}");
+        }
+        catch (QuotaExceededException ex)
+        {
+            return new KeyTestResult(false, $"Billing limit reached. Add credits to your provider account and try again. ({ex.Message})");
         }
         catch (Exception ex)
         {

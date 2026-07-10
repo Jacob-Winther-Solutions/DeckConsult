@@ -174,7 +174,7 @@ public partial class ApiKeySettings : ComponentBase
         var result = await Tester.TestAsync(_keyInput, _selectedProvider);
         _busy  = false;
         _error = !result.Ok;
-        _message = result.Ok ? "Key works." : $"Key rejected: {result.Error}";
+        _message = result.Ok ? "Key works." : result.Error;
     }
 
     private async Task DisconnectAsync()

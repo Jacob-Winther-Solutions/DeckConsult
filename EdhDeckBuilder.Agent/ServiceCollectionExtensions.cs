@@ -1,6 +1,7 @@
 using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Authentication.Claude;
 using EdhDeckBuilder.Agent.Authentication.Gemini;
+using EdhDeckBuilder.Agent.Authentication.OpenAI;
 using EdhDeckBuilder.Agent.Discovery;
 using EdhDeckBuilder.Agent.Instrumentation;
 using EdhDeckBuilder.Agent.Interfaces;
@@ -52,8 +53,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SessionApiKeyProvider>();
         services.AddScoped<IClaudeApiKeyProvider>(sp => sp.GetRequiredService<SessionApiKeyProvider>());
 
-        // Named HttpClient for both ClaudeHttpLlmClientFactory and KeyTester
+        // Named HttpClients for KeyTester probes
         services.AddHttpClient("claude", c => c.Timeout = TimeSpan.FromSeconds(120));
+        services.AddHttpClient("openai", c => c.Timeout = TimeSpan.FromSeconds(120));
 
         // ClaudeHttpLlmClientFactory — typed HttpClient so connection pooling is managed by
         // IHttpClientFactory rather than creating a raw HttpClient per circuit.
@@ -69,13 +71,20 @@ public static class ServiceCollectionExtensions
         // GeminiLlmClientFactory wraps IGeminiClientFactory behind ILlmClientFactory.
         services.AddScoped<GeminiLlmClientFactory>();
 
+        // OpenAiLlmClientFactory — typed HttpClient so connection pooling is managed by IHttpClientFactory.
+        services.AddHttpClient<OpenAiLlmClientFactory>(c => c.Timeout = TimeSpan.FromSeconds(120));
+        services.AddScoped<OpenAiLlmClientFactory>();
+
         // Provider-dispatched ILlmClientFactory — resolved once per Blazor circuit.
         services.AddScoped<ILlmClientFactory>(sp =>
         {
             var keys = sp.GetRequiredService<IClaudeApiKeyProvider>();
-            return keys.ActiveProvider == AiProvider.Google
-                ? (ILlmClientFactory)sp.GetRequiredService<GeminiLlmClientFactory>()
-                : sp.GetRequiredService<ClaudeHttpLlmClientFactory>();
+            return keys.ActiveProvider switch
+            {
+                AiProvider.Google => (ILlmClientFactory)sp.GetRequiredService<GeminiLlmClientFactory>(),
+                AiProvider.OpenAI => sp.GetRequiredService<OpenAiLlmClientFactory>(),
+                _                 => sp.GetRequiredService<ClaudeHttpLlmClientFactory>(),
+            };
         });
 
         services.AddScoped<IKeyTester, KeyTester>();

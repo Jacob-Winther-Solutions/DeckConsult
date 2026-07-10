@@ -60,6 +60,12 @@ token used). Once connected, pick which model is used for card selection: Haiku 
 (fast and cheap); Sonnet and Opus give better rationale quality at higher cost. Classification
 always uses Haiku regardless — it's the cheap batch step.
 
+**OpenAI** — Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+Requires a paid account with billing credit attached (no free tier for the API). Classification
+always uses `gpt-4o-mini`; you can select `gpt-4o`, `o4-mini`, or `o3` for card selection.
+Note: the o-series reasoning models (`o4-mini`, `o3`) are significantly more expensive and slower
+than the GPT-4o family — use them if rationale quality is the priority.
+
 **Google Gemini** — Create a key at
 [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free tier available). Gemini's
 free tier has meaningful daily limits — as low as 20 requests per day on `Gemini 2.5 Flash` —

@@ -55,6 +55,9 @@ public sealed class ClaudeHttpLlmClient(
                 throw new ApiKeyRejectedException(
                     new HttpRequestException($"Anthropic API rejected the key ({(int)response.StatusCode}): {ExtractErrorMessage(body)}"));
 
+            if (response.StatusCode == HttpStatusCode.TooManyRequests && IsQuotaError(body))
+                throw new QuotaExceededException(ExtractErrorMessage(body));
+
             if (RetryableStatuses.Contains(response.StatusCode) && attempt < MaxAttempts)
             {
                 var delay = GetRetryDelay(response, attempt);
@@ -243,6 +246,9 @@ public sealed class ClaudeHttpLlmClient(
             },
         };
     }
+
+    private static bool IsQuotaError(string body) =>
+        body.Contains("quota", StringComparison.OrdinalIgnoreCase);
 
     // Anthropic deprecated the temperature parameter for models newer than claude-opus-4-6.
     // Haiku 4.5 and claude-3 variants still accept it.

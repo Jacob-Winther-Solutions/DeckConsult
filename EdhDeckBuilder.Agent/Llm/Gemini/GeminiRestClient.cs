@@ -121,6 +121,9 @@ public sealed class GeminiRestClient
                     $"Gemini API rejected the key ({(int)response.StatusCode}): {ExtractErrorMessage(body)}"));
             }
 
+            if (response.StatusCode == HttpStatusCode.TooManyRequests && IsQuotaError(body))
+                throw new QuotaExceededException(ExtractErrorMessage(body));
+
             if (RetryableStatuses.Contains(response.StatusCode) && attempt < MaxAttempts)
             {
                 var delay = GetRetryDelay(response, attempt);
@@ -179,6 +182,10 @@ public sealed class GeminiRestClient
             return Truncate(body);
         }
     }
+
+    private static bool IsQuotaError(string body) =>
+        body.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+        body.Contains("quota",              StringComparison.OrdinalIgnoreCase);
 
     private static string Truncate(string body) =>
         body.Length > 500 ? body[..500] + "…" : body;

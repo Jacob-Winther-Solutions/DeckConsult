@@ -41,6 +41,12 @@ public static class ModelPricing
         ["gemini-3-flash"]            = new(0.30m,  2.50m),
         ["gemini-3.5-flash"]          = new(0.30m,  2.50m),
         ["gemini-3.1-flash-lite"]     = new(0.10m,  0.40m),
+
+        // ── OpenAI ──────────────────────────────────────────────────────────────
+        ["gpt-4o-mini"]               = new(0.15m,  0.60m),
+        ["gpt-4o"]                    = new(2.50m, 10.00m),
+        ["o4-mini"]                   = new(1.10m,  4.40m),
+        ["o3"]                        = new(10.00m, 40.00m),
     };
 
     /// <summary>Returns the rate for a model, or <see cref="Zero"/> if unknown.</summary>

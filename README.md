@@ -1,17 +1,17 @@
 # EdhDeckBuilder
 
-An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end. Supports both
-Anthropic Claude (via direct HTTP — `ClaudeHttpLlmClient`) and Google Gemini (via a custom REST
-client — `GeminiHttpLlmClient`) as the LLM backend, chosen per user session.
+An LLM-assisted Commander (EDH) deck builder in C#/.NET, with a Blazor front end. Supports
+Anthropic Claude, OpenAI GPT/o-series, and Google Gemini as LLM backends, chosen per user
+session via BYOK (bring-your-own-key).
 
 ## Solution layout
 
 ```
 EdhDeckBuilder.slnx
-├── EdhDeckBuilder.Core            # domain model + rules + templates (no external deps)  ← done
-├── EdhDeckBuilder.Infrastructure  # Scryfall + EDHREC clients, local card store         ← done
-├── EdhDeckBuilder.Agent           # Anthropic + Gemini adapters, fill engine, pipeline  ← done
-└── EdhDeckBuilder.Web             # Blazor Web App (the visual, grouped deck view)       ← done
+├── EdhDeckBuilder.Core            # domain model + rules + templates (no external deps)         ← done
+├── EdhDeckBuilder.Infrastructure  # Scryfall + EDHREC clients, local card store                ← done
+├── EdhDeckBuilder.Agent           # Anthropic + OpenAI + Gemini adapters, fill engine, pipeline ← done
+└── EdhDeckBuilder.Web             # Blazor Web App (the visual, grouped deck view)              ← done
 ```
 
 Dependency direction points inward: everything references `Core`, `Core` references nothing.
@@ -112,16 +112,25 @@ concrete `ILlmClient` implementations handle the actual wire format:
 **`Llm/Claude/ClaudeHttpLlmClient`** — posts directly to `api.anthropic.com/v1/messages` with
 `x-api-key` and `anthropic-version` headers. No Anthropic C# SDK; pure `HttpClient`. Handles
 retries (429/50x with `Retry-After`-aware backoff), maps 401/403 to `ApiKeyRejectedException`,
-and serializes prompt-cache breakpoints when `LlmRequest.EnableCaching = true` (system prompt
-is marked ephemeral; cache fires when the system+tool token count exceeds the per-model minimum).
-Classification always runs on `claude-haiku-4-5-20251001`; selection uses the user's chosen
-model (Haiku / Sonnet 5 / Opus 4.8).
+quota 429s to `QuotaExceededException`, and serializes prompt-cache breakpoints when
+`LlmRequest.EnableCaching = true`. Classification always runs on `claude-haiku-4-5-20251001`;
+selection uses the user's chosen model (Haiku / Sonnet 5 / Opus 4.8).
+
+**`Llm/OpenAI/OpenAiHttpLlmClient`** — posts to `api.openai.com/v1/chat/completions` with
+`Authorization: Bearer` header. Maps `LlmRequest` to OpenAI's chat format: system prompt as a
+system-role message, tools wrapped in `{type: "function", function: {...}}`, tool choice as
+`{type: "function", function: {name: "..."}}`. Tool-call arguments arrive as a JSON string and
+are parsed into a `JsonNode` so all adapters receive a uniform `LlmToolUseBlock`. Handles
+retries with backoff, maps 401/403 → `ApiKeyRejectedException`, quota 429s →
+`QuotaExceededException`. Temperature and `max_tokens` are omitted for o-series reasoning models
+(`o1`, `o3`, `o4-mini`), which use `max_completion_tokens` instead. Classification always runs
+on `gpt-4o-mini`; selection uses the user's chosen model.
 
 **`Llm/Gemini/GeminiHttpLlmClient`** — wraps `GeminiRestClient`, which posts directly to
 `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with a
 `x-goog-api-key` header. No OpenAI SDK. Structured output is requested via
 `generationConfig.responseSchema` (Gemini's OpenAPI 3.0 subset). The client simulates a
-`LlmToolUseBlock` in the response so all three adapters can treat both providers uniformly.
+`LlmToolUseBlock` in the response so all three adapters can treat all providers uniformly.
 Both classifier and selector run on the user's chosen Gemini model.
 
 Supporting pieces on the Gemini path:
@@ -129,10 +138,9 @@ Supporting pieces on the Gemini path:
 - **`GeminiRateLimiter`** (Scoped per Blazor circuit) enforces a minimum 1050 ms spacing between
   calls to stay under free-tier RPM ceilings (as low as 5 RPM on some models).
 - **`GeminiRestClient`** retries transient failures (429, 502, 503, 504) up to 3 times with
-  `Retry-After`-aware backoff. Non-transient errors (401/403 → `ApiKeyRejectedException`,
-  MAX_TOKENS truncation → returned as null payload) are surfaced cleanly with Google's structured
-  error body parsed into the exception message so `RESOURCE_EXHAUSTED` cases (billing-gated
-  models on free tier) are diagnosable at first glance.
+  `Retry-After`-aware backoff. Non-transient errors (401/403 → `ApiKeyRejectedException`, quota
+  429s → `QuotaExceededException`, MAX_TOKENS truncation → returned as null payload) are surfaced
+  cleanly with Google's structured error body parsed into the exception message.
 - **`GeminiSchemas`** builds the response schema in Gemini's dialect — uppercase types
   (`OBJECT` / `ARRAY` / `STRING`), `format: enum` for constrained strings, and `propertyOrdering`
   set so reasoning fields (e.g. `rationale`) precede the answer they justify. This measurably
@@ -141,11 +149,11 @@ Supporting pieces on the Gemini path:
 ### Cost accounting
 
 `Instrumentation/ModelPricing.cs` holds per-model paid-tier USD rates per 1M tokens (Anthropic:
-Haiku 4.5, Sonnet 5, Opus 4.8; Gemini: 2.5/2.0 Flash, Flash Lite, 3.x series). `UsageTracker`
-uses it for both per-call rows and the summary total — a mixed-provider run tallies correctly.
-Free-tier Gemini usage still reports a cost figure: it's the "what you'd pay on paid tier"
-estimate. When a new model is added to a picker, add its row to `ModelPricing.Prices` in the
-same change; unknown models silently report $0.
+Haiku 4.5, Sonnet 5, Opus 4.8; OpenAI: gpt-4o-mini, gpt-4o, o4-mini, o3; Gemini: 2.5/2.0 Flash,
+Flash Lite, 3.x series). `UsageTracker` uses it for both per-call rows and the summary total —
+a mixed-provider run tallies correctly. Free-tier Gemini usage still reports a cost figure: it's
+the "what you'd pay on paid tier" estimate. When a new model is added to a picker, add its row to
+`ModelPricing.Prices` in the same change; unknown models silently report $0.
 
 `IUsageTrackerAware` is a marker interface implemented by all three adapters. `DeckBuilder` and
 `CommanderDiscovery` dispatch through it — no type-specific `is LlmXxx` branches.
@@ -186,7 +194,7 @@ effect, clear the cookie or use an incognito window.
 dotnet restore
 dotnet build
 
-# Run all 327 tests:
+# Run all 337 tests:
 dotnet test Tests
 
 # Run the app:

@@ -13,43 +13,18 @@ structured `responseSchema`. See `README.md` and `CLAUDE.md` for the architectur
 
 ---
 
-## OpenAI Direct Client
+## OpenAI Direct Client — DONE (2026-07-10)
 
-UI, cookie, and key storage for OpenAI are already in place (`SessionApiKeyProvider`,
-`ApiKeySettings`, `AiProvider.OpenAI`, `OpenAiModels`). The LLM interfaces currently fall through
-to the Anthropic implementation when OpenAI is selected. This section tracks wiring the actual
-HTTP client and adapters.
-
-OpenAI's chat endpoint: `POST https://api.openai.com/v1/chat/completions` with
-`Authorization: Bearer {sk-…}`. The request/response shape differs from Anthropic's but
-tool-use and forced tool calls are well-supported. The three provider-agnostic adapters
-(`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) need only the `ILlmClient`
-implementation and factory — nothing else changes.
-
-**Implementation tasks:**
-
-- [ ] Implement `OpenAiHttpLlmClient` in `EdhDeckBuilder.Agent/Llm/OpenAI/`:
-      POST to `https://api.openai.com/v1/chat/completions` with `Authorization: Bearer {key}`.
-      Map `LlmRequest` → OpenAI request body (note: tool choice format is
-      `{"type": "function", "function": {"name": "…"}}`, finish reason is `"tool_calls"` not
-      `"tool_use"`, and token fields are `prompt_tokens`/`completion_tokens`).
-      Handle `o1`/`o3`/`o4-mini` reasoning models: these reject `temperature` — apply the same
-      `ModelSupportsTemperature` gate used in `ClaudeHttpLlmClient`.
-- [ ] Implement `OpenAiLlmClientFactory` implementing `ILlmClientFactory`; constructed from
-      `IHttpClientFactory` and `SessionApiKeyProvider`. Register via
-      `AddHttpClient<OpenAiLlmClientFactory>`.
-- [ ] Wire into `ServiceCollectionExtensions.AddAgent`: add the `AiProvider.OpenAI` case to
-      all three DI factory lambdas (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`).
-- [ ] Implement `IUsageTrackerAware` on `OpenAiHttpLlmClient` so cost tracking picks it up
-      automatically (no `is OpenAiXxx` branch needed in `DeckBuilder`).
-- [ ] Add `ModelPricing` entries for all models in `OpenAiModels.SelectionModels`.
-      Unknown models silently report $0 — add pricing in the same change.
-- [ ] Update `KeyTester` OpenAI branch (currently format-only) to do a real 1-token probe
-      against the OpenAI endpoint, consistent with the Anthropic probe.
-- [ ] Handle 401 from the OpenAI endpoint: wrap as `ApiKeyRejectedException` so the UI clears
-      the key and shows a reconnect prompt.
-- [ ] Add tests: manual mock for `OpenAiHttpLlmClient` following the same pattern as the
-      existing Anthropic and Gemini mock fixtures in `Tests/`.
+`OpenAiHttpLlmClient` posts to `api.openai.com/v1/chat/completions` with `Authorization: Bearer`.
+System prompt maps to a system-role message; tools wrap in `{type:function}`; tool-call arguments
+(a JSON string in OpenAI's format) are parsed into `JsonNode` so adapters receive a uniform
+`LlmToolUseBlock`. `IsReasoningModel` gates temperature and `max_completion_tokens` for o-series
+models. `OpenAiLlmClientFactory` implements `ILlmClientFactory`; classification always pins to
+`gpt-4o-mini`. Wired into `ServiceCollectionExtensions.AddAgent` as a third case alongside
+Anthropic and Gemini. Pricing added for `gpt-4o-mini`, `gpt-4o`, `o4-mini`, `o3`. `KeyTester`
+upgraded to a real 1-token probe. 401/403 → `ApiKeyRejectedException`; quota 429s →
+`QuotaExceededException` (all three providers). `InternalsVisibleTo` added to the Agent `.csproj`
+so `BuildRequestJson`/`ParseResponse` are testable. 9 new unit tests; 337 total, all green.
 
 ---
 
@@ -598,13 +573,13 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 327 tests pass.
+All four projects compile; 337 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 
 **Agent pipeline:** `LlmClassifier` (Haiku, forced tool call, batched, cached except Plan/Synergy/Payoff), `LlmSelector` (user model, forced tool call, per-build rationale). `FillEngine` (greedy + reconciliation, max 50 iterations), `ColorFixingPass` (pip-demand scoring). Deterministic `RepairEngine` + `DeckBuilder` (12-stage pipeline). Multi-role classification: role profiles, secondary contributions, coverage accounting.
 
-**Multi-provider LLM (Anthropic + Gemini):** Three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) dispatch to one of two `ILlmClient` implementations via `ILlmClientFactory`. Anthropic path via `ClaudeHttpLlmClient` — direct HTTP to `api.anthropic.com/v1/messages`, no Anthropic C# SDK. Gemini path via `GeminiHttpLlmClient` wrapping `GeminiRestClient` — posts to `generateContent` with `responseSchema` structured output. `GeminiSchemas` translates our schema shape to Gemini's OpenAPI 3.0 subset (uppercase types, `propertyOrdering`, `format: enum`). `GeminiRateLimiter` (Scoped) enforces per-circuit RPM pacing. `GeminiRestClient` retries 429/502/503/504 with `Retry-After`-aware backoff; parses Google's structured error body so free-tier `limit: 0` gating is diagnosable. MAX_TOKENS handled distinct from JSON parse errors. Model picker covers `2.5 Flash`, `2.5 Flash Lite`, `3.1 Flash Lite` (default — 500 RPD), `3 Flash`, `3.5 Flash`, `2.0 Flash*` (needs billing).
+**Multi-provider LLM (Anthropic + OpenAI + Gemini):** Three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`) dispatch to one of three `ILlmClient` implementations via `ILlmClientFactory`. Anthropic path via `ClaudeHttpLlmClient` — direct HTTP to `api.anthropic.com/v1/messages`, no Anthropic C# SDK. OpenAI path via `OpenAiHttpLlmClient` — direct HTTP to `api.openai.com/v1/chat/completions`; maps tool calls to `{type:function}`, parses JSON-string arguments; gates temperature and `max_completion_tokens` for o-series reasoning models; classification pinned to `gpt-4o-mini`. Gemini path via `GeminiHttpLlmClient` wrapping `GeminiRestClient` — posts to `generateContent` with `responseSchema` structured output. `GeminiSchemas` translates our schema shape to Gemini's OpenAPI 3.0 subset. `GeminiRateLimiter` (Scoped) enforces per-circuit RPM pacing. All three clients map 401/403 → `ApiKeyRejectedException` and quota 429s → `QuotaExceededException` (no retry); transient 429s still retry with backoff. `KeyTester` probes Anthropic and OpenAI with a live 1-token call; Google is format-validated only.
 
 **Cost accounting:** `Instrumentation/ModelPricing.cs` — per-model USD rates per 1M tokens for both providers. `UsageTracker` uses it for per-call rows and summary totals; mixed-provider runs tally correctly. Free-tier Gemini calls show the "what you'd pay on paid tier" estimate. `IUsageTrackerAware` marker interface removes type-specific dispatch — all three adapters implement it, `DeckBuilder` and `CommanderDiscovery` wire the tracker through it.
 

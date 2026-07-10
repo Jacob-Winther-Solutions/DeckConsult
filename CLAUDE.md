@@ -12,16 +12,17 @@ perspective of someone using the deck builder rather than building it.
 
 An LLM-assisted Magic: the Gathering Commander (EDH) deck builder in C#/.NET 10, with a Blazor
 front end. The user drives it in natural language; an agent builds and validates decks against
-a pure domain core. Two LLM providers are wired: **Anthropic Claude** (via direct HTTP —
-`ClaudeHttpLlmClient`) and **Google Gemini** (via `GeminiRestClient`). Both implement `ILlmClient`
-so the three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`, `LlmCommanderSelector`)
-are shared. Runtime dispatch by `AiProvider` on the per-circuit `SessionApiKeyProvider`.
+a pure domain core. Three LLM providers are wired: **Anthropic Claude** (via `ClaudeHttpLlmClient`),
+**OpenAI** (via `OpenAiHttpLlmClient`), and **Google Gemini** (via `GeminiRestClient`). All three
+implement `ILlmClient` so the three provider-agnostic adapters (`LlmClassifier`, `LlmSelector`,
+`LlmCommanderSelector`) are shared. Runtime dispatch by `AiProvider` on the per-circuit
+`SessionApiKeyProvider`.
 `README.md` documents the architecture; `TODO/TODO.md` tracks deferred work;
 `TODO/AGENT_PRINCIPLES.md` is the design rationale document for the Agent layer.
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 328 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 337 tests, all green.
 
 | Project | Status |
 |---|---|
@@ -42,11 +43,13 @@ staged pipeline; the LLM is consulted at exactly two fixed points:
    overlaps. Results cached globally by `OracleId` except `Plan`, `Synergy`, and `Payoff`,
    which are re-classified per build.
    - Anthropic path: `claude-haiku-4-5-20251001` regardless of user selection (fast + cheap).
+   - OpenAI path: `gpt-4o-mini` regardless of user selection (fast + cheap).
    - Gemini path: user's selected Gemini model (higher token ceiling: 32 768).
 2. **Selection** — `ICardSelector` / `LlmSelector` (temperature 0.6, per-role call, forced
    structured output, prompt caching enabled). Returns a ranked list with per-card rationale.
    The fill engine decides count; the model never outputs counts.
    - Anthropic path: user-selected Claude model, default Haiku.
+   - OpenAI path: user-selected OpenAI model, default `gpt-4o-mini`.
    - Gemini path: user's selected Gemini model.
 
 Everything else — fill order, reconciliation, color-fixing, repair, basic distribution — is
@@ -57,12 +60,12 @@ without an explicit user request.
 
 ### Provider dispatch
 
-`SessionApiKeyProvider.ActiveProvider` (`Anthropic` / `Google` / `OpenAI`) is set at the
-UI level and read at the DI factory lambdas in `ServiceCollectionExtensions.AddAgent`. Each
-interface (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`) resolves to either the
-Anthropic or Gemini concrete class at scope-resolution time. OpenAI adapters are still
-deferred — the UI wires the key and cookie for it, but the LLM interfaces fall through to
-the Anthropic implementation until `OpenAiHttpLlmClient` is implemented.
+`SessionApiKeyProvider.ActiveProvider` (`Anthropic` / `OpenAI` / `Google`) is set at the
+UI level and read at the DI factory lambda in `ServiceCollectionExtensions.AddAgent`. The lambda
+is a three-way switch that resolves `ILlmClientFactory` to `ClaudeHttpLlmClientFactory`,
+`OpenAiLlmClientFactory`, or `GeminiLlmClientFactory` at scope-resolution time. All three
+interfaces (`ILlmClassifier`, `ICardSelector`, `ICommanderSelector`) share the same dispatch
+through the factory.
 
 ### Gemini path — custom REST client
 
@@ -133,13 +136,18 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   `ClassificationCache` is the only Singleton in the Agent layer. Never register a Scoped LLM
   service as Singleton — it would capture the per-circuit key or pacing state.
 - **BYOK — HTTP seams:** `ClaudeHttpLlmClientFactory` is the only place that constructs
-  `ClaudeHttpLlmClient` (no Anthropic SDK — direct HTTP to `api.anthropic.com/v1/messages`).
-  `GeminiClientFactory` is the only place that constructs `GeminiRestClient`. Both implement
-  `ILlmClientFactory`. No LLM adapter should construct an HTTP client itself.
-- **BYOK — 401/403 handling:** Anthropic's `AnthropicUnauthorizedException` and Gemini's 401/403
-  responses (from `GeminiRestClient`) are both rethrown as `ApiKeyRejectedException`. The UI
-  catches this, calls `Keys.Clear()`, and shows a reconnect prompt. Don't swallow it or convert
-  it to a generic build failure.
+  `ClaudeHttpLlmClient` (direct HTTP to `api.anthropic.com/v1/messages`). `OpenAiLlmClientFactory`
+  is the only place that constructs `OpenAiHttpLlmClient` (direct HTTP to
+  `api.openai.com/v1/chat/completions`). `GeminiClientFactory` is the only place that constructs
+  `GeminiRestClient`. All three implement `ILlmClientFactory`. No LLM adapter should construct
+  an HTTP client itself.
+- **BYOK — 401/403 handling:** All three HTTP clients map 401/403 responses to
+  `ApiKeyRejectedException`. The UI catches this, calls `Keys.Clear()`, and shows a reconnect
+  prompt. Don't swallow it or convert it to a generic build failure.
+- **Quota / billing errors:** All three HTTP clients detect quota-exhaustion 429s (body contains
+  "quota" or "RESOURCE_EXHAUSTED") and throw `QuotaExceededException` immediately — no retry.
+  `KeyTester` catches this and returns a user-facing "Billing limit reached" message. Transient
+  rate-limit 429s (no quota keyword) are still retried with backoff.
 - **Gemini — free-tier `limit: 0` is a project setting, not our bug.** Some models
   (currently `gemini-2.0-flash*`) return HTTP 429 with `status: RESOURCE_EXHAUSTED` and
   `limit: 0` on projects without billing attached. The full error body (parsed by
@@ -164,10 +172,14 @@ These decisions are intentional. Keep them unless the user explicitly asks to ch
   added to a picker (`GeminiModels.SelectionModels` / `ClaudeModels.SelectionModels`), add a
   corresponding row to `ModelPricing.Prices` in the same change; unknown models silently report
   $0 which will surface as a suspicious total.
-- **Temperature — model-gated:** `ClaudeHttpLlmClient.ModelSupportsTemperature` controls whether
-  the `temperature` field is included in the request. Haiku 4.5 and `claude-3-*` variants accept
-  it; Sonnet 5 and Opus 4.8 reject it with HTTP 400. Do not send temperature for newly added
-  models until confirmed — just omit it and let the model default.
+- **Temperature — model-gated (Anthropic):** `ClaudeHttpLlmClient.ModelSupportsTemperature`
+  controls whether the `temperature` field is included in the request. Haiku 4.5 and `claude-3-*`
+  variants accept it; Sonnet 5 and Opus 4.8 reject it with HTTP 400. Do not send temperature for
+  newly added models until confirmed — just omit it and let the model default.
+- **Temperature — model-gated (OpenAI):** `OpenAiHttpLlmClient.IsReasoningModel` gates
+  temperature for o-series models (`o1`, `o3`, `o4-*`). These models also use
+  `max_completion_tokens` instead of `max_tokens`. Any future o-series model should be covered
+  by the existing prefix check; verify before adding gpt-* models to the reasoning gate.
 - **Prompt caching — implemented:** `ClaudeHttpLlmClient.BuildRequestJson` serializes the system
   prompt as a structured content block and marks the last tool definition with
   `"cache_control": {"type": "ephemeral"}` when `LlmRequest.EnableCaching = true`. All three
