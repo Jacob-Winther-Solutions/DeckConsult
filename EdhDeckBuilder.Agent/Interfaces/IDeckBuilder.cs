@@ -42,5 +42,6 @@ public interface IDeckBuilder
         SoftConstraints? constraints = null,
         Func<string, Task>? progress = null,
         CancellationToken ct = default,
-        bool isLegalPartnerPair = false);
+        bool isLegalPartnerPair = false,
+        Func<string, Task>? subProgress = null);
 }

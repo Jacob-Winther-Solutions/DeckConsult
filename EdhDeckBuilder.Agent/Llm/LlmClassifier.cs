@@ -28,7 +28,8 @@ public sealed class LlmClassifier(
     public async Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
         IReadOnlyList<CardCandidate> candidates,
         IReadOnlyList<Card> commanders,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<string, Task>? subProgress = null)
     {
         cache.Partition(candidates, out var hits, out var misses);
 
@@ -36,11 +37,18 @@ public sealed class LlmClassifier(
             return hits;
 
         var fresh = new List<ClassificationResult>();
+
+        if (subProgress is not null)
+            await subProgress($"{hits.Count} / {candidates.Count} cards classified");
+
         for (int i = 0; i < misses.Count; i += BatchSize)
         {
             var batch = misses.Skip(i).Take(BatchSize).ToList();
             var results = await CallLlmAsync(batch, commanders, ct);
             fresh.AddRange(results);
+
+            if (subProgress is not null)
+                await subProgress($"{hits.Count + fresh.Count} / {candidates.Count} cards classified");
         }
         cache.Store(fresh);
 

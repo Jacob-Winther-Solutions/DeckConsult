@@ -42,13 +42,15 @@ public sealed class FillEngine(ICardSelector selector)
     public async Task<FillResult> FillAsync(
         BuildContext context,
         IReadOnlyList<FillCandidate> pool,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<string, Task>? subProgress = null)
     {
         var state = new BuildState(context.ReservedLandCount);
         var committed = new HashSet<Guid>();
         var rationales = new Dictionary<Guid, string>();
         var selectorStats = new Dictionary<CardRole, (int Input, int Ranked)>();
         int spellBudget = context.NonCommanderCount - context.ReservedLandCount;
+        int selectorCall = 0;
 
         // ── Greedy fill ──────────────────────────────────────────────────────
         foreach (var role in FillOrder)
@@ -65,6 +67,10 @@ public sealed class FillEngine(ICardSelector selector)
                 .ToList();
 
             if (candidates.Count == 0) continue;
+
+            selectorCall++;
+            if (subProgress is not null)
+                await subProgress($"Selecting {role} cards… ({selectorCall} / {FillOrder.Count})");
 
             var ranked = await selector.SelectAsync(role, candidates, context, state, ct);
             selectorStats[role] = (candidates.Count, ranked.Count);

@@ -338,19 +338,22 @@ the deck-builder entry point is different (form input before the build, not post
 
 ---
 
-### LLM step progress reporting — sub-steps deferred
+### LLM step progress reporting — sub-steps done (2026-07-10)
 
-The Builder and Discovery pages both show named stages with correct timing (done 2026-07-10).
-Sub-step granularity within the two LLM-heavy Builder stages is still deferred:
+Named stages with correct timing done 2026-07-10. Sub-step detail now live for both slow stages:
 
-- [ ] Inside `ClassifyPool`, report each 30-card batch: `"Classifying cards (batch {i}/{total})…"`.
-- [ ] Inside `FillEngine`, report each per-role selector call: `"Selecting {Role} cards…"`.
-      `FillEngine` currently has no progress parameter — add one (nullable).
-- [ ] Consider a structured `(string Stage, int? PercentComplete)` type to drive a percentage
-      bar in `BuildProgress.razor`; the 10 fixed stages plus ~13 sub-steps give granular 0–100%.
+- `ClassifyPool` fires `"N / M cards classified"` before the first batch (showing cache hits
+  immediately) and after each 30-card LLM batch. `ILlmClassifier.ClassifyAsync` accepts an
+  optional `Func<string, Task>? subProgress` threaded from `IDeckBuilder.BuildAsync` →
+  `DeckBuilder.ClassifyPoolAsync` → `LlmClassifier`.
+- `FillEngine.FillAsync` accepts the same optional callback and fires `"Selecting {Role} cards…
+  (N / 9)"` before each `selector.SelectAsync` call.
 
-**Scope:** Medium — one new `Func<string, Task>?` parameter on `FillEngine`, wired from
-`DeckBuilder`, plus a `BuildProgress` percentage bar.
+Remaining deferred:
+
+- [ ] Percentage bar in `BuildProgress.razor` — would require a structured
+      `(string Stage, int? PercentComplete)` progress type; the 10 fixed stages plus ~13
+      sub-steps give granular 0–100%. Deferred: the text counter is sufficient for now.
 
 ---
 
@@ -592,5 +595,7 @@ All four projects compile; 337 tests pass.
 **Deck results & logging:** Saved locally (3-max, Data Protection cookie). Token usage logging with per-call table + summary total across all discovery and build flows, per-provider pricing.
 
 **Deck Download:** Markdown export with header, role buckets (with rationale), runner-ups, coverage summary, raw decklist (ready to paste).
+
+**Build progress — sub-step detail:** `ClassifyPool` shows `"N / M cards classified"` (updating per 30-card batch, seeded immediately with cache-hit count). `FillEngine` shows `"Selecting {Role} cards… (N / 9)"` before each selector call. Both stages surface their detail via `CurrentStageDetail` in `BuildProgress.razor`.
 
 **Tests:** 328 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration). All green.

@@ -33,5 +33,6 @@ public interface ILlmClassifier
     Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
         IReadOnlyList<CardCandidate> candidates,
         IReadOnlyList<Card> commanders,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        Func<string, Task>? subProgress = null);
 }

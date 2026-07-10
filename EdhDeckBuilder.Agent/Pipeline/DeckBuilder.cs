@@ -59,7 +59,8 @@ public sealed class DeckBuilder(
         SoftConstraints? constraints = null,
         Func<string, Task>? progress = null,
         CancellationToken ct = default,
-        bool isLegalPartnerPair = false)
+        bool isLegalPartnerPair = false,
+        Func<string, Task>? subProgress = null)
     {
         var timer = Stopwatch.StartNew();
         var commanderNames = string.Join(" / ", commanders.Select(c => c.Name));
@@ -120,7 +121,7 @@ public sealed class DeckBuilder(
         // 6. Classify pool → FillCandidates.
         await (progress?.Invoke("Classifying card pool") ?? Task.CompletedTask);
         stageTimer.Restart();
-        var (fillPool, classifications) = await ClassifyPoolAsync(filteredPool, commanders, ct);
+        var (fillPool, classifications) = await ClassifyPoolAsync(filteredPool, commanders, ct, subProgress);
         stageTimer.Stop();
 
         // Count breakdown by role
@@ -161,7 +162,7 @@ public sealed class DeckBuilder(
         await (progress?.Invoke("Filling deck") ?? Task.CompletedTask);
         stageTimer.Restart();
         var engine     = new FillEngine(selector);
-        var fillResult = await engine.FillAsync(context, fillPool, ct);
+        var fillResult = await engine.FillAsync(context, fillPool, ct, subProgress);
         stageTimer.Stop();
         logger.LogInformation("FillEngine: {FilledCount} cards committed, {ElapsedMs}ms",
             fillResult.State.Committed.Count, stageTimer.ElapsedMilliseconds);
@@ -311,9 +312,10 @@ public sealed class DeckBuilder(
     private async Task<(IReadOnlyList<FillCandidate>, IReadOnlyList<ClassificationResult>)> ClassifyPoolAsync(
         IReadOnlyList<CardCandidate> pool,
         IReadOnlyList<Card> commanders,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<string, Task>? subProgress = null)
     {
-        var classifications = await classifier.ClassifyAsync(pool, commanders, ct);
+        var classifications = await classifier.ClassifyAsync(pool, commanders, ct, subProgress);
 
         var poolById       = pool.ToDictionary(c => c.Card.OracleId);
         var classifiedById = classifications.ToDictionary(r => r.OracleId);

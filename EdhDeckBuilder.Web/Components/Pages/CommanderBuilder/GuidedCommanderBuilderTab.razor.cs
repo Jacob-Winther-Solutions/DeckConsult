@@ -64,6 +64,7 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 
     private bool _isBuilding;
     private string? _currentStage;
+    private string? _currentStageDetail;
     private readonly List<string> _completedStages = [];
     private string? _errorMessage;
     private string? _partnerWarning;
@@ -157,6 +158,7 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 
         _isBuilding = true;
         _currentStage = null;
+        _currentStageDetail = null;
         _completedStages.Clear();
         _errorMessage = null;
         _buildCts = new CancellationTokenSource();
@@ -186,7 +188,8 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
                 p.Constraints,
                 OnStageReport,
                 _buildCts.Token,
-                isLegalPartnerPair);
+                isLegalPartnerPair,
+                OnSubStageReport);
 
             if (enableTracking && DeckBuilder.UsageTracker != null)
             {
@@ -262,6 +265,17 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
         {
             if (_currentStage is not null) _completedStages.Add(_currentStage);
             _currentStage = stage;
+            _currentStageDetail = null;
+            StateHasChanged();
+        });
+        await Task.Yield();
+    }
+
+    private async Task OnSubStageReport(string detail)
+    {
+        await InvokeAsync(() =>
+        {
+            _currentStageDetail = detail;
             StateHasChanged();
         });
         await Task.Yield();

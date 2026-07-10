@@ -50,7 +50,8 @@ public sealed class DeckBuilderTests
         public Task<IReadOnlyList<ClassificationResult>> ClassifyAsync(
             IReadOnlyList<CardCandidate> candidates,
             IReadOnlyList<Card> commanders,
-            CancellationToken ct)
+            CancellationToken ct = default,
+            Func<string, Task>? subProgress = null)
         {
             IReadOnlyList<ClassificationResult> results = candidates.Select(c => new ClassificationResult
             {
