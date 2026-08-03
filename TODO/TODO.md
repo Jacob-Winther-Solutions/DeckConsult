@@ -499,8 +499,9 @@ Features and enhancements worth considering for future iterations:
 
 - [ ] **Opening-hand / curve simulation** — Sanity-check deck consistency by simulating
       opening hands and mana curves.
-- [ ] **Plain text decklist export** — For users who prefer to manually paste into external
-      deck builders (TCGPlayer Mass Entry, etc.). Shares the `CartLine` mapping with the buy button.
+- [x] **Plain text decklist export** — Done (2026-08-03). "Copy Decklist" and "Download (.txt)"
+      buttons in the export panel. `DeckReportExporter.ExportDecklist()` is the shared method;
+      `downloadTextFile` in `app.js` now accepts an optional MIME-type parameter.
 - [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
       while keeping the builder interface slot-in-ready.
 
@@ -566,7 +567,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 337 tests pass.
+All four projects compile; 352 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 

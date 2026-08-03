@@ -185,6 +185,64 @@ public sealed class DeckReportExporterTests
     }
 
     [Fact]
+    public void ExportDecklist_ContainsCommanderAndDeckCards()
+    {
+        var commander = MakeCard("Korvold, Fae-Cursed King", CardType.Creature);
+        var card      = MakeSuggestion(MakeCard("Sol Ring", CardType.Artifact), CardRole.Ramp, "Ramp.");
+        var result    = MakeResult([card]);
+
+        var decklist = DeckReportExporter.ExportDecklist(result, [commander]);
+
+        Assert.Contains("1 Korvold, Fae-Cursed King", decklist);
+        Assert.Contains("1 Sol Ring", decklist);
+        Assert.Contains("20 Forest", decklist);
+    }
+
+    [Fact]
+    public void ExportDecklist_CommanderAppearsBeforeDeckCards()
+    {
+        var commander = MakeCard("Atraxa, Praetors' Voice", CardType.Creature);
+        var card      = MakeSuggestion(MakeCard("Sol Ring", CardType.Artifact), CardRole.Ramp, "Ramp.");
+        var result    = MakeResult([card]);
+
+        var decklist = DeckReportExporter.ExportDecklist(result, [commander]);
+
+        Assert.True(decklist.IndexOf("Atraxa", StringComparison.Ordinal)
+                  < decklist.IndexOf("Sol Ring", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ExportDecklist_DoesNotContainMarkdownOrReportContent()
+    {
+        var commander = MakeCard("Atraxa, Praetors' Voice", CardType.Creature);
+        var card      = MakeSuggestion(MakeCard("Sol Ring", CardType.Artifact), CardRole.Ramp, "Ramp.");
+        var result    = MakeResult([card]);
+
+        var decklist = DeckReportExporter.ExportDecklist(result, [commander]);
+
+        Assert.DoesNotContain("#", decklist);
+        Assert.DoesNotContain("**", decklist);
+        Assert.DoesNotContain("Coverage", decklist);
+    }
+
+    [Fact]
+    public void ExportDecklist_PartnerPair_IncludesBothCommanders()
+    {
+        var commanders = new[]
+        {
+            MakeCard("Akiri, Line-Slinger",    CardType.Creature),
+            MakeCard("Bruse Tarl, Boorish Herder", CardType.Creature),
+        };
+        var card   = MakeSuggestion(MakeCard("Sol Ring", CardType.Artifact), CardRole.Ramp, "Ramp.");
+        var result = MakeResult([card]);
+
+        var decklist = DeckReportExporter.ExportDecklist(result, commanders);
+
+        Assert.Contains("1 Akiri, Line-Slinger", decklist);
+        Assert.Contains("1 Bruse Tarl, Boorish Herder", decklist);
+    }
+
+    [Fact]
     public void SlugifyFilename_ProducesCleanSlug()
     {
         var commanders = new[] { MakeCard("Atraxa, Praetors' Voice") };

@@ -53,6 +53,6 @@ public partial class DeckResultsPage
             _stored.TotalBudgetUsd,
             _stored.BuiltOn);
         var filename = DeckReportExporter.SlugifyFilename(_stored.Commanders) + "-build-report.md";
-        await JS.InvokeVoidAsync("downloadTextFile", filename, content);
+        await JS.InvokeVoidAsync("downloadTextFile", filename, content, "text/markdown");
     }
 }

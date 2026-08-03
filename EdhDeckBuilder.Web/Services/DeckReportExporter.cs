@@ -167,20 +167,22 @@ public static class DeckReportExporter
         sb.AppendLine("*(Paste directly into your favorite deck builder)*");
         sb.AppendLine();
 
+        sb.AppendLine(ExportDecklist(result, commanders));
+
+        return sb.ToString();
+    }
+
+    public static string ExportDecklist(DeckBuildResult result, IReadOnlyList<Card> commanders)
+    {
+        var sb = new StringBuilder();
         foreach (var c in commanders)
             sb.AppendLine($"1 {c.Name}");
         sb.AppendLine();
-
         foreach (var s in result.Deck.OrderBy(s => s.Card.Name))
             sb.AppendLine($"1 {s.Card.Name}");
-
-        if (result.BasicLandCounts.Count > 0)
-        {
-            foreach (var (land, count) in result.BasicLandCounts.OrderByDescending(kv => kv.Value))
-                sb.AppendLine($"{count} {land}");
-        }
-
-        return sb.ToString();
+        foreach (var (land, count) in result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+            sb.AppendLine($"{count} {land}");
+        return sb.ToString().TrimEnd();
     }
 
     public static string SlugifyFilename(IReadOnlyList<Card> commanders)

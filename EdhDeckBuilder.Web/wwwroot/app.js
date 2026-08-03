@@ -45,8 +45,8 @@ function saveDeckResult(key, value, maxResults) {
     try { localStorage.setItem(key, value); } catch { }
 }
 
-function downloadTextFile(filename, content) {
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+function downloadTextFile(filename, content, mimeType = 'text/plain') {
+    const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

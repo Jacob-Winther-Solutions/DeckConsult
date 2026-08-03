@@ -1,8 +1,8 @@
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using System.Text;
 
 namespace EdhDeckBuilder.Web.Components.Results;
 
@@ -15,33 +15,27 @@ public partial class DeckExportPanel
     [Parameter]                 public          EventCallback        OnReset    { get; set; }
     [Parameter]                 public          EventCallback        OnDownloadReport { get; set; }
 
-    private bool _showExport;
-    private bool _exportCopied;
+    private bool _copiedDecklist;
 
-    private string BuildExportText()
-    {
-        var sb = new StringBuilder();
-        foreach (var c in Commanders)
-            sb.AppendLine($"1 {c.Name}");
-        sb.AppendLine();
-        foreach (var s in Result.Deck.OrderBy(s => s.Card.Name))
-            sb.AppendLine($"1 {s.Card.Name}");
-        foreach (var (land, count) in Result.BasicLandCounts.OrderByDescending(kv => kv.Value))
-            sb.AppendLine($"{count} {land}");
-        return sb.ToString().TrimEnd();
-    }
+    private string DecklistText() => DeckReportExporter.ExportDecklist(Result, Commanders);
 
-    private async Task CopyExportTextAsync()
+    private async Task CopyDecklistAsync()
     {
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", BuildExportText());
-            _exportCopied = true;
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", DecklistText());
+            _copiedDecklist = true;
             StateHasChanged();
             await Task.Delay(2000);
-            _exportCopied = false;
+            _copiedDecklist = false;
             StateHasChanged();
         }
-        catch { /* clipboard unavailable — user can select-all from the textarea */ }
+        catch { /* clipboard unavailable */ }
+    }
+
+    private async Task DownloadDecklistAsync()
+    {
+        var filename = DeckReportExporter.SlugifyFilename(Commanders) + "-decklist.txt";
+        await JS.InvokeVoidAsync("downloadTextFile", filename, DecklistText(), "text/plain");
     }
 }
