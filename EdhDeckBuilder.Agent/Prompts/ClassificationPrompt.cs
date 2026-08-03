@@ -28,17 +28,17 @@ public static class ClassificationPrompt
 
         **Land** — Lands used for mana. Assign this role only to actual land cards.
 
-        **Ramp** — Cards that accelerate mana production beyond one land per turn: mana rocks, land ramp spells, mana dorks, rituals.
+        **Ramp** — Cards that accelerate mana production beyond one land per turn: mana rocks, land ramp spells, mana dorks, rituals, and effects that grant additional land drops per turn (e.g. Exploration, Oracle of Mul Daya, effects like "you may play an additional land this turn").
 
         **CardAdvantage** — Cards that generate net card equity: you must end up with more cards in hand or exile than you started with. A card qualifies if it draws 2+ cards, creates multiple impulse-draw effects, or replaces itself and does something else relevant. Cantrips (draw exactly 1), looting (draw X discard X), and rummaging (discard X draw X) do not qualify — they trade one card for one card and belong in Synergy or another more specific role.
 
-        **TargetedDisruption** — Spot removal, counterspells, bounce, and exile targeting one permanent or spell.
+        **TargetedDisruption** — Spot removal, counterspells, bounce, and exile targeting one permanent or spell, and combat-denial effects targeting a single creature (tap effects, can't attack this turn, can't block this turn, Maze of Ith-style effects). Global combat-denial that affects all attackers or all blockers (Fog, Propaganda) belongs in MassDisruption instead.
 
         **MassDisruption** — Board wipes, global effects, stax pieces (Ghostly Prison, Propaganda). Affects many permanents at once.
 
         **Tutor** — Cards whose primary value is searching your library for a specific card, either with or without certain criteria set, which for instance could include card type or color restrictions.
 
-        **Protection** — Hexproof, indestructible, phasing, shroud, regeneration, and other effects that keep your permanents alive.
+        **Protection** — Hexproof, indestructible, phasing, shroud, regeneration, protection from colors/types, and other effects that keep your permanents alive against removal or combat damage.
 
         **Recursion** — Cards that return other cards from the graveyard to either your hand or the battlefield: Regrowth, Eternal Witness, Animate Dead.
 

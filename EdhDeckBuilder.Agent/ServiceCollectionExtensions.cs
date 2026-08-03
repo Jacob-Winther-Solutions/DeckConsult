@@ -1,3 +1,4 @@
+using EdhDeckBuilder.Agent.Analysis;
 using EdhDeckBuilder.Agent.Authentication;
 using EdhDeckBuilder.Agent.Authentication.Claude;
 using EdhDeckBuilder.Agent.Authentication.Gemini;
@@ -100,6 +101,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IDeckBuilder, DeckBuilder>();
         services.AddScoped<ILockedCardValidator, LockedCardValidator>();
+        services.AddScoped<IDeckAnalyzer, DeckAnalyzer>();
+        services.AddSingleton<DecklistParser>();
 
         // Commander discovery
         services.AddScoped<ICommanderDiscovery, CommanderDiscovery>();

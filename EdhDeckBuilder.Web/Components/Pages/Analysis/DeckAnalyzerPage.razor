@@ -1,0 +1,569 @@
+@page "/analyze"
+
+<PageTitle>Deck Analyzer — EDH Deck Builder</PageTitle>
+
+<div class="container-fluid">
+
+    <div style="padding: 1.5rem 1.5rem 0 1.5rem;">
+        <h2 class="mb-1">Deck Analyzer</h2>
+        <p class="text-muted mb-0">Paste an existing decklist to classify it, see its coverage profile, and estimate its power bracket.</p>
+    </div>
+
+    @if (_isAnalyzing)
+    {
+        <BuildProgress AllStages="AnalysisStages"
+                       CurrentStage="@_currentStage"
+                       CurrentStageDetail="@_currentStageDetail"
+                       CompletedStages="_completedStages"
+                       Title="Analyzing deck…"
+                       OnCancel="CancelAnalysis" />
+    }
+    else if (_result is not null)
+    {
+        <!-- ── Export bar ────────────────────────────────────────────────────── -->
+        <div class="d-flex align-items-center gap-2 px-3 pt-4 pb-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Reset">&#8592; Analyze another</button>
+            <button class="btn @(_copiedReport ? "btn-success" : "btn-outline-primary") btn-sm"
+                    @onclick="CopyReportAsync">
+                @(_copiedReport ? "Copied!" : "Copy Report")
+            </button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="DownloadReportAsync">
+                Export Analysis (.md)
+            </button>
+        </div>
+
+        <div class="py-4" style="max-width: 1000px; margin: 0 auto;">
+
+            <!-- ── Header ───────────────────────────────────────────────────── -->
+            <div class="d-flex flex-wrap align-items-start gap-3 px-3 mb-4">
+                <div class="flex-grow-1">
+                    <h3 class="mb-0">@string.Join(" + ", _result.Commanders.Select(c => c.Name))</h3>
+                    <div class="text-muted small">@string.Join(" / ", _result.Commanders.Select(c => c.TypeLine))</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <ColorIdentityPips Identity="@(_result.Commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity))" />
+                    <span class="badge bg-secondary">
+                        Est. Bracket @((int)_result.EstimatedBracket) &mdash; @BracketLibrary.All[_result.EstimatedBracket].Name
+                    </span>
+                    @{
+                        var totalCards = _result.Cards.Count + _result.BasicLandCounts.Values.Sum();
+                    }
+                    <span class="badge bg-light text-dark border" title="Non-basic cards + basic lands">
+                        @totalCards / @(100 - _result.Commanders.Count) cards
+                    </span>
+                    @if (_result.TotalPriceUsd > 0)
+                    {
+                        <span class="badge bg-light text-dark border" title="Total price of non-basic cards">
+                            $@_result.TotalPriceUsd.ToString("F2")
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- ── Bracket explanation ───────────────────────────────────────── -->
+            <div class="alert alert-info mx-3 mb-4 py-2">
+                <strong>Bracket estimate:</strong> @_result.BracketExplanation
+            </div>
+
+            <!-- ── View tabs ─────────────────────────────────────────────────── -->
+            <ul class="nav nav-tabs px-3 mb-3">
+                <li class="nav-item">
+                    <button class="nav-link @(_view == AnalysisView.ByRole ? "active" : "")"
+                            @onclick='() => _view = AnalysisView.ByRole'>Coverage Report</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_view == AnalysisView.AllCards ? "active" : "")"
+                            @onclick='() => _view = AnalysisView.AllCards'>All Cards</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_view == AnalysisView.ByType ? "active" : "")"
+                            @onclick='() => _view = AnalysisView.ByType'>By Type</button>
+                </li>
+            </ul>
+
+            @if (_view == AnalysisView.ByRole)
+            {
+                <!-- ── Coverage summary ──────────────────────────────────────── -->
+                <div class="card mb-3 mx-3">
+                    <div class="card-header d-flex align-items-center">
+                        <span class="fw-semibold me-auto">Coverage vs. Balanced Midrange baseline</span>
+                        <button class="btn btn-sm btn-link text-muted py-0" @onclick="() => _showCoverage = !_showCoverage">
+                            @(_showCoverage ? "Hide" : "Show")
+                        </button>
+                    </div>
+                    @if (_showCoverage)
+                    {
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="text-muted" style="font-size: 0.8rem;">
+                                <tr>
+                                    <th class="ps-3 fw-normal">Role</th>
+                                    <th class="text-center fw-normal">Baseline (min&ndash;ideal&ndash;max)</th>
+                                    <th class="text-center fw-normal">Actual</th>
+                                    <th class="pe-3 fw-normal" style="min-width: 140px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var role in RoleDisplayOrder)
+                                {
+                                    if (!DeckTemplate.Balanced.Targets.TryGetValue(role, out var target)) continue;
+                                    var actual = _result.ActualCoverage.GetValueOrDefault(role, 0.0);
+                                    var barPct = target.Ideal > 0
+                                        ? Math.Min(100.0, actual / target.Ideal * 100.0)
+                                        : 0.0;
+                                    var isOk = actual >= target.Min;
+                                    <tr>
+                                        <td class="ps-3">@CardRoleDisplay.RoleName(role)</td>
+                                        <td class="text-center text-muted" style="font-size: 0.8rem;">
+                                            @target.Min&ndash;@target.Ideal&ndash;@target.Max
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge @(isOk ? "bg-success" : "bg-warning text-dark")">
+                                                @actual.ToString("0.#")
+                                            </span>
+                                        </td>
+                                        <td class="pe-3">
+                                            <div class="progress" style="height: 5px;">
+                                                <div class="progress-bar @(isOk ? "bg-success" : "bg-warning")"
+                                                     style="width: @barPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;">
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+
+                <!-- ── Role gaps ─────────────────────────────────────────────── -->
+                @if (_result.RoleGaps.Count > 0)
+                {
+                    <div class="alert alert-warning mx-3 mb-3">
+                        <strong>Role gaps vs. balanced baseline</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var gap in _result.RoleGaps)
+                            {
+                                <li>
+                                    <strong>@CardRoleDisplay.RoleName(gap.Role):</strong>
+                                    @gap.ActualCoverage.ToString("0.#") / @gap.IdealTarget ideal
+                                    (@gap.Shortfall.ToString("0.#") short)
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <!-- ── Input warnings ─────────────────────────────────────────── -->
+                @if (_result.UnresolvedNames.Count > 0)
+                {
+                    <div class="alert alert-warning mx-3 mb-3">
+                        <strong>@_result.UnresolvedNames.Count card name(s) could not be resolved and are excluded from the analysis:</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var name in _result.UnresolvedNames) { <li>@name</li> }
+                        </ul>
+                    </div>
+                }
+                @if (_result.ColorIdentityViolations.Count > 0)
+                {
+                    <div class="alert alert-warning mx-3 mb-3">
+                        <strong>Color identity violations — these cards are outside your commander's color identity:</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var v in _result.ColorIdentityViolations) { <li>@v</li> }
+                        </ul>
+                    </div>
+                }
+
+                <!-- ── Role buckets ───────────────────────────────────────────── -->
+                var allAnalyzed = _result.CommanderCards.Concat(_result.Cards).ToList();
+                @foreach (var role in RoleDisplayOrder)
+                {
+                    var primaryCards = allAnalyzed
+                        .Where(c => c.Roles.Primary == role)
+                        .OrderBy(c => c.IsCommander ? 0 : 1)
+                        .ThenBy(c => c.Card.Name)
+                        .ToList();
+                    var secondaryCards = allAnalyzed
+                        .Where(c => c.Roles.Primary != role && c.Roles.Secondary.Any(s => s.Role == role))
+                        .OrderByDescending(c => c.Roles.Secondary.First(s => s.Role == role).Weight)
+                        .ThenBy(c => c.Card.Name)
+                        .ToList();
+                    if (primaryCards.Count == 0 && secondaryCards.Count == 0) continue;
+
+                    var actual    = _result.ActualCoverage.GetValueOrDefault(role, 0.0);
+                    var collapsed = _collapsedBuckets.Contains(role);
+
+                    <div class="card mb-3 mx-3">
+                        <div class="card-header d-flex align-items-center gap-2"
+                             style="cursor: pointer;"
+                             @onclick="() => ToggleBucket(role)">
+                            <span class="fw-semibold me-auto">
+                                @CardRoleDisplay.RoleName(role)
+                                <span class="badge bg-secondary ms-1 fw-normal">@primaryCards.Count</span>
+                                @if (secondaryCards.Count > 0)
+                                {
+                                    <span class="badge bg-secondary bg-opacity-50 ms-1 fw-normal"
+                                          title="@secondaryCards.Count card(s) also contribute to this role">
+                                        +@secondaryCards.Count
+                                    </span>
+                                }
+                            </span>
+                            <span class="text-muted small">@actual.ToString("0.#") coverage</span>
+                            <span class="text-muted small">@(collapsed ? "&#9654;" : "&#9660;")</span>
+                        </div>
+
+                        @if (!collapsed)
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var card in primaryCards)
+                                {
+                                    <div class="list-group-item py-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                            <span class="fw-semibold">@card.Card.Name</span>
+                                            @if (card.IsCommander)
+                                            {
+                                                <span class="badge bg-secondary" title="Commander">&#128081; Commander</span>
+                                            }
+                                            @if (card.Card.ManaValue > 0)
+                                            {
+                                                <span class="badge bg-light text-dark border"
+                                                      style="font-size: 0.7rem;" title="Mana value">
+                                                    @card.Card.ManaValue.ToString("0.#")
+                                                </span>
+                                            }
+                                            @if (card.Card.PriceUsd.HasValue)
+                                            {
+                                                <span class="badge bg-light text-dark border"
+                                                      style="font-size: 0.7rem;" title="Price">
+                                                    $@card.Card.PriceUsd.Value.ToString("F2")
+                                                </span>
+                                            }
+                                            <span class="text-muted small">@card.Card.TypeLine</span>
+                                            @foreach (var contrib in card.Roles.Secondary)
+                                            {
+                                                var b = SecondaryBadge(contrib);
+                                                <span class="badge @b.CssClass"
+                                                      style="font-size: 0.7rem;"
+                                                      title="@b.Tooltip">@b.Label</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (secondaryCards.Count > 0)
+                            {
+                                <div class="px-3 py-2 border-top" style="background: rgba(0,0,0,0.02);">
+                                    <div class="text-muted fw-semibold text-uppercase mb-2"
+                                         style="font-size: 0.65rem; letter-spacing: 0.05em;">
+                                        Also contributes
+                                    </div>
+                                    @foreach (var card in secondaryCards)
+                                    {
+                                        var contrib = card.Roles.Secondary.First(s => s.Role == role);
+                                        var b = SecondaryBadge(contrib);
+                                        <div class="d-flex flex-wrap align-items-center gap-2 py-1">
+                                            <span class="text-muted" style="font-size: 0.85rem;">@card.Card.Name</span>
+                                            @if (card.IsCommander)
+                                            {
+                                                <span class="badge bg-secondary" style="font-size: 0.65rem;">Commander</span>
+                                            }
+                                            @if (card.Card.ManaValue > 0)
+                                            {
+                                                <span class="badge bg-light text-dark border"
+                                                      style="font-size: 0.65rem;" title="Mana value">
+                                                    @card.Card.ManaValue.ToString("0.#")
+                                                </span>
+                                            }
+                                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                                  style="font-size: 0.65rem;" title="Primary role">
+                                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                                            </span>
+                                            <span class="badge @b.CssClass"
+                                                  style="font-size: 0.65rem;" title="@b.Tooltip">@b.Label</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+
+                <!-- ── Basic lands ────────────────────────────────────────────── -->
+                @if (_result.BasicLandCounts.Count > 0)
+                {
+                    <div class="card mb-3 mx-3">
+                        <div class="card-header d-flex align-items-center gap-2"
+                             style="cursor: pointer;" @onclick="() => _showBasics = !_showBasics">
+                            <span class="fw-semibold me-auto">
+                                Basic Lands
+                                <span class="badge bg-secondary ms-1 fw-normal">
+                                    @_result.BasicLandCounts.Values.Sum()
+                                </span>
+                            </span>
+                            <span class="text-muted small">@(_showBasics ? "&#9660;" : "&#9654;")</span>
+                        </div>
+                        @if (_showBasics)
+                        {
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap gap-4">
+                                    @foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+                                    {
+                                        <div class="text-center">
+                                            <div class="fw-semibold fs-5">@count&times;</div>
+                                            <div class="text-muted small">@land</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            @if (_view == AnalysisView.AllCards)
+            {
+                var allForTable = _result.CommanderCards.Concat(_result.Cards).ToList();
+                <div class="card mx-3 mb-3">
+                    <div class="card-body p-0">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="text-muted" style="font-size: 0.8rem;">
+                                <tr>
+                                    <th class="ps-3 fw-normal">Card</th>
+                                    <th class="fw-normal text-center" style="width: 48px;">MV</th>
+                                    <th class="fw-normal text-center" style="width: 64px;">Price</th>
+                                    <th class="fw-normal">Type</th>
+                                    <th class="fw-normal">Roles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var card in allForTable.OrderBy(c => c.Card.Name))
+                                {
+                                    <tr>
+                                        <td class="ps-3 fw-semibold">
+                                            @card.Card.Name
+                                            @if (card.IsCommander)
+                                            {
+                                                <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Commander</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (card.Card.ManaValue > 0)
+                                            {
+                                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                    @card.Card.ManaValue.ToString("0.#")
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="text-center text-muted small">
+                                            @(card.Card.PriceUsd.HasValue ? $"${card.Card.PriceUsd.Value:F2}" : "—")
+                                        </td>
+                                        <td class="text-muted small">@card.Card.TypeLine</td>
+                                        <td>
+                                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                                  style="font-size: 0.7rem;">
+                                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                                            </span>
+                                            @foreach (var contrib in card.Roles.Secondary)
+                                            {
+                                                var b = SecondaryBadge(contrib);
+                                                <span class="badge @b.CssClass ms-1"
+                                                      style="font-size: 0.7rem;" title="@b.Tooltip">@b.Label</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if (_result.BasicLandCounts.Count > 0)
+                {
+                    <div class="card mx-3 mb-3">
+                        <div class="card-header small fw-semibold text-muted">Basic Lands</div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-4">
+                                @foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+                                {
+                                    <div><span class="fw-semibold">@count&times;</span> <span class="text-muted small">@land</span></div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (_view == AnalysisView.ByType)
+            {
+                var allForType = _result.CommanderCards.Concat(_result.Cards).ToList();
+                @foreach (var typeName in TypeOrder)
+                {
+                    var cards = allForType
+                        .Where(c => CardTypeBucket(c.Card) == typeName)
+                        .OrderBy(c => c.Card.Name)
+                        .ToList();
+                    if (cards.Count == 0) continue;
+                    var typeCollapsed = _collapsedTypeBuckets.Contains(typeName);
+
+                    <div class="card mb-3 mx-3">
+                        <div class="card-header d-flex align-items-center gap-2"
+                             style="cursor: pointer;"
+                             @onclick="() => ToggleTypeBucket(typeName)">
+                            <span class="fw-semibold me-auto">
+                                @typeName
+                                <span class="badge bg-secondary ms-1 fw-normal">@cards.Count</span>
+                            </span>
+                            <span class="text-muted small">@(typeCollapsed ? "&#9654;" : "&#9660;")</span>
+                        </div>
+                        @if (!typeCollapsed)
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var card in cards)
+                                {
+                                    <div class="list-group-item py-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="fw-semibold me-1">@card.Card.Name</span>
+                                            @if (card.IsCommander)
+                                            {
+                                                <span class="badge bg-secondary" title="Commander">Commander</span>
+                                            }
+                                            @if (card.Card.ManaValue > 0)
+                                            {
+                                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Mana value">
+                                                    @card.Card.ManaValue.ToString("0.#")
+                                                </span>
+                                            }
+                                            @if (card.Card.PriceUsd.HasValue)
+                                            {
+                                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Price">
+                                                    $@card.Card.PriceUsd.Value.ToString("F2")
+                                                </span>
+                                            }
+                                            <span class="text-muted small">@card.Card.TypeLine</span>
+                                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                                  style="font-size: 0.7rem;">
+                                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                                            </span>
+                                            @foreach (var contrib in card.Roles.Secondary)
+                                            {
+                                                var b = SecondaryBadge(contrib);
+                                                <span class="badge @b.CssClass" style="font-size: 0.7rem;" title="@b.Tooltip">@b.Label</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                @if (_result.BasicLandCounts.Count > 0)
+                {
+                    <div class="card mx-3 mb-3">
+                        <div class="card-header small fw-semibold text-muted">Basic Lands</div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-4">
+                                @foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+                                {
+                                    <div><span class="fw-semibold">@count&times;</span> <span class="text-muted small">@land</span></div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    }
+    else
+    {
+        <div style="max-width: 860px; padding: 1.5rem;">
+
+            @if (_errorMessage is not null)
+            {
+                <div class="alert alert-danger alert-dismissible">
+                    @_errorMessage
+                    <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+                </div>
+            }
+
+            <!-- ── Commander ─────────────────────────────────────────────────── -->
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">Commander(s)</div>
+                <div class="card-body">
+                    <CommanderPicker SelectedCommanders="_selectedCommanders"
+                                     OnSelectionChanged="OnCommandersChanged"
+                                     OnError="e => _errorMessage = e" />
+                </div>
+            </div>
+
+            <!-- ── Decklist ──────────────────────────────────────────────────── -->
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">Decklist</div>
+                <div class="card-body">
+                    <label class="form-label small fw-semibold mb-1">One card per line — plain format (e.g. "1 Sol Ring" or "30 Plains")</label>
+                    <textarea class="form-control font-monospace"
+                              rows="16"
+                              value="@_decklistText"
+                              @oninput="OnDecklistChanged"
+                              placeholder=@("1 Sol Ring\n1 Rhystic Study\n1 Cyclonic Rift\n30 Plains\n…")
+                              disabled="@(_selectedCommanders.Count == 0)"></textarea>
+                    <div class="text-muted small mt-1">
+                        Paste your 99 cards (without the commander). Section headers like "Lands" and "Creatures" are ignored. Quantities on basics are counted correctly.
+                    </div>
+                    <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+                        <button class="btn btn-outline-secondary btn-sm"
+                                disabled="@(!CanValidate)"
+                                @onclick="ValidateAsync">
+                            @(_isValidating ? "Validating…" : "Validate Cards")
+                        </button>
+                        @if (_validationDone)
+                        {
+                            <span class="text-success small">@_validationResolved resolved</span>
+                            @if (_validationUnresolved.Count > 0)
+                            {
+                                <span class="text-warning small">@_validationUnresolved.Count unresolved</span>
+                            }
+                        }
+                    </div>
+                    @if (_validationDone && _validationUnresolved.Count > 0)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0 py-2">
+                            <strong>Could not find these card names — check spelling before analyzing:</strong>
+                            <ul class="mb-0 mt-1 small">
+                                @foreach (var name in _validationUnresolved)
+                                {
+                                    <li>@name</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- ── Optional feedback ─────────────────────────────────────────── -->
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">
+                    What isn't working?
+                    <span class="text-muted fw-normal small ms-2">optional</span>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control"
+                              rows="3"
+                              @bind="_userFeedback"
+                              placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."
+                              disabled="@(_selectedCommanders.Count == 0)"></textarea>
+                    <div class="text-muted small mt-1">
+                        Describing what isn't working helps weight the gap analysis toward your actual pain points.
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary"
+                    disabled="@(!CanAnalyze)"
+                    @onclick="AnalyzeAsync">
+                Analyze Deck
+            </button>
+
+        </div>
+    }
+
+</div>

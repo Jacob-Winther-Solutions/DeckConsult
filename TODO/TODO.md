@@ -30,6 +30,22 @@ so `BuildRequestJson`/`ParseResponse` are testable. 9 new unit tests; 337 total,
 
 ## Bugs to Investigate
 
+### Bracket estimation accuracy — to investigate (2026-08-03)
+
+**Symptom:** Bracket estimates reported as off in manual testing. The current `BracketEstimator`
+uses only Tutor count (primary signal) and Land+Protection counts (secondary). This misses
+several important signals used by the official Command Zone bracket system (CEDH staples,
+card-specific overrides, combo presence, fast mana like Mana Crypt/Mana Vault).
+
+**Next steps:**
+- Compare estimator output vs. the Command Zone bracket system on 5–10 real decklists.
+- Check whether Commander Spellbook's `estimate-bracket` endpoint would be a better signal
+  source than the hand-rolled heuristic.
+- Identify which card signals (fast mana, hard stax, infinite combos) are missing from
+  `BracketEstimator.cs` and add them or replace with an API-backed approach.
+
+---
+
 ### LLM Classifier returns all Unmatched on cold cache (2026-07-07) — RESOLVED
 
 **Root cause (confirmed via log analysis 2026-07-09):** Output token truncation. When a forced
@@ -434,37 +450,31 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 See `TODO/TODO_new_features.md` for the full brainstorm session with design context and open questions.
 
-### 1. Deck Analyzer
+### 1. Deck Analyzer — v1 DONE (2026-08-03)
 
-Given an existing decklist (not built by this tool), classify it against the role taxonomy,
-estimate bracket/power level, and generate staged budget upgrade paths.
+Paste an existing decklist → classify it → coverage report → bracket estimate → role gaps.
+Plain `1 Card Name` format only. Commander in a separate picker. No upgrade paths in v1.
 
-**Features:**
-- [ ] **Decklist ingestion**: accept pasted decklists in common export formats (at minimum:
-      plain `1 Card Name` per line, Arena format). Resolve each line to Scryfall via existing
-      client. Handle fuzzy matches, DFCs, misprints, not-found cards (report to user).
-- [ ] **Commander detection**: separate commander(s) from the 99 — may need explicit user input
-      if format doesn't mark it.
-- [ ] **Role classification**: reuse `LlmClassifier` on pasted deck to tag cards with roles,
-      surface `CoverageByRole`, identify significant gaps vs. baseline template targets.
-      Output a report structure (reusable by subsequent features).
-- [ ] **Bracket estimation**: reuse/refactor existing bracket logic (currently generative only)
-      to evaluate a deck and estimate its bracket. Include human-readable explanation (e.g.
-      "N fast mana + M tutors").
-- [ ] **Budget upgrade paths**: given classified/gapped decklist, generate staged upgrade
-      suggestions at multiple budget tiers, mapped to identified role gaps. Reuse selection
-      logic rather than building parallel system.
-- [ ] **User experience feedback**: optional free-text field where user describes what they found
-      working and not working with the deck (e.g. "I always find that I cannot recover from a 
-      board wipe" or "It builds well, but I cannot finish the game"). This informs gap analysis 
-      and upgrade suggestions — if user reports recovery issues, prioritize board wipe protection 
-      in upgrades; if they report finishing issues, prioritize payoff/draw/tutors.
+**Architecture:**
+- `DecklistParser` (Agent singleton) — parses plain text; skips headers, comments, blanks.
+- `BracketEstimator` (static) — deterministic: primary signal is Tutor count, secondary Land+Protection.
+- `DeckAnalyzer` (Agent scoped) — orchestrates resolve → classify → coverage → bracket → gaps.
+- `IDeckAnalyzer` interface in Agent/Interfaces.
+- `AnalyzedCard`, `RoleGap`, `DeckAnalysisResult` models.
+- `/analyze` Blazor page with `CommanderPicker` reuse, `BuildProgress` for stages.
+  Optional "What isn't working?" field accepted but deferred for v2 weighting.
+- 25 new tests (13 `DecklistParserTests` + 9 `BracketEstimatorTests`); 373 total, all green.
 
-**Open questions for Master:**
-- Exact budget tier breakpoints.
-- Which export formats to prioritize (Moxfield, Archidekt, Arena, MTGO).
-- Whether bracket-estimation needs new logic or can reuse generative constraints.
-- How to weight user experience feedback in upgrade suggestions (use as primary signal, secondary, or informational only)?
+**Deferred to v2:**
+- [ ] **Budget upgrade paths**: given classified + gapped deck, generate staged upgrade
+      suggestions at multiple budget tiers mapped to identified role gaps. Reuse `ICardSelector`.
+      Requires owner decision on budget tier breakpoints before implementation.
+- [ ] **User experience feedback weighting**: the optional feedback field is accepted by the UI
+      and passed to `IDeckAnalyzer.AnalyzeAsync` but currently unused. Wire it into the gap
+      ordering once the upgrade path feature lands (it should influence which gaps are surfaced
+      first and which roles the upgrade suggestions target).
+- [ ] **Additional input formats**: Arena (`Commander` section header), Moxfield/Archidekt
+      section comments. Plain format covers the majority of use cases for now.
 
 ### 2. Combo Finder
 
@@ -567,7 +577,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 352 tests pass.
+All four projects compile; 373 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 
@@ -589,4 +599,6 @@ All four projects compile; 352 tests pass.
 
 **Build progress — sub-step detail:** `ClassifyPool` shows `"N / M cards classified"` (updating per 30-card batch, seeded immediately with cache-hit count). `FillEngine` shows `"Selecting {Role} cards… (N / 9)"` before each selector call. Both stages surface their detail via `CurrentStageDetail` in `BuildProgress.razor`.
 
-**Tests:** 328 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration). All green.
+**Deck Analyzer (v1):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` format. Optional user feedback field accepted (weighting deferred). 25 new tests.
+
+**Tests:** 373 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer). All green.

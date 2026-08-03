@@ -22,6 +22,7 @@ public static class CardRoleDisplay
         CardRole.Payoff,
         CardRole.Land,
         CardRole.Unclassified,
+        CardRole.Unmatched,
     ];
 
     public static readonly string[] TypeOrder =
@@ -45,6 +46,7 @@ public static class CardRoleDisplay
         CardRole.Payoff             => "Payoffs",
         CardRole.Synergy            => "Synergy",
         CardRole.Unclassified       => "Unclassified",
+        CardRole.Unmatched          => "Unmatched",
         _                           => role.ToString(),
     };
 
