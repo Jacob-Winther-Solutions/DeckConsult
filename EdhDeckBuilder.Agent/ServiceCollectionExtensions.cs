@@ -99,6 +99,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICommanderSelector, LlmCommanderSelector>();
 
         services.AddScoped<IDeckBuilder, DeckBuilder>();
+        services.AddScoped<ILockedCardValidator, LockedCardValidator>();
 
         // Commander discovery
         services.AddScoped<ICommanderDiscovery, CommanderDiscovery>();

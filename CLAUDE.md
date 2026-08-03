@@ -22,7 +22,7 @@ implement `ILlmClient` so the three provider-agnostic adapters (`LlmClassifier`,
 
 ## Current state
 
-All four projects exist and compile. Run `dotnet test Tests` — 337 tests, all green.
+All four projects exist and compile. Run `dotnet test Tests` — 348 tests, all green.
 
 | Project | Status |
 |---|---|

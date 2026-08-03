@@ -16,11 +16,24 @@
             </span>
             @if (Result.TotalPriceUsd > 0)
             {
-                var overTotal = TotalBudgetUsd.HasValue && Result.TotalPriceUsd > TotalBudgetUsd;
+                var nonLockedTotal = Result.Deck.Where(s => !s.IsLocked).Sum(s => s.Card.PriceUsd ?? 0m);
+                var overTotal = TotalBudgetUsd.HasValue && nonLockedTotal > TotalBudgetUsd;
+                var lockedCount = Result.Deck.Count(s => s.IsLocked);
+                var priceTitle = TotalBudgetUsd.HasValue
+                    ? (lockedCount > 0 ? $"Budget: ${TotalBudgetUsd:F2} (excl. {lockedCount} locked card(s))" : $"Budget: ${TotalBudgetUsd:F2}")
+                    : (lockedCount > 0 ? $"Excl. {lockedCount} locked card(s)" : "Total non-basic card price");
                 <span class="badge @(overTotal ? "bg-danger" : "bg-light text-dark border")"
-                      title="@(TotalBudgetUsd.HasValue ? $"Budget: ${TotalBudgetUsd:F2}" : "Total non-basic card price")">
-                    $@Result.TotalPriceUsd.ToString("F2")
+                      title="@priceTitle">
+                    $@nonLockedTotal.ToString("F2")
                 </span>
+                @if (lockedCount > 0)
+                {
+                    <span class="badge bg-light text-muted border"
+                          style="font-size: 0.7rem;"
+                          title="Full deck total including locked cards">
+                        $@Result.TotalPriceUsd.ToString("F2") incl. locked
+                    </span>
+                }
             }
         </div>
     </div>
@@ -177,7 +190,7 @@
                         @foreach (var suggestion in primaryCards)
                         {
                             var isCut = cutIds.Contains(suggestion.Card.OracleId);
-                            var isOver = IsOverBudget(suggestion.Card);
+                            var isOver = !suggestion.IsLocked && IsOverBudget(suggestion.Card);
                             <div class="list-group-item @(isCut ? "list-group-item-warning" : "") py-2">
                                 <div class="d-flex gap-3 align-items-start">
                                     <span class="text-muted small mt-1" style="min-width:1.8rem; text-align:right;">
@@ -207,6 +220,10 @@
                                             {
                                                 var b = SecondaryBadge(contrib);
                                                 <span class="badge @b.CssClass" title="@b.Tooltip">@b.Label</span>
+                                            }
+                                                            @if (suggestion.IsLocked)
+                                            {
+                                                <span class="badge bg-secondary" title="Locked by user — will not be cut">&#128274; locked</span>
                                             }
                                             @if (isCut)
                                             {
@@ -364,10 +381,14 @@
                     <div class="list-group list-group-flush">
                         @foreach (var suggestion in cards)
                         {
-                            var isOverType = IsOverBudget(suggestion.Card);
+                            var isOverType = !suggestion.IsLocked && IsOverBudget(suggestion.Card);
                             <div class="list-group-item py-2">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="fw-semibold me-1">@suggestion.Card.Name</span>
+                                    @if (suggestion.IsLocked)
+                                    {
+                                        <span class="badge bg-secondary" title="Locked by user — will not be cut">&#128274; locked</span>
+                                    }
                                     @if (suggestion.Card.ManaValue > 0)
                                     {
                                         <span class="badge bg-light text-dark border"
@@ -442,9 +463,15 @@
                     <tbody>
                         @foreach (var suggestion in Result.Deck.OrderBy(s => s.Card.Name))
                         {
-                            var isOverAll = IsOverBudget(suggestion.Card);
+                            var isOverAll = !suggestion.IsLocked && IsOverBudget(suggestion.Card);
                             <tr class="@(isOverAll ? "table-danger" : "")">
-                                <td class="ps-3 fw-semibold">@suggestion.Card.Name</td>
+                                <td class="ps-3 fw-semibold">
+                                    @suggestion.Card.Name
+                                    @if (suggestion.IsLocked)
+                                    {
+                                        <span class="badge bg-secondary ms-1" style="font-size:0.65rem;" title="Locked by user — will not be cut">&#128274; locked</span>
+                                    }
+                                </td>
                                 <td class="text-center">
                                     @if (suggestion.Card.ManaValue > 0)
                                     {

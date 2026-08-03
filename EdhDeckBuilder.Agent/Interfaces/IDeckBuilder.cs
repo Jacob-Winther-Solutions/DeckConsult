@@ -43,5 +43,6 @@ public interface IDeckBuilder
         Func<string, Task>? progress = null,
         CancellationToken ct = default,
         bool isLegalPartnerPair = false,
-        Func<string, Task>? subProgress = null);
+        Func<string, Task>? subProgress = null,
+        IReadOnlyList<Card>? lockedCards = null);
 }

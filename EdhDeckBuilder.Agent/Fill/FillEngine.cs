@@ -43,7 +43,8 @@ public sealed class FillEngine(ICardSelector selector)
         BuildContext context,
         IReadOnlyList<FillCandidate> pool,
         CancellationToken ct = default,
-        Func<string, Task>? subProgress = null)
+        Func<string, Task>? subProgress = null,
+        IReadOnlyList<FillCandidate>? lockedCards = null)
     {
         var state = new BuildState(context.ReservedLandCount);
         var committed = new HashSet<Guid>();
@@ -51,6 +52,16 @@ public sealed class FillEngine(ICardSelector selector)
         var selectorStats = new Dictionary<CardRole, (int Input, int Ranked)>();
         int spellBudget = context.NonCommanderCount - context.ReservedLandCount;
         int selectorCall = 0;
+
+        // ── Pre-commit locked cards ──────────────────────────────────────────
+        if (lockedCards is { Count: > 0 })
+        {
+            foreach (var locked in lockedCards)
+            {
+                state.Commit(locked, isLocked: true);
+                committed.Add(locked.Card.OracleId);
+            }
+        }
 
         // ── Greedy fill ──────────────────────────────────────────────────────
         foreach (var role in FillOrder)
@@ -115,14 +126,14 @@ public sealed class FillEngine(ICardSelector selector)
         }
 
         // ── Reconciliation ───────────────────────────────────────────────────
-        var warnings = Reconcile(context, pool, state, committed, spellBudget);
+        Reconcile(context, pool, state, committed, spellBudget);
 
-        return new FillResult(state, warnings, rationales, selectorStats);
+        return new FillResult(state, rationales, selectorStats);
     }
 
     // ── Reconciliation ────────────────────────────────────────────────────────
 
-    private static IReadOnlyList<string> Reconcile(
+    private static void Reconcile(
         BuildContext context,
         IReadOnlyList<FillCandidate> pool,
         BuildState state,
@@ -159,11 +170,12 @@ public sealed class FillEngine(ICardSelector selector)
 
             if (toAdd is null) break; // nothing in the pool can help — stop
 
-            // Worst committed spell-slot card in an over-covered role.
+            // Worst committed spell-slot card in an over-covered role (never cut locked cards).
             var toCut = state.CommittedCandidates.Values
                 .Where(c =>
                 {
-                    if (c.Card.Types.HasFlag(CardType.Land)) return false; // don't cut utility lands here
+                    if (c.Card.Types.HasFlag(CardType.Land)) return false;
+                    if (context.LockedOracleIds.Contains(c.Card.OracleId)) return false;
                     if (!context.NetTargets.TryGetValue(c.Roles.Primary, out var t)) return false;
                     return state.Coverage.GetValueOrDefault(c.Roles.Primary) > t.Ideal;
                 })
@@ -192,8 +204,6 @@ public sealed class FillEngine(ICardSelector selector)
                 break; // monotonicity guarantee: if the best candidate can't help, stop
             }
         }
-
-        return BuildWarnings(context, state);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -210,7 +220,7 @@ public sealed class FillEngine(ICardSelector selector)
         return total;
     }
 
-    private static IReadOnlyList<string> BuildWarnings(BuildContext context, BuildState state)
+    internal static IReadOnlyList<string> BuildWarnings(BuildContext context, BuildState state)
     {
         var warnings = new List<string>();
         foreach (var role in FillOrder)

@@ -20,6 +20,9 @@ public sealed record DeckSlot
     /// <summary>0–1 confidence in the classification (mainly meaningful for LLM/heuristic sources).</summary>
     public double RoleConfidence { get; init; } = 1.0;
 
+    /// <summary>True when the user explicitly locked this card into the deck before the build started.</summary>
+    public bool IsLocked { get; init; } = false;
+
     /// <summary>The single bucket used for the physical 99-card count and the visual grouping.</summary>
     public CardRole PrimaryRole => Roles.Primary;
 }

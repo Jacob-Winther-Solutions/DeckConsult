@@ -60,7 +60,8 @@ public sealed class DeckBuilder(
         Func<string, Task>? progress = null,
         CancellationToken ct = default,
         bool isLegalPartnerPair = false,
-        Func<string, Task>? subProgress = null)
+        Func<string, Task>? subProgress = null,
+        IReadOnlyList<Card>? lockedCards = null)
     {
         var timer = Stopwatch.StartNew();
         var commanderNames = string.Join(" / ", commanders.Select(c => c.Name));
@@ -102,7 +103,7 @@ public sealed class DeckBuilder(
         logger.LogInformation("ClassifyCommanders: {CommanderCount} commanders classified, {ElapsedMs}ms",
             commanders.Count, stageTimer.ElapsedMilliseconds);
 
-        // 5. Build context.
+        // 5. Build context (LockedOracleIds populated after step 6).
         int reservedLandCount  = resolved.Targets.TryGetValue(CardRole.Land, out var lt) ? lt.Ideal : 38;
         int nonCommanderCount  = 100 - commanders.Count;
 
@@ -123,6 +124,16 @@ public sealed class DeckBuilder(
         stageTimer.Restart();
         var (fillPool, classifications) = await ClassifyPoolAsync(filteredPool, commanders, ct, subProgress);
         stageTimer.Stop();
+
+        // 6b. Classify locked cards and add them to context.
+        var lockedFillCandidates = await ClassifyLockedCardsAsync(
+            lockedCards, commanders, commanderIds, ct, subProgress);
+        if (lockedFillCandidates.Count > 0)
+        {
+            var ids = lockedFillCandidates.Select(c => c.Card.OracleId).ToHashSet();
+            context = context with { LockedOracleIds = ids };
+            logger.LogInformation("LockedCards: {Count} cards pre-committed", lockedFillCandidates.Count);
+        }
 
         // Count breakdown by role
         var roleBreakdown = fillPool
@@ -162,7 +173,7 @@ public sealed class DeckBuilder(
         await (progress?.Invoke("Filling deck") ?? Task.CompletedTask);
         stageTimer.Restart();
         var engine     = new FillEngine(selector);
-        var fillResult = await engine.FillAsync(context, fillPool, ct, subProgress);
+        var fillResult = await engine.FillAsync(context, fillPool, ct, subProgress, lockedFillCandidates);
         stageTimer.Stop();
         logger.LogInformation("FillEngine: {FilledCount} cards committed, {ElapsedMs}ms",
             fillResult.State.Committed.Count, stageTimer.ElapsedMilliseconds);
@@ -307,6 +318,41 @@ public sealed class DeckBuilder(
             result[role]    = new RoleTarget(Math.Max(0, netIdeal - pad), netIdeal, netIdeal + pad);
         }
         return result;
+    }
+
+    private async Task<IReadOnlyList<FillCandidate>> ClassifyLockedCardsAsync(
+        IReadOnlyList<Card>? lockedCards,
+        IReadOnlyList<Card> commanders,
+        HashSet<Guid> commanderIds,
+        CancellationToken ct,
+        Func<string, Task>? subProgress = null)
+    {
+        if (lockedCards is not { Count: > 0 }) return [];
+
+        // Exclude commanders from the locked list — they're already committed elsewhere.
+        var candidates = lockedCards
+            .Where(c => !commanderIds.Contains(c.OracleId))
+            .Select(c => new CardCandidate(c, 1.0, "Locked"))
+            .ToList();
+
+        if (candidates.Count == 0) return [];
+
+        if (subProgress is not null)
+            await subProgress($"Locking {candidates.Count} must-include card(s)…");
+
+        var classifications = await classifier.ClassifyAsync(candidates, commanders, ct);
+        var classifiedById  = classifications.ToDictionary(r => r.OracleId);
+
+        return candidates.Select(c =>
+        {
+            classifiedById.TryGetValue(c.Card.OracleId, out var r);
+            return new FillCandidate
+            {
+                Candidate   = c,
+                Roles       = r?.ToRoleProfile() ?? RoleProfile.Of(CardRole.Synergy),
+                LandCredit  = r?.LandCredit ?? 0.0,
+            };
+        }).ToList();
     }
 
     private async Task<(IReadOnlyList<FillCandidate>, IReadOnlyList<ClassificationResult>)> ClassifyPoolAsync(

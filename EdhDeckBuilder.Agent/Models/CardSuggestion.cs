@@ -21,4 +21,7 @@ public sealed record CardSuggestion
 
     /// <summary>Rank within the card's primary role bucket (1 = highest scored by the selector).</summary>
     public required int Rank { get; init; }
+
+    /// <summary>True when the user locked this card in before the build started.</summary>
+    public bool IsLocked { get; init; } = false;
 }

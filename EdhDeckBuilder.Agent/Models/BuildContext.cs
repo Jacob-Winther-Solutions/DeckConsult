@@ -57,4 +57,11 @@ public sealed record BuildContext
     /// Defaults to false (safe — always merge).
     /// </summary>
     public bool IsLegalPartnerPair { get; init; } = false;
+
+    /// <summary>
+    /// Oracle IDs of cards the user locked in before the build. These are pre-committed
+    /// to <see cref="BuildState"/> before the fill engine runs and must never be removed
+    /// by repair, reconciliation, or budget swap passes.
+    /// </summary>
+    public IReadOnlySet<Guid> LockedOracleIds { get; init; } = new HashSet<Guid>();
 }

@@ -302,39 +302,47 @@ Default changed to "All Cards". Tab order is now All Cards → By Type → Cover
 
 ---
 
-### Must-include cards (locked 99 slots)
+### Must-include cards (locked 99 slots) — DONE (2026-07-10)
 
-Let the user nominate cards that must appear in the generated deck regardless of the LLM's
-selection or cut suggestions. For pet cards, cards already owned, or staples the user always runs.
+Users nominate cards that must appear in the generated deck regardless of LLM selection,
+budget constraints, or cut suggestions. Implemented end-to-end across all layers.
 
-**Specific constraint from design:** the LLM may still rank these cards low or include them
-in cut suggestions — that is fine and expected. The pipeline must **override** those signals
-and lock the cards in anyway. Cut suggestions for locked cards should either be suppressed or
-clearly labeled so the user understands they are advisory-only.
+**Budget decisions (confirmed):**
+- Locked cards are excluded entirely from both per-card and total budget enforcement.
+  A user may own an expensive card they want in a budget deck; budget must not block it.
+- If locked cards fill all available slots (≥ 99 − commander count), the build button is
+  disabled — same UX as no commander selected. The deck analyzer (when built) is the right
+  place for users with a full decklist.
 
-This overlaps with the "Locked / Included Cards" item in the Deck Analysis track below, but
-the deck-builder entry point is different (form input before the build, not post-analysis).
+**Implementation summary:**
+- `DeckSlot.IsLocked` (Core) and `CardSuggestion.IsLocked` (Agent) propagate the flag
+  through the full pipeline into the UI.
+- `BuildContext.LockedOracleIds` makes the locked set visible to `RepairEngine` and
+  `FillEngine` without threading extra parameters.
+- `BuildState.Commit(isLocked: true)` marks slots and guards `Remove` from ever evicting
+  a locked card (even if called accidentally).
+- Locked cards are classified via `ILlmClassifier` before the fill loop, then pre-committed
+  to `BuildState` so their coverage reduces how much the greedy fill needs to fill.
+- Reconciliation and color-fixing repair skip locked oracle IDs.
+- Budget repair (`RepairBudgetExcess`) excludes locked cards from the enforcement total.
+- `BuildBudgetWarnings` skips locked cards for per-card checks; uses non-locked sum for total.
+- Cut suggestions exclude locked cards entirely (honest: no advisory label needed — they
+  simply aren't candidates for cutting).
+- `ILockedCardValidator` / `LockedCardValidator` resolves names via `ICardRepository`,
+  returns `ValidCards`, `UnrecognizedNames` (blocking), and `WrongColorCards` (advisory).
+- Both Builder tabs (Guided + Custom) have a "Must-Include Cards" textarea with a Validate
+  button, error/warning display, and build-button gating.
+- Deck views (All Cards, By Type, Coverage Report) show a 🔒 badge on locked cards.
+- 11 new tests (5 pipeline integration + 5 validator unit + 1 mixed); 348 total, all green.
 
-- [ ] Add a must-include card list input to the Builder UI (Guided + Custom tabs). Reuse the
-      same plain-text card-name ingestion from the Analyzer if that feature lands first.
-- [ ] Validate color identity before build starts; surface illegal cards as warnings, not errors
-      (let the user decide whether to remove or override).
-- [ ] Commit locked cards into `BuildState` at the start of the fill pass, before the greedy
-      loop. Each locked card is classified normally (`ILlmClassifier`) and counts toward its
-      role's coverage, reducing the ideal target the fill engine needs to hit.
-- [ ] Adjust `spellBudget` and `ReservedLandCount` so locked cards don't shrink the remaining
-      fill slots — they consume their own slot type (spell or land).
-- [ ] In `RepairEngine.Assemble`, mark locked `DeckSlot` entries so the UI can render them
-      distinctly (e.g. a padlock badge). Suppress cut-suggestion entries for locked cards or
-      label them "advisory (locked)".
-- [ ] Confirm interaction: locked land → counts as a utility land for ColorFixingPass cap;
-      locked MDFC → land credit still applied normally.
-- [ ] Confirm cap on locked cards: warn if locked cards alone exceed 99, or error before build.
-
-**Open questions:**
-- Budget semantics: exclude locked cards from total-budget enforcement, or deduct them first?
-- Should locked cards bypass the EDHREC pool entirely (user-supplied), or must they appear
-  in the pool to receive EDHREC-derived inclusion scores for sorting?
+**Follow-up fixes (2026-08-03):**
+- Textarea placeholder `&#10;` entities now rendered via `@("...\n...")` binding (was literal string).
+- Budget badge in results header shows non-locked total as primary; includes "incl. locked" secondary badge.
+- Over-budget badge and red highlight suppressed on locked cards in all three deck views.
+- Coverage warnings moved to `RepairEngine.Assemble` so they always agree with the final `ActualCoverage`
+  (previously emitted mid-pipeline before color-fixing and repair passes).
+- Scryfall bulk-data API breaking change handled: `download_uri` removed by Scryfall; client now
+  reads `jsonl_download_uri` and decompresses JSONL.gz into a plain JSON array on disk.
 
 ---
 
@@ -476,24 +484,6 @@ small number of additional cards.
 **Open questions for Master:**
 - Is v1 read-only (analysis/discovery) or should it feed into build-time selection?
 - Attribution/display requirements from Spellbook's licensing.
-
-### 3. Locked / Included Cards
-
-Let the user specify cards that must appear in the generated deck regardless of budget,
-theme, or archetype constraints — for pet cards or cards the user already owns.
-
-- [ ] Add locked-card list input to Deck Builder flow (reuse decklist ingestion from Analyzer).
-- [ ] Validate locked cards against commander color identity before build starts; reject or
-      warn on illegal inclusions.
-- [ ] Reserved as fixed slots before fill pass; counted toward `CoverageByRole` so fill pass
-      doesn't over-provision.
-- [ ] Confirm interaction with land count / Pass A / Pass B logic if locked card is a land.
-- [ ] Confirm interaction with `RoleRelation` types — locked card with multiple roles must
-      resolve correctly.
-
-**Open questions for Master:**
-- Budget semantics: excluded from total budget entirely, or deducted from remaining budget?
-- Cap on number of locked cards (warn if alone they exceed 99, or hard build error)?
 
 ### Explicitly out of scope for Deck Analysis track
 

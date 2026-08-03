@@ -25,7 +25,8 @@ internal static class RepairEngine
         var committedIds = state.CommittedCandidates.Keys.ToHashSet();
 
         var illegal = state.CommittedCandidates.Values
-            .Where(c => !c.Card.ColorIdentity.IsWithin(context.ColorIdentity))
+            .Where(c => !context.LockedOracleIds.Contains(c.Card.OracleId)
+                     && !c.Card.ColorIdentity.IsWithin(context.ColorIdentity))
             .ToList();
 
         foreach (var illegalCard in illegal)
@@ -77,13 +78,18 @@ internal static class RepairEngine
 
         for (int i = 0; i < 99; i++)
         {
-            var total = state.CommittedCandidates.Values.Sum(c => c.Card.PriceUsd ?? 0m);
+            // Locked cards are excluded from total budget enforcement.
+            var total = state.CommittedCandidates.Values
+                .Where(c => !context.LockedOracleIds.Contains(c.Card.OracleId))
+                .Sum(c => c.Card.PriceUsd ?? 0m);
             if (total <= budget) break;
 
             var committedIds = state.CommittedCandidates.Keys.ToHashSet();
 
             var costliest = state.CommittedCandidates.Values
-                .Where(c => c.Card.PriceUsd.HasValue && !tried.Contains(c.Card.OracleId))
+                .Where(c => c.Card.PriceUsd.HasValue
+                         && !tried.Contains(c.Card.OracleId)
+                         && !context.LockedOracleIds.Contains(c.Card.OracleId))
                 .OrderByDescending(c => c.Card.PriceUsd)
                 .ThenBy(c => c.Card.OracleId)
                 .FirstOrDefault();
@@ -157,11 +163,11 @@ internal static class RepairEngine
                 $"Consider adjusting archetypes, themes, or budget parameters.");
         }
 
-        allWarnings.AddRange(fillResult.Warnings);
+        allWarnings.AddRange(FillEngine.BuildWarnings(context, fillResult.State));
         allWarnings.AddRange(fixingWarnings);
 
         var totalPrice = deck.Sum(s => s.Card.PriceUsd ?? 0m);
-        var budgetWarnings = BuildBudgetWarnings(deck, totalPrice, context.Constraints);
+        var budgetWarnings = BuildBudgetWarnings(deck, context.Constraints);
 
         return new DeckBuildResult
         {
@@ -181,15 +187,15 @@ internal static class RepairEngine
 
     private static IReadOnlyList<string> BuildBudgetWarnings(
         IReadOnlyList<CardSuggestion> deck,
-        decimal totalPrice,
         SoftConstraints constraints)
     {
         var warnings = new List<string>();
+        int lockedCount = deck.Count(s => s.IsLocked);
 
         if (constraints.MaxCardPriceUsd.HasValue)
         {
             var overBudget = deck
-                .Where(s => s.Card.PriceUsd > constraints.MaxCardPriceUsd)
+                .Where(s => !s.IsLocked && s.Card.PriceUsd > constraints.MaxCardPriceUsd)
                 .OrderByDescending(s => s.Card.PriceUsd)
                 .ToList();
             foreach (var s in overBudget)
@@ -198,9 +204,17 @@ internal static class RepairEngine
                     $"(${s.Card.PriceUsd:F2} > ${constraints.MaxCardPriceUsd:F2})");
         }
 
-        if (constraints.TotalBudgetUsd.HasValue && totalPrice > constraints.TotalBudgetUsd)
-            warnings.Add(
-                $"Total deck price ${totalPrice:F2} exceeds the total budget of ${constraints.TotalBudgetUsd:F2}");
+        if (constraints.TotalBudgetUsd.HasValue)
+        {
+            var enforcedTotal = deck.Where(s => !s.IsLocked).Sum(s => s.Card.PriceUsd ?? 0m);
+            if (enforcedTotal > constraints.TotalBudgetUsd)
+            {
+                var suffix = lockedCount > 0 ? $" (excluding {lockedCount} locked card(s))" : "";
+                warnings.Add(
+                    $"Total deck price ${enforcedTotal:F2} exceeds the total budget " +
+                    $"of ${constraints.TotalBudgetUsd:F2}{suffix}");
+            }
+        }
 
         return warnings;
     }
@@ -225,12 +239,15 @@ internal static class RepairEngine
                 var slot = ordered[i];
                 result.Add(new CardSuggestion
                 {
-                    Card   = slot.Card,
-                    Roles  = slot.Roles,
-                    Reason = rationales.TryGetValue(slot.Card.OracleId, out var reason)
-                        ? reason
-                        : $"Fills the {slot.PrimaryRole} role for {commanderNames}.",
-                    Rank = i + 1,
+                    Card     = slot.Card,
+                    Roles    = slot.Roles,
+                    Reason   = slot.IsLocked
+                        ? "Locked by user — included regardless of selection."
+                        : (rationales.TryGetValue(slot.Card.OracleId, out var reason)
+                            ? reason
+                            : $"Fills the {slot.PrimaryRole} role for {commanderNames}."),
+                    Rank     = i + 1,
+                    IsLocked = slot.IsLocked,
                 });
             }
         }
@@ -250,7 +267,7 @@ internal static class RepairEngine
             if (state.Coverage.GetValueOrDefault(role) <= target.Max) continue;
 
             var weakest = deck
-                .Where(s => s.Roles.Primary == role)
+                .Where(s => s.Roles.Primary == role && !s.IsLocked)
                 .OrderByDescending(s => s.Rank)   // highest rank number = weakest fit
                 .Take(5)
                 .ToList();

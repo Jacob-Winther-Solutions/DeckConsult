@@ -13,6 +13,7 @@ public sealed class BuildState
     private double _basicCountRaw;
     private int _spellCount;
     private readonly Dictionary<Guid, FillCandidate> _committedCandidates = new();
+    private readonly HashSet<Guid> _lockedIds = new();
 
     public BuildState(int initialBasicCount)
     {
@@ -55,6 +56,9 @@ public sealed class BuildState
     /// <summary>All committed candidates, keyed by oracle id. Used by the reconciliation loop.</summary>
     public IReadOnlyDictionary<Guid, FillCandidate> CommittedCandidates => _committedCandidates;
 
+    /// <summary>Oracle IDs of user-locked cards. These must never be removed during repair or reconciliation.</summary>
+    public IReadOnlySet<Guid> LockedIds => _lockedIds;
+
     /// <summary>
     /// Commits a classified candidate to the build. Updates primary counts, coverage, and the
     /// basic land reserve according to the candidate's card type and land credit.
@@ -62,7 +66,8 @@ public sealed class BuildState
     public void Commit(
         FillCandidate candidate,
         ClassificationSource source = ClassificationSource.Llm,
-        double confidence = 1.0)
+        double confidence = 1.0,
+        bool isLocked = false)
     {
         var slot = new DeckSlot
         {
@@ -71,7 +76,9 @@ public sealed class BuildState
             Roles = candidate.Roles,
             RoleSource = source,
             RoleConfidence = confidence,
+            IsLocked = isLocked,
         };
+        if (isLocked) _lockedIds.Add(candidate.Card.OracleId);
 
         Committed.Add(slot);
         _committedCandidates[candidate.Card.OracleId] = candidate;
@@ -95,10 +102,11 @@ public sealed class BuildState
 
     /// <summary>
     /// Reverses a prior <see cref="Commit"/>. Used by the reconciliation swap loop.
-    /// No-op if the oracle id is not in the committed set.
+    /// No-op if the oracle id is not in the committed set, or if the card is locked.
     /// </summary>
     public void Remove(Guid oracleId)
     {
+        if (_lockedIds.Contains(oracleId)) return;
         if (!_committedCandidates.TryGetValue(oracleId, out var candidate)) return;
 
         var slot = Committed.FirstOrDefault(s => s.Card.OracleId == oracleId);

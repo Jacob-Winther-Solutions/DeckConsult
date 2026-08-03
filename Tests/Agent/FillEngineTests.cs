@@ -394,9 +394,10 @@ public sealed class FillEngineTests
 
         var engine = new FillEngine(MockSelector);
         var result = await engine.FillAsync(context, [rampCard]);
+        var warnings = FillEngine.BuildWarnings(context, result.State);
 
-        Assert.NotEmpty(result.Warnings);
-        Assert.Contains(result.Warnings, w => w.Contains("Ramp") && w.Contains("below minimum"));
+        Assert.NotEmpty(warnings);
+        Assert.Contains(warnings, w => w.Contains("Ramp") && w.Contains("below minimum"));
     }
 
     [Fact]

@@ -9,6 +9,7 @@ internal sealed class BulkDataEntry
 {
     public string Type { get; init; } = "";
     public string DownloadUri { get; init; } = "";
+    public string JsonlDownloadUri { get; init; } = "";
     public DateTimeOffset UpdatedAt { get; init; }
 }
 

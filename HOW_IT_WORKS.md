@@ -160,6 +160,22 @@ alternatives.
 additional hints forwarded to the card-selection prompt. Useful for unusual strategies the
 archetypes and/or themes don't fully capture.
 
+**Must-Include Cards.** A list of cards that must appear in the finished deck, entered one
+per line in the "Must-Include Cards" textarea. These are treated as locked slots — they are
+committed to the deck before the fill pass runs and are completely protected from removal:
+
+- The tool validates each name before the build starts. Unrecognized names block the build
+  entirely; names that are wrong for the commander's color identity generate a warning (not a
+  hard block, in case you are intentionally testing a configuration).
+- Locked cards are **excluded from all budget enforcement**. A card you already own that costs
+  more than your per-card or total budget limit is kept regardless — budget only applies to
+  cards the tool selects.
+- Locked cards are never candidates for cut suggestions. The cut list only includes cards the
+  tool chose on its own.
+- In the result views, locked cards show a 🔒 badge so they are easy to identify.
+- If the number of locked cards fills all available slots (99 minus the commander count), the
+  build button is disabled — there is nothing left for the tool to select.
+
 ---
 
 ## What the tool decides on its own

@@ -14,14 +14,15 @@ namespace EdhDeckBuilder.Web.Components.Pages.CommanderBuilder;
 
 public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 {
-    [Inject] private IDeckBuilder          DeckBuilder { get; set; } = default!;
-    [Inject] private SessionApiKeyProvider Keys        { get; set; } = default!;
-    [Inject] private IJSRuntime            JS          { get; set; } = default!;
-    [Inject] private IApiKeyStateService   ApiKeyState { get; set; } = default!;
-    [Inject] private NavigationManager     Navigation  { get; set; } = default!;
-    [Inject] private DeckResultStore       ResultStore { get; set; } = default!;
-    [Inject] private IConfiguration        Config      { get; set; } = default!;
-    [Inject] private ICardRepository       CardRepository { get; set; } = default!;
+    [Inject] private IDeckBuilder           DeckBuilder     { get; set; } = default!;
+    [Inject] private SessionApiKeyProvider  Keys            { get; set; } = default!;
+    [Inject] private IJSRuntime             JS              { get; set; } = default!;
+    [Inject] private IApiKeyStateService    ApiKeyState     { get; set; } = default!;
+    [Inject] private NavigationManager      Navigation      { get; set; } = default!;
+    [Inject] private DeckResultStore        ResultStore     { get; set; } = default!;
+    [Inject] private IConfiguration         Config          { get; set; } = default!;
+    [Inject] private ICardRepository        CardRepository  { get; set; } = default!;
+    [Inject] private ILockedCardValidator   LockedCardValidator { get; set; } = default!;
 
     [Parameter] public Card? InitialCommander { get; set; }
     [Parameter] public IReadOnlyDictionary<Archetype, double>? InitialArchetypeWeights { get; set; }
@@ -47,6 +48,13 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 
     private IReadOnlyList<Card> _selectedCommanders = [];
     private int _commanderResetKey = 0;
+
+    // Locked cards
+    private string _lockedCardsText = "";
+    private IReadOnlyList<Card>     _validatedLockedCards  = [];
+    private IReadOnlyList<string>   _lockedCardErrors      = [];
+    private IReadOnlyList<Card>     _lockedColorWarnings   = [];
+    private bool _lockedCardsValidated = false;
 
     private IReadOnlyDictionary<Archetype, double> _archetypeWeights = new Dictionary<Archetype, double>();
     private int _archetypeResetKey = 0;
@@ -102,12 +110,62 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
     {
         _selectedCommanders = commanders;
         _partnerWarning = null;
+        // Reset locked card validation whenever the commander changes (color identity may differ).
+        _lockedCardsValidated = false;
+        _validatedLockedCards = [];
+        _lockedCardErrors = [];
+        _lockedColorWarnings = [];
 
         if (commanders.Count == 2)
         {
             _ = ValidateAndShowWarningAsync(commanders);
         }
     }
+
+    private void OnLockedCardsTextChanged(ChangeEventArgs e)
+    {
+        _lockedCardsText = e.Value?.ToString() ?? "";
+        _lockedCardsValidated = false;
+        _validatedLockedCards = [];
+        _lockedCardErrors = [];
+        _lockedColorWarnings = [];
+    }
+
+    internal async Task ValidateLockedCardsAsync()
+    {
+        if (_selectedCommanders.Count == 0) return;
+
+        var names = _lockedCardsText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        if (names.Count == 0)
+        {
+            _validatedLockedCards = [];
+            _lockedCardErrors = [];
+            _lockedColorWarnings = [];
+            _lockedCardsValidated = true;
+            return;
+        }
+
+        var colorIdentity = _selectedCommanders.Aggregate(
+            EdhDeckBuilder.Core.Cards.Color.None,
+            (ci, c) => ci | c.ColorIdentity);
+
+        var result = await LockedCardValidator.ValidateAsync(names, colorIdentity);
+        _validatedLockedCards = result.ValidCards;
+        _lockedCardErrors = result.UnrecognizedNames;
+        _lockedColorWarnings = result.WrongColorCards;
+        _lockedCardsValidated = true;
+    }
+
+    private int LockedCardSlotLimit => 99 - _selectedCommanders.Count;
+
+    private bool CanBuild =>
+        _selectedCommanders.Count > 0
+        && (!_lockedCardsValidated || (!_lockedCardErrors.Any() && (_validatedLockedCards.Count + _lockedColorWarnings.Count) < LockedCardSlotLimit))
+        && (string.IsNullOrWhiteSpace(_lockedCardsText) || _lockedCardsValidated);
 
     private async Task ValidateAndShowWarningAsync(IReadOnlyList<Card> commanders)
     {
@@ -154,7 +212,7 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 
     private async Task StartBuildAsync()
     {
-        if (_selectedCommanders.Count == 0) return;
+        if (!CanBuild) return;
 
         _isBuilding = true;
         _currentStage = null;
@@ -179,6 +237,11 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
 
         try
         {
+            // Combine valid and wrong-color locked cards — user decided to include them.
+            var allLocked = _validatedLockedCards
+                .Concat(_lockedColorWarnings)
+                .ToList();
+
             var buildResult = await DeckBuilder.BuildAsync(
                 [.. _selectedCommanders],
                 p.Template,
@@ -189,7 +252,8 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
                 OnStageReport,
                 _buildCts.Token,
                 isLegalPartnerPair,
-                OnSubStageReport);
+                OnSubStageReport,
+                allLocked.Count > 0 ? allLocked : null);
 
             if (enableTracking && DeckBuilder.UsageTracker != null)
             {
