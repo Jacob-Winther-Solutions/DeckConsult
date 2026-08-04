@@ -1,6 +1,7 @@
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Infrastructure.Edhrec;
 using EdhDeckBuilder.Infrastructure.Scryfall;
+using EdhDeckBuilder.Infrastructure.Spellbook;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -41,6 +42,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISuggestionSource>(sp => sp.GetRequiredService<SuggestionSource>());
         services.AddSingleton<IPartnerPairingRepository>(sp => new PartnerPairingRepository(
             sp.GetRequiredService<SuggestionSource>()));
+
+        services.AddHttpClient<CommanderSpellbookClient>(c =>
+        {
+            c.BaseAddress = new Uri("https://backend.commanderspellbook.com/");
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("EdhDeckBuilder/1.0");
+            c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            c.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddSingleton<IComboSource>(sp => sp.GetRequiredService<CommanderSpellbookClient>());
 
         return services;
     }

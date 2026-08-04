@@ -30,19 +30,22 @@ so `BuildRequestJson`/`ParseResponse` are testable. 9 new unit tests; 337 total,
 
 ## Bugs to Investigate
 
-### Bracket estimation accuracy — to investigate (2026-08-03)
+### Bracket estimation accuracy — partially addressed (2026-08-04)
 
-**Symptom:** Bracket estimates reported as off in manual testing. The current `BracketEstimator`
+**Symptom:** Bracket estimates reported as off in manual testing. The hand-rolled `BracketEstimator`
 uses only Tutor count (primary signal) and Land+Protection counts (secondary). This misses
 several important signals used by the official Command Zone bracket system (CEDH staples,
 card-specific overrides, combo presence, fast mana like Mana Crypt/Mana Vault).
 
-**Next steps:**
-- Compare estimator output vs. the Command Zone bracket system on 5–10 real decklists.
-- Check whether Commander Spellbook's `estimate-bracket` endpoint would be a better signal
-  source than the hand-rolled heuristic.
-- Identify which card signals (fast mana, hard stax, infinite combos) are missing from
-  `BracketEstimator.cs` and add them or replace with an API-backed approach.
+**What's done:** Commander Spellbook's `estimate-bracket` endpoint is now wired and shown in
+the Combos tab as a supplementary signal. It accounts for combo presence, game-changer cards,
+extra-turn spells, and mass land denial.
+
+**Remaining work:**
+- Compare both estimates (hand-rolled vs. Spellbook) on 5–10 real decklists to calibrate accuracy.
+- Consider surfacing the Spellbook bracket in the main analysis header alongside the hand-rolled one.
+- Identify which specific card signals are missing from `BracketEstimator.cs` (fast mana, hard stax)
+  and either patch it or defer to Spellbook exclusively.
 
 ---
 
@@ -163,8 +166,8 @@ sanctioned sources to add are:
 
 **Implementation tasks:**
 
-- [ ] Implement `CommanderSpellbookClient` in Infrastructure: `find-my-combos` + `estimate-bracket`
-      endpoints, cached per card-list hash. Define `IComboSource` in Core Abstractions.
+- [x] Implement `CommanderSpellbookClient` in Infrastructure: `find-my-combos` + `estimate-bracket`
+      endpoints, cached per card-list hash. Define `IComboSource` in Core Abstractions. (2026-08-04)
 - [ ] Implement `TopDeckIngestJob` in Infrastructure: periodic pull of EDH/DC tournaments,
       aggregate `deckObj` card frequency by commander into a local store. Define
       `ICompetitiveMetaSource` in Core Abstractions.
@@ -450,7 +453,7 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 See `TODO/TODO_new_features.md` for the full brainstorm session with design context and open questions.
 
-### 1. Deck Analyzer — v2 DONE (2026-08-03)
+### 1. Deck Analyzer — v3 DONE (2026-08-03)
 
 Paste an existing decklist → classify it → coverage report → bracket estimate → role gaps.
 Plain `1 Card Name` format only. Commander in a separate picker. No upgrade paths in v1.
@@ -486,24 +489,25 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
       count-suffixed section headers like `Creatures (24)`, and `SB:` sideboard lines.
       20 new parser tests; 396 total, all green.
 
-### 2. Combo Finder
+### 2. Combo Finder — DONE (2026-08-04)
 
-Given a decklist, surface Commander Spellbook combos that are "close" — achievable with a
-small number of additional cards.
+- [x] `IComboSource` in Core Abstractions: `FindCombosAsync` + `EstimateBracketTagAsync`.
+      Models: `ComboVariant`, `ComboPiece`, `ComboSearchResult`.
+- [x] `CommanderSpellbookClient` in Infrastructure: POST `/find-my-combos/` + `/estimate-bracket/`.
+      In-memory cache keyed by SHA256 of sorted card list. Registered as `IComboSource` Singleton.
+- [x] `IComboFinder` / `ComboFinder` in Agent: calls both endpoints in parallel via `Task.WhenAll`.
+      Maps bracketTag ("S"/"R"/"E"/"P"/"C") → `Bracket`. Registered as Scoped.
+- [x] **Combos tab** added to Deck Analyzer page. On-demand trigger (button). Shows:
+      - Present combos (all pieces in deck) — collapsible with description, mana, prerequisites.
+      - Near-miss combos (1 card away, within color identity) — owned pieces (green) + missing (red/grey template).
+      - Combo-aware bracket estimate from Spellbook alongside the hand-rolled estimate.
+      - Attribution credit + link to commanderspellbook.com (MIT license).
+- [x] **Integration point 2** (build-time) explicitly deferred — read-only only for now.
 
-- [ ] Integrate Commander Spellbook REST API client in Infrastructure (verify not already
-      scoped in `DATA_SOURCES.md`).
-- [ ] Query for combos where most pieces are already present; define and implement "distance"
-      metric (e.g. combos missing 1–2 cards, ranked by fewest missing).
-- [ ] Output: combo name/pieces, owned vs. missing, effect description. Respect Spellbook's
-      licensing/attribution.
-- [ ] **Integration point 1:** standalone check against pasted decklist (pairs with Analyzer).
-- [ ] **Integration point 2:** optional read-only signal during deck building (confirm with
-      Master — recommend starting read-only to avoid entangling with deterministic fill logic).
-
-**Open questions for Master:**
-- Is v1 read-only (analysis/discovery) or should it feed into build-time selection?
-- Attribution/display requirements from Spellbook's licensing.
+**API contract (verified 2026-08-04):**
+- Request body: `{"commanders":[{"card":"Name"}],"main":[{"card":"Name"}]}`
+- `almostIncluded` = combos where named pieces in `uses` + template slots in `requires` are ≤1 short.
+- `bracketTag` values: "S"=Spike(B5), "R"=Ruthless(B4), "E"=Escalated(B3); "P"/"C" for lower brackets.
 
 ### Explicitly out of scope for Deck Analysis track
 
@@ -587,7 +591,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 373 tests pass.
+All four projects compile; 399 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 

@@ -15,6 +15,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 {
     [Inject] private IDeckAnalyzer          Analyzer        { get; set; } = default!;
     [Inject] private IDeckUpgrader          Upgrader        { get; set; } = default!;
+    [Inject] private IComboFinder           ComboFinder     { get; set; } = default!;
     [Inject] private DecklistParser         Parser          { get; set; } = default!;
     [Inject] private ICardRepository        CardRepository  { get; set; } = default!;
     [Inject] private SessionApiKeyProvider  Keys            { get; set; } = default!;
@@ -55,6 +56,15 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     private DeckAnalysisResult? _result;
     private bool _copiedReport;
 
+    // ── Combo state ──────────────────────────────────────────────────────────
+
+    private bool              _isLoadingCombos;
+    private bool              _comboStarted;
+    private string?           _comboError;
+    private ComboAnalysisResult? _comboResult;
+    private CancellationTokenSource? _comboCts;
+    private readonly HashSet<string> _expandedCombos = [];
+
     // ── Upgrade state ────────────────────────────────────────────────────────
 
     private decimal? _maxUpgradePriceUsd;
@@ -77,11 +87,13 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _cts?.Dispose();
         _upgradeCts?.Cancel();
         _upgradeCts?.Dispose();
+        _comboCts?.Cancel();
+        _comboCts?.Dispose();
     }
 
     // ── View state ──────────────────────────────────────────────────────────
 
-    private enum AnalysisView { ByRole, AllCards, ByType, UpgradePaths }
+    private enum AnalysisView { ByRole, AllCards, ByType, UpgradePaths, Combos }
     private AnalysisView _view = AnalysisView.ByRole;
 
     private bool _showCoverage = true;
@@ -408,6 +420,10 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _upgradeError = null;
         _upgradeCurrentStage = null;
         _upgradeStarted = false;
+        _comboResult = null;
+        _comboError = null;
+        _comboStarted = false;
+        _expandedCombos.Clear();
         _errorMessage = null;
         _completedStages = new List<string>();
         _currentStage = null;
@@ -415,6 +431,79 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _view = AnalysisView.ByRole;
         ClearValidation();
     }
+
+    private Task FindCombosAsync() => RunCombosAsync(switchView: true);
+
+    private async Task RunCombosAsync(bool switchView)
+    {
+        if (_result is null) return;
+
+        _comboError   = null;
+        _comboResult  = null;
+        _isLoadingCombos = true;
+        _comboStarted = true;
+        _expandedCombos.Clear();
+        if (switchView)
+            _view = AnalysisView.Combos;
+
+        _comboCts = new CancellationTokenSource();
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+
+        try
+        {
+            _comboResult = await ComboFinder.FindCombosAsync(_result, _comboCts.Token);
+            await InvokeAsync(() =>
+            {
+                _isLoadingCombos = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            await InvokeAsync(() => { _isLoadingCombos = false; StateHasChanged(); });
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isLoadingCombos = false;
+                _comboError = ex.Message;
+                StateHasChanged();
+            });
+        }
+        finally
+        {
+            _comboCts?.Dispose();
+            _comboCts = null;
+        }
+    }
+
+    private void CancelCombos() => _comboCts?.Cancel();
+
+    private void ToggleCombo(string id)
+    {
+        if (!_expandedCombos.Add(id)) _expandedCombos.Remove(id);
+    }
+
+    private static string BracketTagLabel(string? tag) => tag switch
+    {
+        "S" => "Spike (cEDH) — Bracket 5",
+        "R" => "Ruthless — Bracket 4",
+        "E" => "Escalated — Bracket 3",
+        "P" => "Precon Appropriate — Bracket 2",
+        "C" => "Casual — Bracket 1",
+        _   => tag ?? "Unknown",
+    };
+
+    private static string BracketTagCss(string? tag) => tag switch
+    {
+        "S" => "bg-danger",
+        "R" => "bg-warning text-dark",
+        "E" => "bg-primary",
+        _   => "bg-secondary",
+    };
 
     private async Task DownloadReportAsync()
     {

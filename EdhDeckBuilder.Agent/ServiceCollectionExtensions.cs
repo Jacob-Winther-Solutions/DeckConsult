@@ -103,6 +103,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILockedCardValidator, LockedCardValidator>();
         services.AddScoped<IDeckAnalyzer, DeckAnalyzer>();
         services.AddScoped<IDeckUpgrader, DeckUpgrader>();
+        services.AddScoped<IComboFinder, ComboFinder>();
         services.AddSingleton<DecklistParser>();
 
         // Commander discovery
