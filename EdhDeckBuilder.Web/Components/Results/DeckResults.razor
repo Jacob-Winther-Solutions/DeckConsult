@@ -52,6 +52,27 @@
             <button class="nav-link @(_view == DeckView.ByRole ? "active" : "")"
                     @onclick="() => _view = DeckView.ByRole">Coverage Report</button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link @(_view == DeckView.UpgradePaths ? "active" : "")"
+                    @onclick="() => _view = DeckView.UpgradePaths">
+                Upgrade Paths
+                @if (_upgradeResult is not null)
+                {
+                    <span class="badge bg-success ms-1" style="font-size:0.65rem;">@_upgradeResult.RoleUpgrades.Sum(r => r.Suggestions.Count)</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_view == DeckView.Combos ? "active" : "")"
+                    @onclick="() => _view = DeckView.Combos">
+                Combos
+                @if (_comboResult is not null)
+                {
+                    var total = _comboResult.Combos.Included.Count + _comboResult.Combos.AlmostIncluded.Count;
+                    <span class="badge bg-success ms-1" style="font-size:0.65rem;">@total</span>
+                }
+            </button>
+        </li>
     </ul>
 
     @if (_view == DeckView.ByRole)
@@ -521,6 +542,376 @@
                     </div>
                 </div>
             </div>
+        }
+    }
+
+    @if (_view == DeckView.UpgradePaths)
+    {
+        @if (_isLoadingUpgrades)
+        {
+            <div class="card mx-3 mb-3">
+                <div class="card-body text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    <span class="text-muted">@(_upgradeCurrentStage ?? "Loading upgrade suggestions…")</span>
+                </div>
+                <div class="card-footer d-flex justify-content-end">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="CancelUpgrades">Cancel</button>
+                </div>
+            </div>
+        }
+        else if (_upgradeError is not null)
+        {
+            <div class="alert alert-danger mx-3 mb-3">
+                <strong>Upgrade suggestions failed:</strong> @_upgradeError
+            </div>
+            <div class="card mx-3 mb-3">
+                <div class="card-body">
+                    <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group" style="max-width: 180px;">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" min="0" step="0.5"
+                                   placeholder="no limit"
+                                   @bind="_maxUpgradePriceUsd" @bind:event="oninput" />
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm"
+                                disabled="@(!CanGetUpgrades)"
+                                @onclick="GetUpgradesAsync">Retry</button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (!_upgradeStarted)
+        {
+            <div class="card mx-3 mb-3">
+                <div class="card-header fw-semibold">Get Upgrade Suggestions</div>
+                <div class="card-body">
+                    <label class="form-label small fw-semibold mb-1">What isn't working? (optional)</label>
+                    <textarea class="form-control mb-3" rows="2"
+                              @bind="_userFeedback"
+                              placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."></textarea>
+                    <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group" style="max-width: 180px;">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" min="0" step="0.5"
+                                   placeholder="no limit"
+                                   @bind="_maxUpgradePriceUsd" @bind:event="oninput" />
+                        </div>
+                        <button class="btn btn-primary"
+                                disabled="@(!CanGetUpgrades)"
+                                @onclick="GetUpgradesAsync">
+                            Get Upgrade Suggestions
+                        </button>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        Suggestions are drawn from the EDHREC pool for your commander and prioritize your biggest coverage gaps. Leave the budget empty to consider all cards regardless of price.
+                    </div>
+                </div>
+            </div>
+        }
+        else if (_upgradeResult is not null && _upgradeResult.RoleUpgrades.Count == 0)
+        {
+            <div class="alert alert-info mx-3 mb-3">
+                No upgrade suggestions found — your deck has no significant coverage gaps, or no EDHREC candidates were available within the current budget.
+            </div>
+            <div class="card mx-3 mb-3">
+                <div class="card-body">
+                    <label class="form-label small fw-semibold mb-1">Try a different budget cap</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group" style="max-width: 180px;">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" min="0" step="0.5"
+                                   placeholder="no limit"
+                                   @bind="_maxUpgradePriceUsd" @bind:event="oninput" />
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm"
+                                disabled="@(!CanGetUpgrades)"
+                                @onclick="GetUpgradesAsync">Try Again</button>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="mb-3 mx-3 d-flex justify-content-end">
+                <button class="btn btn-outline-secondary btn-sm" @onclick="GetUpgradesAsync">Refresh</button>
+            </div>
+            @foreach (var roleUpgrade in _upgradeResult!.RoleUpgrades)
+            {
+                <div class="card mb-4 mx-3">
+                    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                        <span class="me-auto">
+                            @CardRoleDisplay.RoleName(roleUpgrade.Gap.Role)
+                            <span class="text-muted fw-normal small ms-2">
+                                actual @roleUpgrade.Gap.ActualCoverage.ToString("0.#") / ideal @roleUpgrade.Gap.IdealTarget
+                            </span>
+                        </span>
+                        <span class="badge bg-warning text-dark">@roleUpgrade.Gap.Shortfall.ToString("0.#") short</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @for (int i = 0; i < roleUpgrade.Suggestions.Count; i++)
+                        {
+                            var s    = roleUpgrade.Suggestions[i];
+                            var rank = i + 1;
+                            <div class="list-group-item py-3">
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    <span class="badge bg-secondary" style="font-size: 0.7rem;">Option @rank</span>
+                                </div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                    <span class="badge bg-success">+ Add</span>
+                                    <span class="fw-semibold">@s.AddCard.Name</span>
+                                    @if (s.AddCard.ManaValue > 0)
+                                    {
+                                        <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Mana value">
+                                            @s.AddCard.ManaValue.ToString("0.#")
+                                        </span>
+                                    }
+                                    @if (s.AddCard.PriceUsd.HasValue)
+                                    {
+                                        <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Price">
+                                            $@s.AddCard.PriceUsd.Value.ToString("F2")
+                                        </span>
+                                    }
+                                    <span class="text-muted small">@s.AddCard.TypeLine</span>
+                                </div>
+                                <p class="text-muted small mb-2 ms-1">@s.AddRationale</p>
+                                @if (s.CutCard is not null)
+                                {
+                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                        <span class="badge bg-danger">− Cut</span>
+                                        <span class="fw-semibold">@s.CutCard.Name</span>
+                                        @if (s.CutCard.ManaValue > 0)
+                                        {
+                                            <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                @s.CutCard.ManaValue.ToString("0.#")
+                                            </span>
+                                        }
+                                        @if (s.CutCard.PriceUsd.HasValue)
+                                        {
+                                            <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                $@s.CutCard.PriceUsd.Value.ToString("F2")
+                                            </span>
+                                        }
+                                        <span class="text-muted small">@s.CutCard.TypeLine</span>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(s.CutRationale))
+                                    {
+                                        <p class="text-muted small mb-0 ms-1">@s.CutRationale</p>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    }
+
+    @if (_view == DeckView.Combos)
+    {
+        @if (_isLoadingCombos)
+        {
+            <div class="card mx-3 mb-3">
+                <div class="card-body text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    <span class="text-muted">Searching Commander Spellbook…</span>
+                </div>
+                <div class="card-footer d-flex justify-content-end">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="CancelCombos">Cancel</button>
+                </div>
+            </div>
+        }
+        else if (_comboError is not null)
+        {
+            <div class="alert alert-danger mx-3 mb-3">
+                <strong>Combo search failed:</strong> @_comboError
+            </div>
+            <div class="card mx-3 mb-3">
+                <div class="card-body">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="FindCombosAsync">Retry</button>
+                </div>
+            </div>
+        }
+        else if (!_comboStarted)
+        {
+            <div class="card mx-3 mb-3">
+                <div class="card-header fw-semibold">Find Combos</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Searches <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>
+                        for combos fully present in your built deck and near-misses (one card away).
+                        Also returns a combo-aware bracket estimate.
+                    </p>
+                    <button class="btn btn-primary" @onclick="FindCombosAsync">Find Combos</button>
+                </div>
+            </div>
+        }
+        else if (_comboResult is not null)
+        {
+            @if (_comboResult.SpellbookBracketTag is not null)
+            {
+                <div class="alert alert-info mx-3 mb-3 py-2 d-flex align-items-center gap-2 flex-wrap">
+                    <strong>Combo-aware bracket (Commander Spellbook):</strong>
+                    <span class="badge @BracketTagCss(_comboResult.SpellbookBracketTag)">
+                        @BracketTagLabel(_comboResult.SpellbookBracketTag)
+                    </span>
+                    <span class="text-muted small ms-auto">Based on combo presence, tutors, and game-changer cards.</span>
+                </div>
+            }
+
+            <div class="mb-3 mx-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">
+                    Powered by <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>
+                    (MIT license)
+                </span>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="FindCombosAsync">Refresh</button>
+            </div>
+
+            @if (_comboResult.Combos.Included.Count == 0 && _comboResult.Combos.AlmostIncluded.Count == 0)
+            {
+                <div class="alert alert-secondary mx-3 mb-3">
+                    No combos or near-misses found for this decklist.
+                </div>
+            }
+            else
+            {
+                @if (_comboResult.Combos.Included.Count > 0)
+                {
+                    <div class="card mb-4 mx-3">
+                        <div class="card-header fw-semibold">
+                            Combos in your deck
+                            <span class="badge bg-success ms-1 fw-normal">@_comboResult.Combos.Included.Count</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            @foreach (var combo in _comboResult.Combos.Included.OrderByDescending(c => c.Popularity))
+                            {
+                                var isExpanded = _expandedCombos.Contains(combo.Id);
+                                var comboId    = combo.Id;
+                                <div class="list-group-item py-3">
+                                    <div class="d-flex flex-wrap align-items-start gap-2 mb-1"
+                                         style="cursor:pointer;" @onclick="() => ToggleCombo(comboId)">
+                                        <span class="badge bg-success">Complete</span>
+                                        <span class="fw-semibold me-auto">@string.Join(", ", combo.ProducedEffects.Take(3))</span>
+                                        @if (!string.IsNullOrEmpty(combo.BracketTag))
+                                        {
+                                            <span class="badge @BracketTagCss(combo.BracketTag)" style="font-size:0.7rem;"
+                                                  title="@BracketTagLabel(combo.BracketTag)">@combo.BracketTag</span>
+                                        }
+                                        <span class="text-muted small">@(isExpanded ? "▼" : "▶")</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                        <span class="text-muted small" style="min-width:6rem;">In your deck:</span>
+                                        @foreach (var piece in combo.OwnedPieces)
+                                        {
+                                            <span class="badge bg-success bg-opacity-25 text-dark border border-success"
+                                                  style="font-size:0.75rem;">&#10003; @piece.Name</span>
+                                        }
+                                    </div>
+                                    @if (isExpanded)
+                                    {
+                                        @if (!string.IsNullOrEmpty(combo.ManaNeeded))
+                                        {
+                                            <div class="text-muted small mb-1"><strong>Mana:</strong> @combo.ManaNeeded</div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(combo.NotablePrerequisites))
+                                        {
+                                            <div class="text-muted small mb-2"><strong>Prerequisites:</strong> @combo.NotablePrerequisites</div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(combo.Description))
+                                        {
+                                            <ol class="small text-muted mb-0 ps-3">
+                                                @foreach (var step in combo.Description.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                                                {
+                                                    <li class="mb-1">@step</li>
+                                                }
+                                            </ol>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (_comboResult.Combos.AlmostIncluded.Count > 0)
+                {
+                    <div class="card mb-4 mx-3">
+                        <div class="card-header fw-semibold">
+                            Near-miss combos &mdash; 1 card away
+                            <span class="badge bg-warning text-dark ms-1 fw-normal">@_comboResult.Combos.AlmostIncluded.Count</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            @foreach (var combo in _comboResult.Combos.AlmostIncluded.OrderByDescending(c => c.Popularity))
+                            {
+                                var isExpanded = _expandedCombos.Contains(combo.Id);
+                                var comboId    = combo.Id;
+                                <div class="list-group-item py-3">
+                                    <div class="d-flex flex-wrap align-items-start gap-2 mb-1"
+                                         style="cursor:pointer;" @onclick="() => ToggleCombo(comboId)">
+                                        <span class="fw-semibold me-auto">@string.Join(", ", combo.ProducedEffects.Take(3))</span>
+                                        @if (!string.IsNullOrEmpty(combo.BracketTag))
+                                        {
+                                            <span class="badge @BracketTagCss(combo.BracketTag)" style="font-size:0.7rem;"
+                                                  title="@BracketTagLabel(combo.BracketTag)">@combo.BracketTag</span>
+                                        }
+                                        <span class="text-muted small">@(isExpanded ? "▼" : "▶")</span>
+                                    </div>
+                                    <div class="mb-1">
+                                        @if (combo.OwnedPieces.Count > 0)
+                                        {
+                                            <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                                <span class="text-muted small" style="min-width:6rem;">In your deck:</span>
+                                                @foreach (var piece in combo.OwnedPieces)
+                                                {
+                                                    <span class="badge bg-success bg-opacity-25 text-dark border border-success"
+                                                          style="font-size:0.75rem;">&#10003; @piece.Name</span>
+                                                }
+                                            </div>
+                                        }
+                                        @foreach (var missing in combo.MissingCardNames)
+                                        {
+                                            <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                                <span class="text-muted small" style="min-width:6rem;">Missing:</span>
+                                                <span class="badge bg-danger bg-opacity-25 text-dark border border-danger"
+                                                      style="font-size:0.75rem;">@missing</span>
+                                            </div>
+                                        }
+                                        @foreach (var tmpl in combo.MissingTemplates)
+                                        {
+                                            <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                                <span class="text-muted small" style="min-width:6rem;">Needs any:</span>
+                                                <span class="badge bg-secondary bg-opacity-25 text-dark border"
+                                                      style="font-size:0.75rem;">@tmpl</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (isExpanded)
+                                    {
+                                        @if (!string.IsNullOrEmpty(combo.ManaNeeded))
+                                        {
+                                            <div class="text-muted small mb-1"><strong>Mana:</strong> @combo.ManaNeeded</div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(combo.NotablePrerequisites))
+                                        {
+                                            <div class="text-muted small mb-2"><strong>Prerequisites:</strong> @combo.NotablePrerequisites</div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(combo.Description))
+                                        {
+                                            <ol class="small text-muted mb-0 ps-3">
+                                                @foreach (var step in combo.Description.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                                                {
+                                                    <li class="mb-1">@step</li>
+                                                }
+                                            </ol>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
         }
     }
 

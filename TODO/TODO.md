@@ -168,6 +168,12 @@ sanctioned sources to add are:
 
 - [x] Implement `CommanderSpellbookClient` in Infrastructure: `find-my-combos` + `estimate-bracket`
       endpoints, cached per card-list hash. Define `IComboSource` in Core Abstractions. (2026-08-04)
+- [x] Implement `ComboPoolSource` (`IComboCardSource`) and wire into `DeckBuilder.GatherPoolAsync`.
+      Calls `find-my-combos(commanders, lockedCards)` on every build; near-miss combo pieces are
+      injected into the pool. Inclusion score = combo popularity normalized 0–1 by the most
+      popular combo returned (floor 0.05 for zero-popularity combos; accumulated per card, capped
+      at 1.0 when a card completes multiple combos). Merged after EDHREC pool (higher score wins).
+      8 unit tests in `ComboPoolSourceTests.cs`. (2026-08-04)
 - [ ] Implement `TopDeckIngestJob` in Infrastructure: periodic pull of EDH/DC tournaments,
       aggregate `deckObj` card frequency by commander into a local store. Define
       `ICompetitiveMetaSource` in Core Abstractions.
@@ -502,7 +508,12 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
       - Near-miss combos (1 card away, within color identity) — owned pieces (green) + missing (red/grey template).
       - Combo-aware bracket estimate from Spellbook alongside the hand-rolled estimate.
       - Attribution credit + link to commanderspellbook.com (MIT license).
-- [x] **Integration point 2** (build-time) explicitly deferred — read-only only for now.
+- [x] **Integration point 2** (build-time) — done via `ComboPoolSource` / `IComboCardSource` (2026-08-04).
+      Near-miss combo pieces injected into the builder pool on every build; locked cards passed as seed deck.
+- [x] **Upgrade Paths + Combos tabs on DeckResults page** — both tabs ported to the build result page
+      (`DeckResults.razor/.cs`). Upgrade paths take an independent per-card price input (not bound by the
+      build's budget cap). Bug fixed in `DeckUpgrader.SelectUpgradesAsync`: `.ToDictionary()` now deduplicates
+      candidates and cut-pool by OracleId before building the whitelist lookups. (2026-08-04)
 
 **API contract (verified 2026-08-04):**
 - Request body: `{"commanders":[{"card":"Name"}],"main":[{"card":"Name"}]}`
@@ -591,7 +602,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 399 tests pass.
+All four projects compile; 407 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 
@@ -613,6 +624,6 @@ All four projects compile; 399 tests pass.
 
 **Build progress — sub-step detail:** `ClassifyPool` shows `"N / M cards classified"` (updating per 30-card batch, seeded immediately with cache-hit count). `FillEngine` shows `"Selecting {Role} cards… (N / 9)"` before each selector call. Both stages surface their detail via `CurrentStageDetail` in `BuildProgress.razor`.
 
-**Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist.
+**Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist. **Combo Finder (v4):** `CommanderSpellbookClient` (`IComboSource`) — `find-my-combos` + `estimate-bracket` endpoints with SHA256 cache. `IComboFinder` / `ComboFinder` runs both in parallel. Combos tab on analyzer page shows complete combos, near-misses (owned + missing pieces), combo-aware bracket from Spellbook. **ComboPoolSource (v5):** `IComboCardSource` / `ComboPoolSource` injects near-miss combo pieces into the builder pool on every build (locked cards passed as seed deck); inclusion score normalized by combo popularity. **DeckResults Upgrade Paths + Combos tabs:** both tabs ported to the build result page; upgrade paths use an independent per-card price input not bound by the build's budget cap.
 
-**Tests:** 399 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser). All green.
+**Tests:** 407 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.

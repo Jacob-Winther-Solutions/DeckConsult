@@ -134,10 +134,18 @@ public sealed class LockedCardsTests
         return cards;
     }
 
+    private sealed class NoOpComboCardSource : IComboCardSource
+    {
+        public Task<IReadOnlyList<CardCandidate>> GetComboCandidatesAsync(
+            IReadOnlyList<Card> _, IReadOnlyList<Card> __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>>([]);
+    }
+
     private static DeckBuilder MakeBuilder(IReadOnlyList<CardCandidate> pool) =>
         new(new FixedSuggestionSource(pool),
             new RoleParsingClassifier(),
             new InclusionOrderSelector(),
+            new NoOpComboCardSource(),
             LoggerFactory.Create(b => b.AddConsole()).CreateLogger<DeckBuilder>());
 
     // ── Tests ─────────────────────────────────────────────────────────────────

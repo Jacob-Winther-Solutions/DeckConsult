@@ -64,6 +64,13 @@ public sealed class BudgetTests
         }
     }
 
+    private sealed class NoOpComboCardSource : IComboCardSource
+    {
+        public Task<IReadOnlyList<CardCandidate>> GetComboCandidatesAsync(
+            IReadOnlyList<Card> _, IReadOnlyList<Card> __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>>([]);
+    }
+
     /// <summary>Ranks candidates by inclusion descending — stable, no LLM calls.</summary>
     private sealed class InclusionOrderSelector : ICardSelector
     {
@@ -178,6 +185,7 @@ public sealed class BudgetTests
         new(new FixedSuggestionSource(pool),
             new RoleParsingClassifier(),
             new InclusionOrderSelector(),
+            new NoOpComboCardSource(),
             LoggerFactory.Create(b => b.AddConsole()).CreateLogger<DeckBuilder>());
 
     private static SoftConstraints Constraints(decimal? maxCard = null, decimal? totalBudget = null) =>

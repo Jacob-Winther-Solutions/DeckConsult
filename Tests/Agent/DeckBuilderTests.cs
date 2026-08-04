@@ -68,6 +68,13 @@ public sealed class DeckBuilderTests
         }
     }
 
+    private sealed class NoOpComboCardSource : IComboCardSource
+    {
+        public Task<IReadOnlyList<CardCandidate>> GetComboCandidatesAsync(
+            IReadOnlyList<Card> _, IReadOnlyList<Card> __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>>([]);
+    }
+
     /// <summary>Ranks candidates by inclusion descending — stable, no LLM calls.</summary>
     private sealed class InclusionOrderSelector : ICardSelector
     {
@@ -170,6 +177,7 @@ public sealed class DeckBuilderTests
         new(new FixedSuggestionSource(pool),
             new RoleParsingClassifier(),
             new InclusionOrderSelector(),
+            new NoOpComboCardSource(),
             LoggerFactory.Create(b => b.AddConsole()).CreateLogger<DeckBuilder>());
 
     // ── Tests ─────────────────────────────────────────────────────────────────

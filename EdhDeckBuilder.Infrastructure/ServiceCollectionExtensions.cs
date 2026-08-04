@@ -51,6 +51,11 @@ public static class ServiceCollectionExtensions
             c.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddSingleton<IComboSource>(sp => sp.GetRequiredService<CommanderSpellbookClient>());
+        services.AddSingleton<ComboPoolSource>(sp => new ComboPoolSource(
+            sp.GetRequiredService<IComboSource>(),
+            sp.GetRequiredService<ICardRepository>(),
+            sp.GetRequiredService<ILogger<ComboPoolSource>>()));
+        services.AddSingleton<IComboCardSource>(sp => sp.GetRequiredService<ComboPoolSource>());
 
         return services;
     }

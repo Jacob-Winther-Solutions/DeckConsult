@@ -30,6 +30,7 @@ public sealed class DeckBuilder(
     ISuggestionSource suggestionSource,
     ILlmClassifier classifier,
     ICardSelector selector,
+    IComboCardSource comboCardSource,
     ILogger<DeckBuilder> logger) : IDeckBuilder
 {
     private UsageTracker? _usageTracker;
@@ -74,7 +75,7 @@ public sealed class DeckBuilder(
         // 2. Gather candidate pool from EDHREC (one call per commander; merged or partner-pair).
         await (progress?.Invoke("Gathering card pool") ?? Task.CompletedTask);
         var stageTimer = Stopwatch.StartNew();
-        var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, ct);
+        var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, lockedCards, ct);
         stageTimer.Stop();
         logger.LogInformation("GatherPool: {PoolSize} cards, {ElapsedMs}ms", rawPool.Count, stageTimer.ElapsedMilliseconds);
 
@@ -239,26 +240,49 @@ public sealed class DeckBuilder(
     private async Task<IReadOnlyList<CardCandidate>> GatherPoolAsync(
         IReadOnlyList<Card> commanders,
         bool isLegalPartnerPair,
+        IReadOnlyList<Card>? lockedCards,
         CancellationToken ct)
     {
-        // If this is a legal partner pair, try the partner-pair endpoint first.
+        // Launch combo pool fetch immediately so it runs in parallel with EDHREC
+        var comboTask = comboCardSource.GetComboCandidatesAsync(commanders, lockedCards ?? [], ct);
+
+        IReadOnlyList<CardCandidate> edhrecPool;
         if (isLegalPartnerPair && commanders.Count == 2)
         {
             var partnerPool = await suggestionSource.GetPartnerPairRecommendationsAsync(
                 commanders[0], commanders[1], ct);
-            if (partnerPool != null)
-            {
-                return partnerPool;
-            }
-            // If partner endpoint returns null, fall through to merge single-commander pools
+            edhrecPool = partnerPool ?? await GetIndividualPoolAsync(commanders, ct);
+        }
+        else
+        {
+            edhrecPool = await GetIndividualPoolAsync(commanders, ct);
         }
 
+        var comboCandidates = await comboTask;
+        if (comboCandidates.Count == 0)
+            return edhrecPool;
+
+        // Merge: start from EDHREC pool; combo candidates upgrade or extend it
+        var merged = new Dictionary<Guid, CardCandidate>();
+        foreach (var c in edhrecPool)
+            merged[c.Card.OracleId] = c;
+        foreach (var c in comboCandidates)
+            if (!merged.TryGetValue(c.Card.OracleId, out var existing)
+                || c.Inclusion > existing.Inclusion)
+                merged[c.Card.OracleId] = c;
+
+        return merged.Values.ToList();
+    }
+
+    private async Task<IReadOnlyList<CardCandidate>> GetIndividualPoolAsync(
+        IReadOnlyList<Card> commanders,
+        CancellationToken ct)
+    {
         var tasks = commanders
             .Select(c => suggestionSource.GetRecommendationsAsync(c, ct))
             .ToList();
         var batches = await Task.WhenAll(tasks);
 
-        // Merge: keep the higher inclusion when the same card appears for multiple commanders.
         var merged = new Dictionary<Guid, CardCandidate>();
         foreach (var batch in batches)
             foreach (var candidate in batch)

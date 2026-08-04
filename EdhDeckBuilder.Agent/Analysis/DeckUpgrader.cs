@@ -248,9 +248,9 @@ public sealed class DeckUpgrader(
 
             var dtos = suggestionsNode.Deserialize<List<UpgradeSuggestionDto>>() ?? [];
 
-            // Whitelists
-            var addByOracle  = candidates.ToDictionary(c => c.Card.OracleId, c => c.Card);
-            var cutByOracle  = cutPool.ToDictionary(c => c.Card.OracleId, c => c.Card);
+            // Whitelists — deduplicate by OracleId (last-wins) before building the lookup
+            var addByOracle  = candidates.DistinctBy(c => c.Card.OracleId).ToDictionary(c => c.Card.OracleId, c => c.Card);
+            var cutByOracle  = cutPool.DistinctBy(c => c.Card.OracleId).ToDictionary(c => c.Card.OracleId, c => c.Card);
 
             var results = new List<UpgradeSuggestion>(SuggestionCount);
             foreach (var dto in dtos.Take(SuggestionCount))
