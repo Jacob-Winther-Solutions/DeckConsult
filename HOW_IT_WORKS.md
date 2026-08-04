@@ -273,6 +273,69 @@ you can make:
 
 ---
 
+## Deck Analyzer
+
+If you already have a deck, use the **Deck Analyzer** page (`/analyze`) to evaluate it and get
+targeted upgrade suggestions.
+
+### What you paste in
+
+**Your decklist.** Paste in your 99 (or up to 100 if your site also includes the commander in
+the maindeck — the tool deduplicates). Most common export formats are accepted:
+
+- Plain `1 Card Name` — the default
+- Arena `1 Card Name (SET) 123` — set code and collector number are stripped
+- Archidekt/MTGO `1 Card Name [SET]` — bracket set code stripped
+- Moxfield, EDHREC, and other sites that put a `# Section` header or a `Creatures (24)` count
+  suffix — those headers are skipped
+- Sideboard lines (`SB: ...`) are ignored
+
+MDFCs (modal double-faced cards) are recognized by their front-face name alone — "Bala Ged Recovery"
+resolves correctly even if the export omits the " // Bala Ged Sanctuary" back face.
+
+**Your commander(s).** Picked via the same commander search as the builder, not pasted in — this
+prevents mis-classification if the site included the commander in the 99.
+
+### What you see
+
+**Coverage Report** — how many cards you have in each functional role (Ramp, Card Advantage,
+Disruption, etc.) vs. the balanced-deck baseline. Roles that fall short are highlighted.
+
+**All Cards / By Type** — full card list with each card's classified role and secondary contributions,
+sorted the same way as the deck builder results.
+
+**Bracket Estimate** — a quick bracket guess (1–5, matching the Command Zone system) based on
+tutor density and protection count. Useful to sanity-check whether a list reads as casual, mid-power,
+or high-power.
+
+**Role Gaps** — the roles most under-served in your current list, ordered by shortfall vs. the balanced
+template. These feed directly into the Upgrade Paths tab.
+
+### Upgrade Paths
+
+Fill in the optional inputs and click **Get Upgrade Suggestions**:
+
+- **What isn't working?** — Free text describing your frustrations ("I always lose to board wipes",
+  "the deck is too slow"). This re-orders which gaps to address first before running upgrade selection.
+- **Max price per card** — the tool only suggests cards at or under this price. Leave empty for no
+  budget constraint.
+
+If you fill these in before clicking **Analyze**, upgrades run automatically once analysis finishes.
+
+For each of the top role gaps, the tool:
+
+1. Fetches EDHREC recommendations for your commander(s) as the candidate pool.
+2. Classifies the candidates with the same LLM step used in the builder.
+3. Asks a fast cheap model (Haiku / Flash Lite) to re-rank the gaps based on your feedback text.
+4. Asks your selected model to suggest up to three **add + cut** pairs for each gap — a specific card
+   to add and a specific card from your current 99 to cut in its place, with written rationale for both.
+
+All suggested adds are validated against the EDHREC pool (no hallucinated card names) and all suggested
+cuts come from your actual decklist. Each unique commander is queried separately and the pools are merged,
+so partner decks get recommendations from both halves of the pair.
+
+---
+
 ## Current limitations
 
 - **Context-aware classification** is not implemented. Some cards (e.g. Jeska's Will) behave

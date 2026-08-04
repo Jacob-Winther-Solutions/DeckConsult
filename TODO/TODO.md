@@ -450,7 +450,7 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 See `TODO/TODO_new_features.md` for the full brainstorm session with design context and open questions.
 
-### 1. Deck Analyzer — v1 DONE (2026-08-03)
+### 1. Deck Analyzer — v2 DONE (2026-08-03)
 
 Paste an existing decklist → classify it → coverage report → bracket estimate → role gaps.
 Plain `1 Card Name` format only. Commander in a separate picker. No upgrade paths in v1.
@@ -465,16 +465,26 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
   Optional "What isn't working?" field accepted but deferred for v2 weighting.
 - 25 new tests (13 `DecklistParserTests` + 9 `BracketEstimatorTests`); 373 total, all green.
 
-**Deferred to v2:**
-- [ ] **Budget upgrade paths**: given classified + gapped deck, generate staged upgrade
-      suggestions at multiple budget tiers mapped to identified role gaps. Reuse `ICardSelector`.
-      Requires owner decision on budget tier breakpoints before implementation.
-- [ ] **User experience feedback weighting**: the optional feedback field is accepted by the UI
-      and passed to `IDeckAnalyzer.AnalyzeAsync` but currently unused. Wire it into the gap
-      ordering once the upgrade path feature lands (it should influence which gaps are surfaced
-      first and which roles the upgrade suggestions target).
-- [ ] **Additional input formats**: Arena (`Commander` section header), Moxfield/Archidekt
-      section comments. Plain format covers the majority of use cases for now.
+**v2 complete (2026-08-04):**
+- [x] **Budget upgrade paths**: `IDeckUpgrader` / `DeckUpgrader` — fetches EDHREC pool per commander,
+      filters by color + budget, classifies candidates, then makes two LLM calls: one Haiku call to
+      prioritize gaps by user feedback (if provided), and one selector-model call per gap to pick
+      3 ranked add+cut pairs. Shown in the new "Upgrade Paths" tab. Single max-price-per-card input.
+- [x] **User experience feedback weighting**: "What isn't working?" field now feeds `DeckUpgrader`
+      as `userFeedback` — the Haiku gap-prioritization call reorders gaps to match the player's pain
+      points before upgrade selection runs. Removed from `IDeckAnalyzer.AnalyzeAsync` (analysis stays
+      objective).
+- [x] **3-tab + 4th Upgrade Paths tab**: Coverage Report, All Cards, By Type, Upgrade Paths.
+- [x] **Home page card**: Deck Analyzer added to 4-column grid.
+- [x] **MDFC land credit**: `BuildRoleProfile()` injects secondary `CardRole.Land` for MDFCs.
+- [x] **Prompt improvements**: Ramp now covers extra land drops; TargetedDisruption includes
+      single-target combat denial; Protection includes protection from colors/types.
+
+**v3 complete (2026-08-04):**
+- [x] **Additional input formats**: `DecklistParser` now handles Arena/Moxfield `(SET) ###`
+      set-code suffixes, Archidekt/MTGO `[SET]` bracket codes, Moxfield `#` section headers,
+      count-suffixed section headers like `Creatures (24)`, and `SB:` sideboard lines.
+      20 new parser tests; 396 total, all green.
 
 ### 2. Combo Finder
 
@@ -599,6 +609,6 @@ All four projects compile; 373 tests pass.
 
 **Build progress — sub-step detail:** `ClassifyPool` shows `"N / M cards classified"` (updating per 30-card batch, seeded immediately with cache-hit count). `FillEngine` shows `"Selecting {Role} cards… (N / 9)"` before each selector call. Both stages surface their detail via `CurrentStageDetail` in `BuildProgress.razor`.
 
-**Deck Analyzer (v1):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` format. Optional user feedback field accepted (weighting deferred). 25 new tests.
+**Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist.
 
-**Tests:** 373 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer). All green.
+**Tests:** 399 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser). All green.

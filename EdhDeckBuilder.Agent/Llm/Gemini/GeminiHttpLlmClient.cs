@@ -132,9 +132,11 @@ public sealed class GeminiHttpLlmClient(
     /// </summary>
     private static JsonNode ResolveSchema(string? toolName) => toolName switch
     {
-        ClassificationPrompt.ToolName      => GeminiSchemas.BuildClassificationSchema(ClassificationPrompt.IsReasoningEnabled),
-        SelectionPrompt.ToolName           => GeminiSchemas.BuildSelectionSchema(),
-        CommanderSelectionPrompt.ToolName  => GeminiSchemas.BuildCommanderSelectionSchema(),
+        ClassificationPrompt.ToolName           => GeminiSchemas.BuildClassificationSchema(ClassificationPrompt.IsReasoningEnabled),
+        SelectionPrompt.ToolName                => GeminiSchemas.BuildSelectionSchema(),
+        CommanderSelectionPrompt.ToolName       => GeminiSchemas.BuildCommanderSelectionSchema(),
+        UpgradeSelectionPrompt.PrioritizationToolName => GeminiSchemas.BuildGapPrioritizationSchema(),
+        UpgradeSelectionPrompt.SelectionToolName      => GeminiSchemas.BuildUpgradeSelectionSchema(),
         _ => throw new InvalidOperationException($"No Gemini schema registered for tool '{toolName}'."),
     };
 

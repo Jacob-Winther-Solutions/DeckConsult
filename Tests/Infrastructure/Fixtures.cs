@@ -14,6 +14,7 @@ internal static class Fixtures
     public static readonly Guid KorvoldId   = new("a0000000-0000-0000-0000-000000000002");
     public static readonly Guid CultivateId = new("a0000000-0000-0000-0000-000000000003");
     public static readonly Guid ForestId    = new("a0000000-0000-0000-0000-000000000004");
+    public static readonly Guid BalaGedId   = new("a0000000-0000-0000-0000-000000000005");
 
     // Partnership test cards
     public static readonly Guid ThrasiosId  = new("a0000000-0000-0000-0000-000000000010");
@@ -126,6 +127,17 @@ internal static class Fixtures
             "keywords":       ["partner with"],
             "power":          "2",
             "toughness":      "2",
+            "legalities":     { "commander": "legal" }
+          },
+          {
+            "id":             "{{BalaGedId}}",
+            "oracle_id":      "{{BalaGedId}}",
+            "name":           "Bala Ged Recovery // Bala Ged Sanctuary",
+            "mana_cost":      "{2}{G}",
+            "cmc":            3.0,
+            "color_identity": ["G"],
+            "type_line":      "Sorcery // Land",
+            "oracle_text":    "Return target card from your graveyard to your hand. // Bala Ged Sanctuary enters tapped.",
             "legalities":     { "commander": "legal" }
           }
         ]

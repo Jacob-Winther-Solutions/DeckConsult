@@ -12,7 +12,6 @@ public interface IDeckAnalyzer
     Task<DeckAnalysisResult> AnalyzeAsync(
         IReadOnlyList<Card> commanders,
         IReadOnlyList<ParsedCardEntry> entries,
-        string? userFeedback = null,
         Func<string, Task>? progress = null,
         Func<string, Task>? subProgress = null,
         CancellationToken ct = default);

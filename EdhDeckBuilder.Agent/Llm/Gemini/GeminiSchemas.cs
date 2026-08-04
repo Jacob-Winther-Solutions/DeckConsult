@@ -118,4 +118,46 @@ internal static class GeminiSchemas
               "required": ["rankings"]
             }
             """)!;
+
+    public static JsonNode BuildGapPrioritizationSchema() =>
+        JsonNode.Parse(
+            """
+            {
+              "type": "OBJECT",
+              "properties": {
+                "prioritized_roles": {
+                  "type": "ARRAY",
+                  "items": { "type": "STRING" }
+                }
+              },
+              "propertyOrdering": ["prioritized_roles"],
+              "required": ["prioritized_roles"]
+            }
+            """)!;
+
+    public static JsonNode BuildUpgradeSelectionSchema() =>
+        JsonNode.Parse(
+            """
+            {
+              "type": "OBJECT",
+              "properties": {
+                "suggestions": {
+                  "type": "ARRAY",
+                  "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                      "add_oracle_id":  { "type": "STRING" },
+                      "add_rationale":  { "type": "STRING" },
+                      "cut_oracle_id":  { "type": "STRING" },
+                      "cut_rationale":  { "type": "STRING" }
+                    },
+                    "propertyOrdering": ["add_oracle_id","add_rationale","cut_oracle_id","cut_rationale"],
+                    "required": ["add_oracle_id","add_rationale","cut_oracle_id","cut_rationale"]
+                  }
+                }
+              },
+              "propertyOrdering": ["suggestions"],
+              "required": ["suggestions"]
+            }
+            """)!;
 }

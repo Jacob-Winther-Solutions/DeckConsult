@@ -30,7 +30,6 @@ public sealed class DeckAnalyzer(
     public async Task<DeckAnalysisResult> AnalyzeAsync(
         IReadOnlyList<Card> commanders,
         IReadOnlyList<ParsedCardEntry> entries,
-        string? userFeedback = null,
         Func<string, Task>? progress = null,
         Func<string, Task>? subProgress = null,
         CancellationToken ct = default)
@@ -41,7 +40,15 @@ public sealed class DeckAnalyzer(
 
         // 1. Resolve entries → non-basics + basics + unresolved
         await (progress?.Invoke("Resolving card names") ?? Task.CompletedTask);
-        var (nonBasics, basicLandCounts, unresolvedNames) = await ResolveCardsAsync(entries, ct);
+        var (resolvedNonBasics, basicLandCounts, unresolvedNames) = await ResolveCardsAsync(entries, ct);
+
+        // Some deck-builder sites include the commander in the 99 — strip duplicates so
+        // each card appears exactly once in the deck.
+        var commanderIds = commanders.Select(c => c.OracleId).ToHashSet();
+        var nonBasics = resolvedNonBasics
+            .Where(c => !commanderIds.Contains(c.OracleId))
+            .ToList();
+
         logger.LogInformation("DeckAnalysis_Resolve: {NonBasic} non-basics, {BasicTotal} basic land slots, {Unresolved} unresolved",
             nonBasics.Count, basicLandCounts.Values.Sum(), unresolvedNames.Count);
 

@@ -65,6 +65,30 @@ public sealed class CardRepositoryTests : IDisposable
         Assert.NotNull(card);
     }
 
+    [Fact]
+    public async Task GetByNameAsync_resolves_mdfc_by_full_name()
+    {
+        var card = await _repo.GetByNameAsync("Bala Ged Recovery // Bala Ged Sanctuary");
+        Assert.NotNull(card);
+        Assert.Equal("Bala Ged Recovery // Bala Ged Sanctuary", card.Name);
+    }
+
+    [Fact]
+    public async Task GetByNameAsync_resolves_mdfc_by_front_face_name_only()
+    {
+        // Arena exports and many deck sites omit the back face (" // Back Face")
+        var card = await _repo.GetByNameAsync("Bala Ged Recovery");
+        Assert.NotNull(card);
+        Assert.Equal("Bala Ged Recovery // Bala Ged Sanctuary", card.Name);
+    }
+
+    [Fact]
+    public async Task GetByNameAsync_mdfc_front_face_lookup_is_case_insensitive()
+    {
+        var card = await _repo.GetByNameAsync("bala ged recovery");
+        Assert.NotNull(card);
+    }
+
     // --- GetByOracleIdAsync ---------------------------------------------------
 
     [Fact]

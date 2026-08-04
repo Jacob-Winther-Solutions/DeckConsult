@@ -79,6 +79,16 @@
                     <button class="nav-link @(_view == AnalysisView.ByType ? "active" : "")"
                             @onclick='() => _view = AnalysisView.ByType'>By Type</button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_view == AnalysisView.UpgradePaths ? "active" : "")"
+                            @onclick='() => _view = AnalysisView.UpgradePaths'>
+                        Upgrade Paths
+                        @if (_upgradeResult is not null)
+                        {
+                            <span class="badge bg-success ms-1" style="font-size: 0.65rem;">@_upgradeResult.RoleUpgrades.Sum(r => r.Suggestions.Count)</span>
+                        }
+                    </button>
+                </li>
             </ul>
 
             @if (_view == AnalysisView.ByRole)
@@ -392,6 +402,184 @@
                 }
             }
 
+            @if (_view == AnalysisView.UpgradePaths)
+            {
+                @if (_isLoadingUpgrades)
+                {
+                    <div class="card mx-3 mb-3">
+                        <div class="card-body text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            <span class="text-muted">@(_upgradeCurrentStage ?? "Loading upgrade suggestions…")</span>
+                        </div>
+                        <div class="card-footer d-flex justify-content-end">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelUpgrades">Cancel</button>
+                        </div>
+                    </div>
+                }
+                else if (_upgradeError is not null)
+                {
+                    <div class="alert alert-danger mx-3 mb-3">
+                        <strong>Upgrade suggestions failed:</strong> @_upgradeError
+                    </div>
+                    <div class="card mx-3 mb-3">
+                        <div class="card-body">
+                            <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="input-group" style="max-width: 180px;">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control"
+                                           min="0" step="0.5"
+                                           placeholder="no limit"
+                                           @bind="_maxUpgradePriceUsd"
+                                           @bind:event="oninput" />
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm"
+                                        disabled="@(!CanGetUpgrades)"
+                                        @onclick="GetUpgradesAsync">
+                                    Retry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (!_upgradeStarted)
+                {
+                    <!-- Not yet run — show budget form -->
+                    <div class="card mx-3 mb-3">
+                        <div class="card-header fw-semibold">Get Upgrade Suggestions</div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrWhiteSpace(_userFeedback))
+                            {
+                                <div class="alert alert-info py-2 small mb-3">
+                                    <strong>Problem statement:</strong> @_userFeedback
+                                </div>
+                            }
+                            <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="input-group" style="max-width: 180px;">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control"
+                                           min="0" step="0.5"
+                                           placeholder="no limit"
+                                           @bind="_maxUpgradePriceUsd"
+                                           @bind:event="oninput" />
+                                </div>
+                                <button class="btn btn-primary"
+                                        disabled="@(!CanGetUpgrades)"
+                                        @onclick="GetUpgradesAsync">
+                                    Get Upgrade Suggestions
+                                </button>
+                            </div>
+                            <div class="text-muted small mt-2">
+                                Suggestions are drawn from the EDHREC pool for your commander and prioritize your biggest coverage gaps. Leave the budget empty to consider all cards.
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (_upgradeResult is not null && _upgradeResult.RoleUpgrades.Count == 0)
+                {
+                    <div class="alert alert-info mx-3 mb-3">
+                        No upgrade suggestions found — your deck has no significant coverage gaps, or no EDHREC candidates were available within the current budget.
+                    </div>
+                    <div class="card mx-3 mb-3">
+                        <div class="card-body">
+                            <label class="form-label small fw-semibold mb-1">Try a different budget cap</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="input-group" style="max-width: 180px;">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control"
+                                           min="0" step="0.5"
+                                           placeholder="no limit"
+                                           @bind="_maxUpgradePriceUsd"
+                                           @bind:event="oninput" />
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm"
+                                        disabled="@(!CanGetUpgrades)"
+                                        @onclick="GetUpgradesAsync">
+                                    Try Again
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3 mx-3 d-flex justify-content-end">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="GetUpgradesAsync">Refresh</button>
+                    </div>
+                    @foreach (var roleUpgrade in _upgradeResult!.RoleUpgrades)
+                    {
+                        <div class="card mb-4 mx-3">
+                            <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                                <span class="me-auto">
+                                    @CardRoleDisplay.RoleName(roleUpgrade.Gap.Role)
+                                    <span class="text-muted fw-normal small ms-2">
+                                        actual @roleUpgrade.Gap.ActualCoverage.ToString("0.#") / ideal @roleUpgrade.Gap.IdealTarget
+                                    </span>
+                                </span>
+                                <span class="badge bg-warning text-dark">@roleUpgrade.Gap.Shortfall.ToString("0.#") short</span>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                @for (int i = 0; i < roleUpgrade.Suggestions.Count; i++)
+                                {
+                                    var s = roleUpgrade.Suggestions[i];
+                                    var rank = i + 1;
+                                    <div class="list-group-item py-3">
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">Option @rank</span>
+                                        </div>
+                                        <!-- Add -->
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                            <span class="badge bg-success">+ Add</span>
+                                            <span class="fw-semibold">@s.AddCard.Name</span>
+                                            @if (s.AddCard.ManaValue > 0)
+                                            {
+                                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Mana value">
+                                                    @s.AddCard.ManaValue.ToString("0.#")
+                                                </span>
+                                            }
+                                            @if (s.AddCard.PriceUsd.HasValue)
+                                            {
+                                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Price">
+                                                    $@s.AddCard.PriceUsd.Value.ToString("F2")
+                                                </span>
+                                            }
+                                            <span class="text-muted small">@s.AddCard.TypeLine</span>
+                                        </div>
+                                        <p class="text-muted small mb-2 ms-1">@s.AddRationale</p>
+                                        <!-- Cut -->
+                                        @if (s.CutCard is not null)
+                                        {
+                                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                <span class="badge bg-danger">− Cut</span>
+                                                <span class="fw-semibold">@s.CutCard.Name</span>
+                                                @if (s.CutCard.ManaValue > 0)
+                                                {
+                                                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                        @s.CutCard.ManaValue.ToString("0.#")
+                                                    </span>
+                                                }
+                                                @if (s.CutCard.PriceUsd.HasValue)
+                                                {
+                                                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                        $@s.CutCard.PriceUsd.Value.ToString("F2")
+                                                    </span>
+                                                }
+                                                <span class="text-muted small">@s.CutCard.TypeLine</span>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(s.CutRationale))
+                                            {
+                                                <p class="text-muted small mb-0 ms-1">@s.CutRationale</p>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            }
+
             @if (_view == AnalysisView.ByType)
             {
                 var allForType = _result.CommanderCards.Concat(_result.Cards).ToList();
@@ -539,20 +727,30 @@
                 </div>
             </div>
 
-            <!-- ── Optional feedback ─────────────────────────────────────────── -->
+            <!-- ── Optional upgrade inputs ───────────────────────────────────── -->
             <div class="card mb-4">
                 <div class="card-header fw-semibold">
-                    What isn't working?
-                    <span class="text-muted fw-normal small ms-2">optional</span>
+                    Upgrade options
+                    <span class="text-muted fw-normal small ms-2">optional — used for Upgrade Paths</span>
                 </div>
                 <div class="card-body">
-                    <textarea class="form-control"
-                              rows="3"
+                    <label class="form-label small fw-semibold mb-1">What isn't working?</label>
+                    <textarea class="form-control mb-3"
+                              rows="2"
                               @bind="_userFeedback"
                               placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."
                               disabled="@(_selectedCommanders.Count == 0)"></textarea>
+                    <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                    <div class="input-group" style="max-width: 180px;">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control"
+                               min="0" step="0.5"
+                               placeholder="no limit"
+                               @bind="_maxUpgradePriceUsd"
+                               @bind:event="oninput" />
+                    </div>
                     <div class="text-muted small mt-1">
-                        Describing what isn't working helps weight the gap analysis toward your actual pain points.
+                        These inputs feed the <strong>Upgrade Paths</strong> tab after analysis completes. The problem description prioritizes which gaps to address first.
                     </div>
                 </div>
             </div>

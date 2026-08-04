@@ -14,6 +14,7 @@ namespace EdhDeckBuilder.Web.Components.Pages.Analysis;
 public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 {
     [Inject] private IDeckAnalyzer          Analyzer        { get; set; } = default!;
+    [Inject] private IDeckUpgrader          Upgrader        { get; set; } = default!;
     [Inject] private DecklistParser         Parser          { get; set; } = default!;
     [Inject] private ICardRepository        CardRepository  { get; set; } = default!;
     [Inject] private SessionApiKeyProvider  Keys            { get; set; } = default!;
@@ -54,6 +55,16 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     private DeckAnalysisResult? _result;
     private bool _copiedReport;
 
+    // ── Upgrade state ────────────────────────────────────────────────────────
+
+    private decimal? _maxUpgradePriceUsd;
+    private bool     _isLoadingUpgrades;
+    private bool     _upgradeStarted;
+    private string?  _upgradeCurrentStage;
+    private string?  _upgradeError;
+    private DeckUpgradeResult? _upgradeResult;
+    private CancellationTokenSource? _upgradeCts;
+
     protected override void OnInitialized()
     {
         ApiKeyState.OnChange += OnApiKeyStateChanged;
@@ -64,11 +75,13 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         ApiKeyState.OnChange -= OnApiKeyStateChanged;
         _cts?.Cancel();
         _cts?.Dispose();
+        _upgradeCts?.Cancel();
+        _upgradeCts?.Dispose();
     }
 
     // ── View state ──────────────────────────────────────────────────────────
 
-    private enum AnalysisView { ByRole, AllCards, ByType }
+    private enum AnalysisView { ByRole, AllCards, ByType, UpgradePaths }
     private AnalysisView _view = AnalysisView.ByRole;
 
     private bool _showCoverage = true;
@@ -128,6 +141,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     {
         _selectedCommanders = commanders;
         _result = null;
+        _upgradeResult = null;
         ClearValidation();
     }
 
@@ -154,6 +168,11 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _selectedCommanders.Count > 0 &&
         !string.IsNullOrWhiteSpace(_decklistText) &&
         !_isValidating &&
+        !_isAnalyzing;
+
+    private bool CanGetUpgrades =>
+        _result is not null &&
+        !_isLoadingUpgrades &&
         !_isAnalyzing;
 
     private async Task ValidateAsync()
@@ -186,6 +205,8 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     {
         _errorMessage = null;
         _result = null;
+        _upgradeResult = null;
+        _upgradeError = null;
         _completedStages = new List<string>();
         _currentStage = null;
         _currentStageDetail = null;
@@ -206,7 +227,6 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
             _result = await Analyzer.AnalyzeAsync(
                 _selectedCommanders,
                 entries,
-                string.IsNullOrWhiteSpace(_userFeedback) ? null : _userFeedback.Trim(),
                 async stage =>
                 {
                     await InvokeAsync(() =>
@@ -239,6 +259,13 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 _isAnalyzing = false;
                 StateHasChanged();
             });
+
+            // Auto-run upgrades if the user provided feedback or a budget cap
+            if (_result is not null &&
+                (_maxUpgradePriceUsd.HasValue || !string.IsNullOrWhiteSpace(_userFeedback)))
+            {
+                _ = AutoRunUpgradesAsync();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -285,13 +312,107 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 
     private void CancelAnalysis() => _cts?.Cancel();
 
+    // Called from onclick — switches to the Upgrade Paths tab and runs
+    private Task GetUpgradesAsync() => RunUpgradesAsync(switchView: true);
+
+    // Called automatically after analysis when the user pre-filled upgrade params
+    private Task AutoRunUpgradesAsync() => RunUpgradesAsync(switchView: false);
+
+    private async Task RunUpgradesAsync(bool switchView)
+    {
+        if (_result is null) return;
+
+        _upgradeError = null;
+        _upgradeResult = null;
+        _upgradeCurrentStage = null;
+        _isLoadingUpgrades = true;
+        _upgradeStarted = true;
+        if (switchView)
+            _view = AnalysisView.UpgradePaths;
+
+        _upgradeCts = new CancellationTokenSource();
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+
+        try
+        {
+            if (Keys.GetApiKey() is not null)
+                Upgrader.UsageTracker = new UsageTracker();
+
+            _upgradeResult = await Upgrader.UpgradeAsync(
+                _result,
+                string.IsNullOrWhiteSpace(_userFeedback) ? null : _userFeedback.Trim(),
+                _maxUpgradePriceUsd,
+                async stage =>
+                {
+                    await InvokeAsync(() =>
+                    {
+                        _upgradeCurrentStage = stage;
+                        StateHasChanged();
+                    });
+                    await Task.Yield();
+                },
+                _upgradeCts.Token);
+
+            await InvokeAsync(() =>
+            {
+                _upgradeCurrentStage = null;
+                _isLoadingUpgrades = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            await InvokeAsync(() =>
+            {
+                _isLoadingUpgrades = false;
+                _upgradeCurrentStage = null;
+                StateHasChanged();
+            });
+        }
+        catch (ApiKeyRejectedException)
+        {
+            await InvokeAsync(() =>
+            {
+                _isLoadingUpgrades = false;
+                _upgradeCurrentStage = null;
+                _upgradeError = "Your API key was rejected — please reconnect.";
+                ApiKeyState.NotifyChanged();
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isLoadingUpgrades = false;
+                _upgradeCurrentStage = null;
+                _upgradeError = ex.Message;
+                StateHasChanged();
+            });
+        }
+        finally
+        {
+            _upgradeCts?.Dispose();
+            _upgradeCts = null;
+        }
+    }
+
+    private void CancelUpgrades() => _upgradeCts?.Cancel();
+
     private void Reset()
     {
         _result = null;
+        _upgradeResult = null;
+        _upgradeError = null;
+        _upgradeCurrentStage = null;
+        _upgradeStarted = false;
         _errorMessage = null;
         _completedStages = new List<string>();
         _currentStage = null;
         _currentStageDetail = null;
+        _view = AnalysisView.ByRole;
         ClearValidation();
     }
 

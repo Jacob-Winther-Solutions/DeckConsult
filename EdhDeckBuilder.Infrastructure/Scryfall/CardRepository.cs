@@ -65,6 +65,7 @@ public sealed class CardRepository : ICardRepository
         return [.. index.ByName.Keys
             .Where(k => k.Contains(q, StringComparison.OrdinalIgnoreCase))
             .Select(k => index.ByName[k])
+            .DistinctBy(c => c.OracleId)
             .OrderBy(c => c.Name)];
     }
 
@@ -111,6 +112,18 @@ public sealed class CardRepository : ICardRepository
             if (dto is null) continue;
             var card = ScryfallMapper.ToCard(dto);
             byName.TryAdd(card.Name, card);
+            // Also index true MDFCs by their front-face name so "Bala Ged Recovery" resolves
+            // even when the pasted decklist omits the back face ("// Bala Ged Sanctuary").
+            // Reversible cards (e.g. "Plains // Plains") have identical face names and must
+            // not create aliases — doing so would corrupt lookups for the real card.
+            if (card.Name.Contains(" // ", StringComparison.Ordinal))
+            {
+                var sep = card.Name.IndexOf(" // ", StringComparison.Ordinal);
+                var frontFace = card.Name[..sep];
+                var backFace  = card.Name[(sep + 4)..];
+                if (!string.Equals(frontFace, backFace, StringComparison.Ordinal))
+                    byName.TryAdd(frontFace, card);
+            }
             byScryfallId.TryAdd(card.ScryfallId, card);
             if (byOracleId.TryAdd(card.OracleId, card))
             {

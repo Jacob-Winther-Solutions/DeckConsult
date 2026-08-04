@@ -194,7 +194,7 @@ effect, clear the cookie or use an incognito window.
 dotnet restore
 dotnet build
 
-# Run all 337 tests:
+# Run all 399 tests:
 dotnet test Tests
 
 # Run the app:
@@ -278,6 +278,7 @@ Components/
 ├── Pages/
 │   ├── CommanderBuilder/  # CommanderBuilder page + GuidedCommanderBuilderTab + CustomCommanderBuilderTab
 │   ├── Discovery/          # CommanderDiscovery page + GuidedDiscoveryTab + CustomDiscoveryTab
+│   ├── Analysis/           # DeckAnalyzerPage (paste decklist → coverage + upgrade paths)
 │   └── (other pages)       # DeckResultsPage, Home, etc.
 ├── Forms/              # Input controls & pickers (ArchetypePicker, BracketPicker, BudgetPicker, ColorIdentityPicker, CommanderPicker, ThemePicker)
 ├── Shared/             # Reusable UI components (ApiKeySettings, ColorIdentityPips, CommanderSuggestionCard)
