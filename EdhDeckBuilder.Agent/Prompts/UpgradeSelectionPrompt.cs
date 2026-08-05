@@ -50,11 +50,11 @@ public static class UpgradeSelectionPrompt
         sb.AppendLine();
         sb.AppendLine($"Player reports: \"{userFeedback}\"");
         sb.AppendLine();
-        sb.AppendLine("Coverage gaps (ordered by shortfall):");
+        sb.AppendLine("Role coverage (actual vs. ideal, ordered by shortfall):");
         foreach (var gap in gaps)
             sb.AppendLine($"  {RoleName(gap.Role)} — actual {gap.ActualCoverage:0.#}, ideal {gap.IdealTarget}, shortfall {gap.Shortfall:0.#}");
         sb.AppendLine();
-        sb.AppendLine("Reorder the roles so the most relevant to the player's issue comes first.");
+        sb.AppendLine("Reorder the roles so the most relevant to the player's stated issue comes first. Include roles even if shortfall is small — player feedback takes priority over gap size.");
         return sb.ToString();
     }
 
@@ -125,7 +125,8 @@ public static class UpgradeSelectionPrompt
         IReadOnlyDictionary<CardRole, double> actualCoverage,
         IReadOnlyList<Card> commanders,
         string? userFeedback,
-        decimal? maxCardPriceUsd)
+        decimal? maxCardPriceUsd,
+        IReadOnlyDictionary<CardRole, RoleTarget> targets)
     {
         var sb = new StringBuilder();
 
@@ -143,8 +144,8 @@ public static class UpgradeSelectionPrompt
         sb.AppendLine();
 
         // Coverage table — lets model see over-filled roles for cut candidates
-        sb.AppendLine("Current coverage vs. Balanced baseline:");
-        foreach (var (role, target) in DeckTemplate.Balanced.Targets)
+        sb.AppendLine("Current coverage vs. targets:");
+        foreach (var (role, target) in targets)
         {
             var actual  = actualCoverage.GetValueOrDefault(role, 0.0);
             var status  = actual >= target.Max ? "OVER" : actual >= target.Min ? "OK" : "LOW";

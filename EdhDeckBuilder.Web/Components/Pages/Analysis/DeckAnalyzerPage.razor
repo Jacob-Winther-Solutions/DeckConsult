@@ -103,20 +103,44 @@
             @if (_view == AnalysisView.ByRole)
             {
                 <!-- ── Coverage summary ──────────────────────────────────────── -->
+                var effectiveTargets = GetEffectiveTargets();
                 <div class="card mb-3 mx-3">
-                    <div class="card-header d-flex align-items-center">
-                        <span class="fw-semibold me-auto">Coverage vs. Balanced Midrange baseline</span>
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span class="fw-semibold me-auto">
+                            Coverage vs. @(_customIdeal.Count > 0 ? "custom" : "balanced midrange") targets
+                        </span>
+                        @if (_customIdeal.Count > 0 && !_editingTargets)
+                        {
+                            <button class="btn btn-sm btn-link text-muted py-0"
+                                    @onclick="() => { _customIdeal.Clear(); }">Reset</button>
+                        }
+                        <button class="btn btn-sm btn-link @(_editingTargets ? "text-primary fw-semibold" : "text-muted") py-0"
+                                @onclick="() => _editingTargets = !_editingTargets">
+                            @(_editingTargets ? "Done" : "Customize")
+                        </button>
                         <button class="btn btn-sm btn-link text-muted py-0" @onclick="() => _showCoverage = !_showCoverage">
                             @(_showCoverage ? "Hide" : "Show")
                         </button>
                     </div>
                     @if (_showCoverage)
                     {
+                        @if (!_editingTargets)
+                        {
+                            <div class="px-3 pt-2 pb-1">
+                                <small class="text-muted">
+                                    These targets determine which roles are treated as gaps when generating
+                                    <strong>Upgrade Paths</strong>. Use <em>Customize</em> to adjust them for
+                                    your playstyle, or change them directly in the Upgrade Paths tab.
+                                </small>
+                            </div>
+                        }
                         <table class="table table-sm mb-0 align-middle">
                             <thead class="text-muted" style="font-size: 0.8rem;">
                                 <tr>
                                     <th class="ps-3 fw-normal">Role</th>
-                                    <th class="text-center fw-normal">Baseline (min&ndash;ideal&ndash;max)</th>
+                                    <th class="text-center fw-normal">
+                                        @(_editingTargets ? "Ideal" : "Baseline (min–ideal–max)")
+                                    </th>
                                     <th class="text-center fw-normal">Actual</th>
                                     <th class="pe-3 fw-normal" style="min-width: 140px;"></th>
                                 </tr>
@@ -124,17 +148,31 @@
                             <tbody>
                                 @foreach (var role in RoleDisplayOrder)
                                 {
-                                    if (!DeckTemplate.Balanced.Targets.TryGetValue(role, out var target)) continue;
+                                    if (!effectiveTargets.TryGetValue(role, out var target)) continue;
                                     var actual = _result.ActualCoverage.GetValueOrDefault(role, 0.0);
                                     var barPct = target.Ideal > 0
                                         ? Math.Min(100.0, actual / target.Ideal * 100.0)
                                         : 0.0;
                                     var isOk = actual >= target.Min;
+                                    var isCustom = _customIdeal.ContainsKey(role);
                                     <tr>
                                         <td class="ps-3">@CardRoleDisplay.RoleName(role)</td>
-                                        <td class="text-center text-muted" style="font-size: 0.8rem;">
-                                            @target.Min&ndash;@target.Ideal&ndash;@target.Max
-                                        </td>
+                                        @if (_editingTargets)
+                                        {
+                                            <td class="text-center">
+                                                <input type="number" class="form-control form-control-sm text-center"
+                                                       style="width: 72px; display: inline-block;"
+                                                       min="0" max="40"
+                                                       value="@target.Ideal"
+                                                       @onchange="e => SetCustomIdeal(role, e.Value)" />
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-center text-muted" style="font-size: 0.8rem;">
+                                                @target.Min&ndash;<strong class="@(isCustom ? "text-primary" : "")">@target.Ideal</strong>&ndash;@target.Max
+                                            </td>
+                                        }
                                         <td class="text-center">
                                             <span class="badge @(isOk ? "bg-success" : "bg-warning text-dark")">
                                                 @actual.ToString("0.#")
@@ -155,12 +193,13 @@
                 </div>
 
                 <!-- ── Role gaps ─────────────────────────────────────────────── -->
-                @if (_result.RoleGaps.Count > 0)
+                var currentGaps = GetCurrentGaps();
+                @if (currentGaps.Count > 0)
                 {
                     <div class="alert alert-warning mx-3 mb-3">
-                        <strong>Role gaps vs. balanced baseline</strong>
+                        <strong>Role gaps vs. @(_customIdeal.Count > 0 ? "custom" : "balanced") targets</strong>
                         <ul class="mb-0 mt-1 small">
-                            @foreach (var gap in _result.RoleGaps)
+                            @foreach (var gap in currentGaps)
                             {
                                 <li>
                                     <strong>@CardRoleDisplay.RoleName(gap.Role):</strong>
@@ -448,6 +487,7 @@
                                     Retry
                                 </button>
                             </div>
+                            @RoleTargetEditor
                         </div>
                     </div>
                 }
@@ -479,6 +519,7 @@
                             <div class="text-muted small mt-2">
                                 Suggestions are drawn from the EDHREC pool for your commander and prioritize your biggest coverage gaps. Leave the budget empty to consider all cards.
                             </div>
+                            @RoleTargetEditor
                         </div>
                     </div>
                 }
@@ -509,6 +550,7 @@
                                     Try Again
                                 </button>
                             </div>
+                            @RoleTargetEditor
                         </div>
                     </div>
                 }
@@ -533,6 +575,7 @@
                                         disabled="@(!CanGetUpgrades)"
                                         @onclick="GetUpgradesAsync">Refresh</button>
                             </div>
+                            @RoleTargetEditor
                         </div>
                     </div>
                     @foreach (var roleUpgrade in _upgradeResult!.RoleUpgrades)

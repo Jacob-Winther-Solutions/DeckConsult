@@ -5,6 +5,7 @@ using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Agent.Prompts;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Decks;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,6 +27,7 @@ public sealed class DeckUpgrader(
         DeckAnalysisResult analysis,
         string? userFeedback,
         decimal? maxCardPriceUsd,
+        IReadOnlyDictionary<CardRole, RoleTarget>? customTargets = null,
         Func<string, Task>? progress = null,
         CancellationToken ct = default)
     {
@@ -68,12 +70,16 @@ public sealed class DeckUpgrader(
 
         var classifiedById = classified.ToDictionary(r => r.OracleId);
 
-        // 6. Prioritize gaps
-        var gaps = analysis.RoleGaps.Take(TopGapCount).ToList();
-        if (gaps.Count == 0)
+        // 6. Prioritize gaps against the effective targets (custom or balanced default)
+        var targets       = customTargets ?? DeckTemplate.Balanced.Targets;
+        var candidateGaps = BuildCandidateGaps(analysis.ActualCoverage, userFeedback, targets);
+
+        if (candidateGaps.Count == 0)
             return new DeckUpgradeResult { RoleUpgrades = [] };
 
-        var prioritizedGaps = await PrioritizeGapsAsync(gaps, userFeedback, analysis.Commanders, ct);
+        var prioritizedGaps = (await PrioritizeGapsAsync(candidateGaps, userFeedback, analysis.Commanders, ct))
+            .Take(TopGapCount)
+            .ToList();
 
         // 7. Select upgrades per gap
         var roleUpgrades = new List<RoleUpgrade>();
@@ -109,7 +115,7 @@ public sealed class DeckUpgrader(
             if (cutPool.Count == 0) break;
 
             var suggestions = await SelectUpgradesAsync(
-                gap, roleCandidates, cutPool, analysis, userFeedback, maxCardPriceUsd, ct);
+                gap, roleCandidates, cutPool, analysis, userFeedback, maxCardPriceUsd, targets, ct);
 
             if (suggestions.Count == 0) continue;
 
@@ -123,6 +129,50 @@ public sealed class DeckUpgrader(
 
         logger.LogInformation("DeckUpgrade_Complete: {Gaps} gaps addressed", roleUpgrades.Count);
         return new DeckUpgradeResult { RoleUpgrades = roleUpgrades };
+    }
+
+    // ── Gap expansion ──────────────────────────────────────────────────────
+
+    private static IReadOnlyList<RoleGap> BuildCandidateGaps(
+        IReadOnlyDictionary<CardRole, double> actualCoverage,
+        string? userFeedback,
+        IReadOnlyDictionary<CardRole, RoleTarget> targets)
+    {
+        // Hard gaps: roles below Min according to the effective targets
+        var hardGaps = targets
+            .Where(kv => kv.Key != CardRole.Land)
+            .Select(kv => (Role: kv.Key, Target: kv.Value, Actual: actualCoverage.GetValueOrDefault(kv.Key)))
+            .Where(x => x.Actual < x.Target.Min)
+            .Select(x => new RoleGap
+            {
+                Role           = x.Role,
+                ActualCoverage = x.Actual,
+                IdealTarget    = x.Target.Ideal,
+                Shortfall      = x.Target.Ideal - x.Actual,
+            })
+            .OrderByDescending(g => g.Shortfall)
+            .ToList();
+
+        if (string.IsNullOrWhiteSpace(userFeedback))
+            return hardGaps.Take(TopGapCount).ToList();
+
+        // Expand: include roles below Ideal (not just below Min) so feedback can surface them.
+        var hardRoles = hardGaps.Select(g => g.Role).ToHashSet();
+        var softGaps = targets
+            .Where(kv =>
+                kv.Key != CardRole.Land &&
+                !hardRoles.Contains(kv.Key) &&
+                actualCoverage.GetValueOrDefault(kv.Key) < kv.Value.Ideal)
+            .Select(kv => new RoleGap
+            {
+                Role           = kv.Key,
+                ActualCoverage = actualCoverage.GetValueOrDefault(kv.Key),
+                IdealTarget    = kv.Value.Ideal,
+                Shortfall      = kv.Value.Ideal - actualCoverage.GetValueOrDefault(kv.Key),
+            })
+            .ToList();
+
+        return [.. hardGaps, .. softGaps];
     }
 
     // ── Pool gathering ─────────────────────────────────────────────────────
@@ -215,6 +265,7 @@ public sealed class DeckUpgrader(
         DeckAnalysisResult analysis,
         string? userFeedback,
         decimal? maxCardPriceUsd,
+        IReadOnlyDictionary<CardRole, RoleTarget> targets,
         CancellationToken ct)
     {
         try
@@ -223,7 +274,7 @@ public sealed class DeckUpgrader(
             var model   = llmFactory.SelectedModel;
             var message = UpgradeSelectionPrompt.FormatSelectionMessage(
                 gap, candidates, cutPool, analysis.ActualCoverage,
-                analysis.Commanders, userFeedback, maxCardPriceUsd);
+                analysis.Commanders, userFeedback, maxCardPriceUsd, targets);
 
             var request = new LlmRequest
             {

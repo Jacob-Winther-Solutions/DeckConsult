@@ -5,6 +5,7 @@ using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -90,6 +91,137 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _comboCts?.Cancel();
         _comboCts?.Dispose();
     }
+
+    // ── Custom targets ──────────────────────────────────────────────────────
+
+    private readonly Dictionary<CardRole, int> _customIdeal = new();
+    private bool _editingTargets;
+    private bool _showTargetEditor;
+
+    private IReadOnlyDictionary<CardRole, RoleTarget> GetEffectiveTargets()
+    {
+        if (_customIdeal.Count == 0) return DeckTemplate.Balanced.Targets;
+        return DeckTemplate.Balanced.Targets.ToDictionary(
+            kv => kv.Key,
+            kv =>
+            {
+                if (!_customIdeal.TryGetValue(kv.Key, out var ideal)) return kv.Value;
+                var minDelta = kv.Value.Ideal - kv.Value.Min;
+                var maxDelta = kv.Value.Max - kv.Value.Ideal;
+                return new RoleTarget(Math.Max(0, ideal - minDelta), ideal, ideal + maxDelta);
+            });
+    }
+
+    private IReadOnlyList<RoleGap> GetCurrentGaps()
+    {
+        if (_result is null) return [];
+        var targets = GetEffectiveTargets();
+        return targets
+            .Where(kv => kv.Key != CardRole.Land)
+            .Select(kv => (Role: kv.Key, Target: kv.Value, Actual: _result.ActualCoverage.GetValueOrDefault(kv.Key)))
+            .Where(x => x.Actual < x.Target.Min)
+            .Select(x => new RoleGap
+            {
+                Role           = x.Role,
+                ActualCoverage = x.Actual,
+                IdealTarget    = x.Target.Ideal,
+                Shortfall      = x.Target.Ideal - x.Actual,
+            })
+            .OrderByDescending(g => g.Shortfall)
+            .ToList();
+    }
+
+    private void SetCustomIdeal(CardRole role, object? value)
+    {
+        if (!int.TryParse(value?.ToString(), out var ideal) || ideal < 0) return;
+        if (DeckTemplate.Balanced.Targets.TryGetValue(role, out var t) && t.Ideal == ideal)
+            _customIdeal.Remove(role);
+        else
+            _customIdeal[role] = ideal;
+    }
+
+    private RenderFragment RoleTargetEditor => __builder =>
+    {
+        __builder.OpenElement(0, "div");
+        __builder.AddAttribute(1, "class", "border-top mt-3 pt-3");
+
+        __builder.OpenElement(2, "div");
+        __builder.AddAttribute(3, "class", "d-flex align-items-center gap-2 mb-1");
+
+        __builder.OpenElement(4, "button");
+        __builder.AddAttribute(5, "class", $"btn btn-sm btn-link p-0 {(_showTargetEditor ? "text-primary" : "text-muted")}");
+        __builder.AddAttribute(6, "onclick", EventCallback.Factory.Create(this, () => _showTargetEditor = !_showTargetEditor));
+        __builder.AddContent(7, _showTargetEditor ? "▲ Hide role targets" : "▼ Adjust role targets");
+        __builder.CloseElement();
+
+        if (_customIdeal.Count > 0)
+        {
+            __builder.OpenElement(8, "span");
+            __builder.AddAttribute(9, "class", "badge bg-primary");
+            __builder.AddAttribute(10, "style", "font-size: 0.65rem;");
+            __builder.AddContent(11, $"{_customIdeal.Count} custom");
+            __builder.CloseElement();
+        }
+
+        __builder.CloseElement(); // d-flex
+
+        if (_showTargetEditor)
+        {
+            __builder.OpenElement(12, "p");
+            __builder.AddAttribute(13, "class", "text-muted small mt-1 mb-2");
+            __builder.AddContent(14,
+                "Set the ideal count for each role. A higher ideal creates a larger gap and makes that role " +
+                "more likely to appear in upgrade suggestions. Changes here are also reflected in the Coverage tab.");
+            __builder.CloseElement();
+
+            __builder.OpenElement(15, "div");
+            __builder.AddAttribute(16, "class", "row row-cols-2 row-cols-sm-3 g-2 mb-2");
+
+            // Sequence numbers 17–28 are used per-iteration (constant within loop = correct for Blazor diffing)
+            foreach (var role in RoleDisplayOrder)
+            {
+                if (!DeckTemplate.Balanced.Targets.TryGetValue(role, out var baseTarget)) continue;
+                var effectiveIdeal = _customIdeal.TryGetValue(role, out var ci) ? ci : baseTarget.Ideal;
+                var isCustom = _customIdeal.ContainsKey(role);
+                var capturedRole = role;
+
+                __builder.OpenElement(17, "div");
+                __builder.AddAttribute(18, "class", "col");
+
+                __builder.OpenElement(19, "label");
+                __builder.AddAttribute(20, "class", $"form-label small mb-1 {(isCustom ? "text-primary fw-semibold" : "text-muted")}");
+                __builder.AddContent(21, CardRoleDisplay.RoleName(role) + (isCustom ? " *" : ""));
+                __builder.CloseElement();
+
+                __builder.OpenElement(22, "input");
+                __builder.AddAttribute(23, "type", "number");
+                __builder.AddAttribute(24, "class", "form-control form-control-sm");
+                __builder.AddAttribute(25, "min", "0");
+                __builder.AddAttribute(26, "max", "40");
+                __builder.AddAttribute(27, "value", effectiveIdeal);
+                __builder.AddAttribute(28, "onchange",
+                    EventCallback.Factory.Create<Microsoft.AspNetCore.Components.ChangeEventArgs>(
+                        this, e => SetCustomIdeal(capturedRole, e.Value)));
+                __builder.CloseElement();
+
+                __builder.CloseElement(); // col
+            }
+
+            __builder.CloseElement(); // row
+
+            if (_customIdeal.Count > 0)
+            {
+                __builder.OpenElement(29, "button");
+                __builder.AddAttribute(30, "class", "btn btn-sm btn-link text-danger p-0");
+                __builder.AddAttribute(31, "onclick",
+                    EventCallback.Factory.Create(this, () => _customIdeal.Clear()));
+                __builder.AddContent(32, "Reset to defaults");
+                __builder.CloseElement();
+            }
+        }
+
+        __builder.CloseElement(); // border-top div
+    };
 
     // ── View state ──────────────────────────────────────────────────────────
 
@@ -346,6 +478,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 _result,
                 string.IsNullOrWhiteSpace(_userFeedback) ? null : _userFeedback.Trim(),
                 _maxUpgradePriceUsd,
+                _customIdeal.Count > 0 ? GetEffectiveTargets() : null,
                 async stage =>
                 {
                     await InvokeAsync(() =>
@@ -405,6 +538,9 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 
     private void Reset()
     {
+        _customIdeal.Clear();
+        _editingTargets = false;
+        _showTargetEditor = false;
         _result = null;
         _upgradeResult = null;
         _upgradeError = null;

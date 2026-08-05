@@ -130,6 +130,7 @@ public partial class DeckResults : ComponentBase, IDisposable
                 AnalysisResult,
                 string.IsNullOrWhiteSpace(_userFeedback) ? null : _userFeedback.Trim(),
                 _maxUpgradePriceUsd,
+                null,
                 async stage =>
                 {
                     await InvokeAsync(() =>
