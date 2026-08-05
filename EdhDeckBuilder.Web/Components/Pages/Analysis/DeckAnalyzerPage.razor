@@ -453,16 +453,13 @@
                 }
                 else if (!_upgradeStarted)
                 {
-                    <!-- Not yet run — show budget form -->
                     <div class="card mx-3 mb-3">
                         <div class="card-header fw-semibold">Get Upgrade Suggestions</div>
                         <div class="card-body">
-                            @if (!string.IsNullOrWhiteSpace(_userFeedback))
-                            {
-                                <div class="alert alert-info py-2 small mb-3">
-                                    <strong>Problem statement:</strong> @_userFeedback
-                                </div>
-                            }
+                            <label class="form-label small fw-semibold mb-1">What isn't working? (optional)</label>
+                            <textarea class="form-control mb-3" rows="2"
+                                      @bind="_userFeedback"
+                                      placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."></textarea>
                             <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
                             <div class="d-flex gap-2 align-items-center">
                                 <div class="input-group" style="max-width: 180px;">
@@ -492,7 +489,11 @@
                     </div>
                     <div class="card mx-3 mb-3">
                         <div class="card-body">
-                            <label class="form-label small fw-semibold mb-1">Try a different budget cap</label>
+                            <label class="form-label small fw-semibold mb-1">What isn't working? (optional)</label>
+                            <textarea class="form-control mb-3" rows="2"
+                                      @bind="_userFeedback"
+                                      placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."></textarea>
+                            <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
                             <div class="d-flex gap-2 align-items-center">
                                 <div class="input-group" style="max-width: 180px;">
                                     <span class="input-group-text">$</span>
@@ -513,8 +514,26 @@
                 }
                 else
                 {
-                    <div class="mb-3 mx-3 d-flex justify-content-end">
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="GetUpgradesAsync">Refresh</button>
+                    <div class="card mx-3 mb-4">
+                        <div class="card-body">
+                            <label class="form-label small fw-semibold mb-1">What isn't working? (optional)</label>
+                            <textarea class="form-control mb-3" rows="2"
+                                      @bind="_userFeedback"
+                                      placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."></textarea>
+                            <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="input-group" style="max-width: 180px;">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" min="0" step="0.5"
+                                           placeholder="no limit"
+                                           @bind="_maxUpgradePriceUsd"
+                                           @bind:event="oninput" />
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm"
+                                        disabled="@(!CanGetUpgrades)"
+                                        @onclick="GetUpgradesAsync">Refresh</button>
+                            </div>
+                        </div>
                     </div>
                     @foreach (var roleUpgrade in _upgradeResult!.RoleUpgrades)
                     {
@@ -947,34 +966,6 @@
                             </ul>
                         </div>
                     }
-                </div>
-            </div>
-
-            <!-- ── Optional upgrade inputs ───────────────────────────────────── -->
-            <div class="card mb-4">
-                <div class="card-header fw-semibold">
-                    Upgrade options
-                    <span class="text-muted fw-normal small ms-2">optional — used for Upgrade Paths</span>
-                </div>
-                <div class="card-body">
-                    <label class="form-label small fw-semibold mb-1">What isn't working?</label>
-                    <textarea class="form-control mb-3"
-                              rows="2"
-                              @bind="_userFeedback"
-                              placeholder="e.g. I always struggle to recover from a board wipe, and I can never close out games."
-                              disabled="@(_selectedCommanders.Count == 0)"></textarea>
-                    <label class="form-label small fw-semibold mb-1">Max price per card (USD)</label>
-                    <div class="input-group" style="max-width: 180px;">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control"
-                               min="0" step="0.5"
-                               placeholder="no limit"
-                               @bind="_maxUpgradePriceUsd"
-                               @bind:event="oninput" />
-                    </div>
-                    <div class="text-muted small mt-1">
-                        These inputs feed the <strong>Upgrade Paths</strong> tab after analysis completes. The problem description prioritizes which gaps to address first.
-                    </div>
                 </div>
             </div>
 

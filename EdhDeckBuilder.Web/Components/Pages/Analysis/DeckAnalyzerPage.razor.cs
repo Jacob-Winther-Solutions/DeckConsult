@@ -272,12 +272,6 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 StateHasChanged();
             });
 
-            // Auto-run upgrades if the user provided feedback or a budget cap
-            if (_result is not null &&
-                (_maxUpgradePriceUsd.HasValue || !string.IsNullOrWhiteSpace(_userFeedback)))
-            {
-                _ = AutoRunUpgradesAsync();
-            }
         }
         catch (OperationCanceledException)
         {
@@ -324,11 +318,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 
     private void CancelAnalysis() => _cts?.Cancel();
 
-    // Called from onclick — switches to the Upgrade Paths tab and runs
     private Task GetUpgradesAsync() => RunUpgradesAsync(switchView: true);
-
-    // Called automatically after analysis when the user pre-filled upgrade params
-    private Task AutoRunUpgradesAsync() => RunUpgradesAsync(switchView: false);
 
     private async Task RunUpgradesAsync(bool switchView)
     {
