@@ -545,6 +545,50 @@ Available as the "By Mana Value" tab on both `/analyze` and the DeckResults page
 
 ---
 
+## Component refactoring
+
+`DeckResults.razor` (915 lines) and `DeckAnalyzerPage.razor` (1 033 lines) each host several
+view-tab blocks whose markup is near-identical. Extracting these into shared components follows
+the same pattern as `ManaCurveChart` and makes both files easier to read and reason about.
+
+Candidates, roughly ordered by impact vs. effort:
+
+- [ ] **Move `SecondaryBadge` / `BadgeInfo` into `CardRoleDisplay`.**
+  The private `BadgeInfo` record and `SecondaryBadge(RoleContribution)` helper are duplicated in
+  `DeckResults.razor.cs`, `DeckAnalyzerPage.razor.cs`, and `ManaCurveChart.razor.cs`. Adding them
+  to `CardRoleDisplay` (static) removes all three copies and lets any future component use them
+  without re-declaring the type. Lowest risk, smallest change.
+
+- [ ] **`<UpgradePathsPanel>` shared component.**
+  The Upgrade Paths tab is ~163 lines in `DeckResults` and ~200 lines in `DeckAnalyzerPage`;
+  the markup is line-for-line identical. Parameters needed: `AnalysisResult`, `Upgrader`,
+  `Keys`, `ApiKeyState`, `MaxCardPriceUsd?` (initial value, two-way bindable or callback).
+  State (`_userFeedback`, `_maxUpgradePriceUsd`, `_isLoadingUpgrades`, `_upgradeResult`, etc.)
+  and the async run/cancel logic move into the component's code-behind. Both pages replace their
+  block with `<UpgradePathsPanel ... />`. Highest duplication by raw line count.
+
+- [ ] **`<CombosPanel>` shared component.**
+  The Combos tab is ~196 lines in `DeckResults` and similarly sized in `DeckAnalyzerPage`.
+  Parameters: `AnalysisResult`, `ComboFinder`. State (`_isLoadingCombos`, `_comboResult`,
+  `_expandedCombos`, run/cancel) and `ToggleCombo` move into the component. Structurally the
+  same extraction as `UpgradePathsPanel`.
+
+- [ ] **`<CardsByTypeList>` shared component.**
+  The By Type tab is ~90 lines in each page (nearly identical). Parameters: `Cards`
+  (`IReadOnlyList<AnalyzedCard>`), `BasicLandCounts`, optional `IsOverBudget` callback (only
+  `DeckResults` needs this). Collapse state per bucket stays inside the component.
+
+- [ ] **`<CoverageReportPanel>` shared component.**
+  The By Role (Coverage Report) tab is ~300 lines in each page and is the largest remaining
+  duplicated block. It needs: `AnalysisResult`, `RoleDisplayOrder`, optional `IsOverBudget`
+  callback, optional locked-card awareness. More parameters than the others but structurally
+  the same pattern.
+
+After these extractions, both host files become thin nav-tab shells that simply switch between
+`<ComponentName ... />` blocks — no view logic inline.
+
+---
+
 ## Potential upgrades
 
 Features and enhancements worth considering for future iterations:
