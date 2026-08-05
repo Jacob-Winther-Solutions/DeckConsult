@@ -67,6 +67,20 @@ public static class CardRoleDisplay
         _                           => role.ToString(),
     };
 
+    public static string CardTypeBucket(Card card)
+    {
+        var tl = card.TypeLine;
+        if (tl.Contains("Creature",     StringComparison.OrdinalIgnoreCase)) return "Creature";
+        if (tl.Contains("Planeswalker", StringComparison.OrdinalIgnoreCase)) return "Planeswalker";
+        if (tl.Contains("Instant",      StringComparison.OrdinalIgnoreCase)) return "Instant";
+        if (tl.Contains("Sorcery",      StringComparison.OrdinalIgnoreCase)) return "Sorcery";
+        if (tl.Contains("Artifact",     StringComparison.OrdinalIgnoreCase)) return "Artifact";
+        if (tl.Contains("Enchantment",  StringComparison.OrdinalIgnoreCase)) return "Enchantment";
+        if (tl.Contains("Battle",       StringComparison.OrdinalIgnoreCase)) return "Battle";
+        if (tl.Contains("Land",         StringComparison.OrdinalIgnoreCase)) return "Land";
+        return "Other";
+    }
+
     public static string PrimaryRoleBadgeClass(CardRole role) => role switch
     {
         CardRole.Plan               => "bg-primary",

@@ -225,7 +225,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 
     // ── View state ──────────────────────────────────────────────────────────
 
-    private enum AnalysisView { ByRole, AllCards, ByType, UpgradePaths, Combos }
+    private enum AnalysisView { ByRole, AllCards, ByType, ByManaValue, UpgradePaths, Combos }
     private AnalysisView _view = AnalysisView.ByRole;
 
     private bool _showCoverage = true;
@@ -248,20 +248,6 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     private static readonly CardRole[] RoleDisplayOrder = CardRoleDisplay.DisplayOrder;
     private static readonly string[]   TypeOrder        = CardRoleDisplay.TypeOrder;
 
-    private static string CardTypeBucket(Card card)
-    {
-        var tl = card.TypeLine;
-        if (tl.Contains("Creature",     StringComparison.OrdinalIgnoreCase)) return "Creature";
-        if (tl.Contains("Planeswalker", StringComparison.OrdinalIgnoreCase)) return "Planeswalker";
-        if (tl.Contains("Instant",      StringComparison.OrdinalIgnoreCase)) return "Instant";
-        if (tl.Contains("Sorcery",      StringComparison.OrdinalIgnoreCase)) return "Sorcery";
-        if (tl.Contains("Artifact",     StringComparison.OrdinalIgnoreCase)) return "Artifact";
-        if (tl.Contains("Enchantment",  StringComparison.OrdinalIgnoreCase)) return "Enchantment";
-        if (tl.Contains("Battle",       StringComparison.OrdinalIgnoreCase)) return "Battle";
-        if (tl.Contains("Land",         StringComparison.OrdinalIgnoreCase)) return "Land";
-        return "Other";
-    }
-
     private static BadgeInfo SecondaryBadge(RoleContribution contrib)
     {
         var name = CardRoleDisplay.RoleName(contrib.Role);
@@ -278,6 +264,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     }
 
     private sealed record BadgeInfo(string CssClass, string Label, string Tooltip);
+
 
     private void OnApiKeyStateChanged() => InvokeAsync(StateHasChanged);
 

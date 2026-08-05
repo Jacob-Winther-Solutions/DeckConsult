@@ -1,0 +1,253 @@
+@{
+    var (curveBuckets, avgMv, totalSpells, totalLands, mdfcLandCount, maxScale) = GetManaCurveData();
+    var typeDist   = GetTypeDistribution();
+    var ci         = System.Globalization.CultureInfo.InvariantCulture;
+    var yTicks     = Enumerable.Range(1, maxScale / 5).Select(i => i * 5).ToArray();
+    var splinePath = GetSplinePath(curveBuckets, maxScale);
+
+    var allCards  = AnalysisResult.CommanderCards.Concat(AnalysisResult.Cards).ToList();
+    var spellList = allCards.Where(c => CardRoleDisplay.CardTypeBucket(c.Card) != "Land").ToList();
+    var landList  = allCards.Where(c => CardRoleDisplay.CardTypeBucket(c.Card) == "Land")
+                            .OrderBy(c => c.Card.ManaValue).ThenBy(c => c.Card.Name).ToList();
+    var mvGroups  = Enumerable.Range(0, 8).Select(i =>
+    {
+        var label = i == 7 ? "7+" : i.ToString();
+        var cards = spellList
+            .Where(c => i == 7 ? (int)Math.Floor(c.Card.ManaValue) >= 7 : (int)Math.Floor(c.Card.ManaValue) == i)
+            .OrderBy(c => c.Card.ManaValue).ThenBy(c => c.Card.Name)
+            .ToList();
+        return (Label: label, Cards: cards);
+    }).Where(g => g.Cards.Count > 0).ToList();
+}
+
+<!-- ── Summary stats ──────────────────────────────────────────────────── -->
+<div class="d-flex flex-wrap gap-4 px-3 mb-4">
+    <div>
+        <div class="text-muted small">Avg. Mana Value</div>
+        <div class="fw-semibold fs-4">@avgMv.ToString("0.00", ci)</div>
+    </div>
+    <div>
+        <div class="text-muted small">Non-land cards</div>
+        <div class="fw-semibold fs-4">@totalSpells</div>
+    </div>
+    <div>
+        <div class="text-muted small">Lands</div>
+        <div class="fw-semibold fs-4">
+            @totalLands
+            @if (mdfcLandCount > 0)
+            {
+                <span class="text-muted fw-normal" style="font-size:0.75rem;"> (+ @mdfcLandCount MDFCs)</span>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ── Bar chart with Y-axis ─────────────────────────────────────────── -->
+<div class="card mx-3 mb-3">
+    <div class="card-body">
+        <div class="d-flex" style="align-items:flex-start;">
+
+            <!-- Y-axis tick labels -->
+            <div style="width:28px; position:relative; height:180px; flex-shrink:0;">
+                @foreach (var tick in yTicks)
+                {
+                    var labelTopPct = (1.0 - tick / (double)maxScale) * 100.0;
+                    <div style="position:absolute; right:4px; top:calc(@(labelTopPct.ToString("0.0", ci))% - 7px);
+                                font-size:0.65rem; line-height:14px; color:var(--bs-secondary-color, #6c757d); text-align:right;">
+                        @tick
+                    </div>
+                }
+            </div>
+
+            <!-- Chart area: grid lines + bars + spline -->
+            <div style="flex:1; position:relative;">
+
+                <div style="height:180px; position:relative;">
+
+                    <!-- Baseline -->
+                    <div style="position:absolute; left:0; right:0; bottom:0; border-top:1px solid rgba(128,128,128,0.35);"></div>
+
+                    <!-- Horizontal reference lines -->
+                    @foreach (var tick in yTicks)
+                    {
+                        var gridTopPct = (1.0 - tick / (double)maxScale) * 100.0;
+                        <div style="position:absolute; left:0; right:0;
+                                    top:@(gridTopPct.ToString("0.0", ci))%;
+                                    border-top:1px dashed rgba(128,128,128,0.2);"></div>
+                    }
+
+                    <!-- Bars -->
+                    <div style="position:absolute; left:0; right:0; top:0; bottom:0;
+                                display:flex; align-items:flex-end; gap:4px; padding:0 2px;">
+                        @foreach (var bucket in curveBuckets)
+                        {
+                            <div style="flex:1; display:flex; flex-direction:column;
+                                        align-items:center; justify-content:flex-end; height:100%;">
+                                @if (bucket.Count > 0)
+                                {
+                                    <div style="width:75%; height:@(bucket.BarHeightPx.ToString("0.0", ci))px;
+                                                background:var(--bs-primary); border-radius:3px 3px 0 0;
+                                                position:relative;">
+                                        <div style="position:absolute; bottom:100%; left:50%;
+                                                    transform:translateX(-50%); margin-bottom:2px;
+                                                    font-size:0.7rem; white-space:nowrap;
+                                                    color:var(--bs-secondary-color, #6c757d);">
+                                            @bucket.Count
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Smooth spline overlay (Catmull-Rom → cubic bezier) -->
+                    @if (!string.IsNullOrEmpty(splinePath))
+                    {
+                        <svg viewBox="0 0 800 180" preserveAspectRatio="none" overflow="hidden"
+                             style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">
+                            <path d="@splinePath"
+                                  fill="none"
+                                  stroke="rgba(230,100,20,0.75)"
+                                  stroke-width="2.5"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round" />
+                        </svg>
+                    }
+                </div>
+
+                <!-- X-axis: CMC labels -->
+                <div style="display:flex; gap:4px; padding:0 2px; margin-top:4px;">
+                    @foreach (var bucket in curveBuckets)
+                    {
+                        <div style="flex:1; text-align:center; font-size:0.8rem; font-weight:500;">
+                            @bucket.Label
+                        </div>
+                    }
+                </div>
+                <div class="text-muted text-center small mt-1">Mana Value</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Type breakdown ────────────────────────────────────────────────── -->
+@if (typeDist.Count > 0)
+{
+    <div class="d-flex flex-wrap gap-3 px-3 mb-3">
+        @foreach (var (type, count) in typeDist)
+        {
+            <div>
+                <span class="text-muted small">@type</span>
+                <span class="fw-semibold ms-1">@count</span>
+            </div>
+        }
+    </div>
+}
+
+<!-- ── Card list by mana value ───────────────────────────────────────── -->
+@foreach (var group in mvGroups)
+{
+    var collapsed = _collapsedMvBuckets.Contains(group.Label);
+    <div class="card mb-3 mx-3">
+        <div class="card-header d-flex align-items-center gap-2"
+             style="cursor:pointer;"
+             @onclick="() => ToggleMvBucket(group.Label)">
+            <span class="fw-semibold me-auto">
+                MV @group.Label
+                <span class="badge bg-secondary ms-1 fw-normal">@group.Cards.Count</span>
+            </span>
+            <span class="text-muted small">@(collapsed ? "&#9654;" : "&#9660;")</span>
+        </div>
+        @if (!collapsed)
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var card in group.Cards)
+                {
+                    <div class="list-group-item py-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="fw-semibold me-1">@card.Card.Name</span>
+                            @if (card.IsCommander)
+                            {
+                                <span class="badge bg-secondary" title="Commander">Commander</span>
+                            }
+                            @if (card.Card.ManaValue > 0)
+                            {
+                                <span class="badge bg-light text-dark border" style="font-size:0.7rem;" title="Mana value">
+                                    @card.Card.ManaValue.ToString("0.#")
+                                </span>
+                            }
+                            @if (card.Card.PriceUsd.HasValue)
+                            {
+                                <span class="badge bg-light text-dark border" style="font-size:0.7rem;" title="Price">
+                                    $@card.Card.PriceUsd.Value.ToString("F2")
+                                </span>
+                            }
+                            <span class="text-muted small">@card.Card.TypeLine</span>
+                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                  style="font-size:0.7rem;">
+                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                            </span>
+                            @foreach (var contrib in card.Roles.Secondary)
+                            {
+                                var b = SecondaryBadge(contrib);
+                                <span class="badge @b.CssClass" style="font-size:0.7rem;" title="@b.Tooltip">@b.Label</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (landList.Count > 0 || AnalysisResult.BasicLandCounts.Count > 0)
+{
+    var landKey = "Lands";
+    var landCollapsed = _collapsedMvBuckets.Contains(landKey);
+    var landTotal = landList.Count + AnalysisResult.BasicLandCounts.Values.Sum();
+    <div class="card mb-3 mx-3">
+        <div class="card-header d-flex align-items-center gap-2"
+             style="cursor:pointer;"
+             @onclick="() => ToggleMvBucket(landKey)">
+            <span class="fw-semibold me-auto">
+                Lands
+                <span class="badge bg-secondary ms-1 fw-normal">@landTotal</span>
+            </span>
+            <span class="text-muted small">@(landCollapsed ? "&#9654;" : "&#9660;")</span>
+        </div>
+        @if (!landCollapsed)
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var card in landList)
+                {
+                    <div class="list-group-item py-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="fw-semibold me-1">@card.Card.Name</span>
+                            @if (card.IsCommander)
+                            {
+                                <span class="badge bg-secondary" title="Commander">Commander</span>
+                            }
+                            @if (card.Card.PriceUsd.HasValue)
+                            {
+                                <span class="badge bg-light text-dark border" style="font-size:0.7rem;" title="Price">
+                                    $@card.Card.PriceUsd.Value.ToString("F2")
+                                </span>
+                            }
+                            <span class="text-muted small">@card.Card.TypeLine</span>
+                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                  style="font-size:0.7rem;">
+                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                            </span>
+                        </div>
+                    </div>
+                }
+                @foreach (var (name, count) in AnalysisResult.BasicLandCounts.OrderBy(kv => kv.Key))
+                {
+                    <div class="list-group-item py-2 text-muted small">
+                        @count&times; @name <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Basic</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}

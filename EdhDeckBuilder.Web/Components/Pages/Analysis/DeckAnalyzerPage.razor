@@ -78,6 +78,10 @@
                             @onclick='() => _view = AnalysisView.ByType'>By Type</button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link @(_view == AnalysisView.ByManaValue ? "active" : "")"
+                            @onclick='() => _view = AnalysisView.ByManaValue'>By Mana Value</button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link @(_view == AnalysisView.UpgradePaths ? "active" : "")"
                             @onclick='() => _view = AnalysisView.UpgradePaths'>
                         Upgrade Paths
@@ -448,6 +452,11 @@
                         </div>
                     </div>
                 }
+            }
+
+            @if (_view == AnalysisView.ByManaValue)
+            {
+                <ManaCurveChart AnalysisResult="_result!" />
             }
 
             @if (_view == AnalysisView.UpgradePaths)
@@ -871,7 +880,7 @@
                 @foreach (var typeName in TypeOrder)
                 {
                     var cards = allForType
-                        .Where(c => CardTypeBucket(c.Card) == typeName)
+                        .Where(c => CardRoleDisplay.CardTypeBucket(c.Card) == typeName)
                         .OrderBy(c => c.Card.Name)
                         .ToList();
                     if (cards.Count == 0) continue;

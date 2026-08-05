@@ -519,25 +519,21 @@ analysis completes.
 
 ---
 
-### 4. Mana Curve Analysis
+### 4. Mana Curve Analysis — Done (2026-08-05)
 
-Deck cards carry `ManaValue` (CMC) from Scryfall. We should compute and display a mana curve.
+**Implemented:** `ManaCurveChart` shared component (`Components/Shared/ManaCurveChart.razor/.cs`).
+Available as the "By Mana Value" tab on both `/analyze` and the DeckResults page.
 
-**Display:**
-- Pillar (bar) chart — one bar per CMC bucket (0–1, 2, 3, 4, 5, 6+), height = card count.
-- Average mana value shown alongside the chart.
-- Own section on the Analyzer page (either a new tab or a panel inside Coverage Report).
+- Bar chart (CMC buckets 0–7+, 180 px tall) with Y-axis ticks at every 5, grid lines, count labels.
+- Catmull-Rom spline overlay (SVG, orange) connecting bar midpoints.
+- Summary stats: average MV, non-land count, land count (+ MDFC annotation).
+- Type breakdown (Creature/Planeswalker/Instant/Sorcery/Artifact/Enchantment/Battle/Land/Other counts).
+- Full deck list below the chart, grouped into collapsible CMC buckets (non-lands) + a Lands bucket.
+- `CardRoleDisplay.CardTypeBucket()` is the canonical type-bucketing method (used by both this
+  component and the ByType views in both pages).
 
-**Upgrade path integration:**
-- When generating upgrade suggestions, the gap-prioritization step should factor in curve shape:
-  if the curve has a large gap or skews high, up-weight upgrades that fill the missing CMC range
-  and flag it explicitly in the upgrade rationale.
-
-**Tasks:**
-- [ ] Compute CMC distribution from `AnalyzedCard.Card.ManaValue` in the analyzer result.
-- [ ] Render a bar chart (inline SVG or a lightweight approach) in the UI.
-- [ ] Pass curve summary (average MV, sparsely-filled CMC range) into `DeckUpgrader` and
-      incorporate it into the gap-prioritization prompt.
+**Deferred:** Curve-aware upgrade prioritization — passing avg MV / sparse-CMC summary into
+`DeckUpgrader` gap-prioritization prompt. Low priority; the visual is the primary ask.
 
 ---
 

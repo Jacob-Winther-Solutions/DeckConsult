@@ -30,7 +30,7 @@ public partial class DeckResults : ComponentBase, IDisposable
 
     // ── View state ─────────────────────────────────────────────────────────
 
-    private enum DeckView { ByRole, AllCards, ByType, UpgradePaths, Combos }
+    private enum DeckView { ByRole, AllCards, ByType, ByManaValue, UpgradePaths, Combos }
     private DeckView _view = DeckView.AllCards;
 
     private bool _showCoverage  = true;
@@ -58,20 +58,6 @@ public partial class DeckResults : ComponentBase, IDisposable
 
     private static string RoleName(CardRole role)              => CardRoleDisplay.RoleName(role);
     private static string PrimaryRoleBadgeClass(CardRole role) => CardRoleDisplay.PrimaryRoleBadgeClass(role);
-
-    internal static string CardTypeBucket(Card card)
-    {
-        var tl = card.TypeLine;
-        if (tl.Contains("Creature",     StringComparison.OrdinalIgnoreCase)) return "Creature";
-        if (tl.Contains("Planeswalker", StringComparison.OrdinalIgnoreCase)) return "Planeswalker";
-        if (tl.Contains("Instant",      StringComparison.OrdinalIgnoreCase)) return "Instant";
-        if (tl.Contains("Sorcery",      StringComparison.OrdinalIgnoreCase)) return "Sorcery";
-        if (tl.Contains("Artifact",     StringComparison.OrdinalIgnoreCase)) return "Artifact";
-        if (tl.Contains("Enchantment",  StringComparison.OrdinalIgnoreCase)) return "Enchantment";
-        if (tl.Contains("Battle",       StringComparison.OrdinalIgnoreCase)) return "Battle";
-        if (tl.Contains("Land",         StringComparison.OrdinalIgnoreCase)) return "Land";
-        return "Other";
-    }
 
     private static BadgeInfo SecondaryBadge(RoleContribution contrib)
     {
