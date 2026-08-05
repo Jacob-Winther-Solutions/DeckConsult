@@ -214,8 +214,8 @@ public static class DeckReportExporter
         sb.AppendLine($"# Analysis Report — {commanderNames}");
         sb.AppendLine();
         sb.AppendLine($"**Date:** {analysisDate:yyyy-MM-dd}  ");
-        sb.AppendLine($"**Estimated Bracket:** {(int)result.EstimatedBracket} — {BracketLibrary.All[result.EstimatedBracket].Name}  ");
-        sb.AppendLine($"**Bracket reasoning:** {result.BracketExplanation}  ");
+        if (result.SpellbookBracket is not null)
+            sb.AppendLine($"**Estimated Bracket:** {(int)result.SpellbookBracket} — {BracketLibrary.All[result.SpellbookBracket.Value].Name}  ");
         if (result.TotalPriceUsd > 0)
             sb.AppendLine($"**Total price:** ${result.TotalPriceUsd.ToString("F2", CultureInfo.InvariantCulture)}  ");
         sb.AppendLine();

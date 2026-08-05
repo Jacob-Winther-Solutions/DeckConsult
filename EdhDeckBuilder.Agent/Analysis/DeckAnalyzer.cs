@@ -12,6 +12,7 @@ namespace EdhDeckBuilder.Agent.Analysis;
 public sealed class DeckAnalyzer(
     ICardRepository cardRepository,
     ILlmClassifier classifier,
+    IComboSource comboSource,
     ILogger<DeckAnalyzer> logger) : IDeckAnalyzer
 {
     private UsageTracker? _usageTracker;
@@ -97,15 +98,20 @@ public sealed class DeckAnalyzer(
             };
         }).ToList();
 
-        // 5. Compute coverage (commanders + 99 + basics)
+        // 5. Compute coverage and estimate bracket via Commander Spellbook
         await (progress?.Invoke("Computing analysis") ?? Task.CompletedTask);
         var coverage = ComputeCoverage(commanderCards, analyzedCards, basicLandCounts);
-        var (bracket, explanation) = BracketEstimator.Estimate(coverage);
-        var gaps = ComputeGaps(coverage, DeckTemplate.Balanced.Targets);
+
+        var allCommanderNames = commanders.Select(c => c.Name).ToList();
+        var allCardNames      = nonBasics.Select(c => c.Name).ToList();
+        var bracketTag = await comboSource.EstimateBracketTagAsync(allCommanderNames, allCardNames, ct);
+        var bracket    = MapBracketTag(bracketTag);
+
+        var gaps       = ComputeGaps(coverage, DeckTemplate.Balanced.Targets);
         var totalPrice = nonBasics.Sum(c => c.PriceUsd ?? 0);
 
-        logger.LogInformation("DeckAnalysis_Complete: {Cards} cards, bracket={Bracket}, gaps={Gaps}",
-            analyzedCards.Count, bracket, gaps.Count);
+        logger.LogInformation("DeckAnalysis_Complete: {Cards} cards, spellbookBracket={Tag}, gaps={Gaps}",
+            analyzedCards.Count, bracketTag, gaps.Count);
 
         return new DeckAnalysisResult
         {
@@ -114,8 +120,8 @@ public sealed class DeckAnalyzer(
             Cards                   = analyzedCards,
             BasicLandCounts         = basicLandCounts,
             ActualCoverage          = coverage,
-            EstimatedBracket        = bracket,
-            BracketExplanation      = explanation,
+            SpellbookBracketTag     = bracketTag,
+            SpellbookBracket        = bracket,
             RoleGaps                = gaps,
             UnresolvedNames         = unresolvedNames,
             ColorIdentityViolations = violations,
@@ -195,6 +201,16 @@ public sealed class DeckAnalyzer(
         }
         return profile;
     }
+
+    private static Bracket? MapBracketTag(string? tag) => tag switch
+    {
+        "S" => Bracket.Five,
+        "R" => Bracket.Four,
+        "E" => Bracket.Three,
+        "P" => Bracket.Two,
+        "C" => Bracket.One,
+        _   => null,
+    };
 
     private static IReadOnlyList<RoleGap> ComputeGaps(
         IReadOnlyDictionary<CardRole, double> coverage,

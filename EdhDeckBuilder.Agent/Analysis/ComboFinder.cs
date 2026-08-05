@@ -1,7 +1,6 @@
 using EdhDeckBuilder.Agent.Interfaces;
 using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
-using EdhDeckBuilder.Core.Decks;
 using Microsoft.Extensions.Logging;
 
 namespace EdhDeckBuilder.Agent.Analysis;
@@ -20,33 +19,11 @@ public sealed class ComboFinder(
         logger.LogInformation("ComboFinder_Start: commanders={Commanders}, cards={CardCount}",
             string.Join(", ", commanderNames), cardNames.Count);
 
-        var combosTask     = comboSource.FindCombosAsync(commanderNames, cardNames, ct);
-        var bracketTagTask = comboSource.EstimateBracketTagAsync(commanderNames, cardNames, ct);
-        await Task.WhenAll(combosTask, bracketTagTask);
+        var combos = await comboSource.FindCombosAsync(commanderNames, cardNames, ct);
 
-        var combos     = combosTask.Result;
-        var bracketTag = bracketTagTask.Result;
-        var bracket    = MapBracketTag(bracketTag);
+        logger.LogInformation("ComboFinder_Complete: included={Included}, nearMiss={NearMiss}",
+            combos.Included.Count, combos.AlmostIncluded.Count);
 
-        logger.LogInformation(
-            "ComboFinder_Complete: included={Included}, nearMiss={NearMiss}, spellbookBracket={Tag}",
-            combos.Included.Count, combos.AlmostIncluded.Count, bracketTag);
-
-        return new ComboAnalysisResult
-        {
-            Combos              = combos,
-            SpellbookBracketTag = bracketTag,
-            SpellbookBracket    = bracket,
-        };
+        return new ComboAnalysisResult { Combos = combos };
     }
-
-    private static Bracket? MapBracketTag(string? tag) => tag switch
-    {
-        "S" => Bracket.Five,
-        "R" => Bracket.Four,
-        "E" => Bracket.Three,
-        "P" => Bracket.Two,
-        "C" => Bracket.One,
-        _   => null,
-    };
 }

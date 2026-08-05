@@ -741,7 +741,6 @@
                     <p class="text-muted small mb-3">
                         Searches <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>
                         for combos fully present in your built deck and near-misses (one card away).
-                        Also returns a combo-aware bracket estimate.
                     </p>
                     <button class="btn btn-primary" @onclick="FindCombosAsync">Find Combos</button>
                 </div>
@@ -749,17 +748,6 @@
         }
         else if (_comboResult is not null)
         {
-            @if (_comboResult.SpellbookBracketTag is not null)
-            {
-                <div class="alert alert-info mx-3 mb-3 py-2 d-flex align-items-center gap-2 flex-wrap">
-                    <strong>Combo-aware bracket (Commander Spellbook):</strong>
-                    <span class="badge @BracketTagCss(_comboResult.SpellbookBracketTag)">
-                        @BracketTagLabel(_comboResult.SpellbookBracketTag)
-                    </span>
-                    <span class="text-muted small ms-auto">Based on combo presence, tutors, and game-changer cards.</span>
-                </div>
-            }
-
             <div class="mb-3 mx-3 d-flex justify-content-between align-items-center">
                 <span class="text-muted small">
                     Powered by <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>

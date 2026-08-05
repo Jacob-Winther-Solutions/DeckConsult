@@ -30,25 +30,6 @@ so `BuildRequestJson`/`ParseResponse` are testable. 9 new unit tests; 337 total,
 
 ## Bugs to Investigate
 
-### Bracket estimation accuracy — partially addressed (2026-08-04)
-
-**Symptom:** Bracket estimates reported as off in manual testing. The hand-rolled `BracketEstimator`
-uses only Tutor count (primary signal) and Land+Protection counts (secondary). This misses
-several important signals used by the official Command Zone bracket system (CEDH staples,
-card-specific overrides, combo presence, fast mana like Mana Crypt/Mana Vault).
-
-**What's done:** Commander Spellbook's `estimate-bracket` endpoint is now wired and shown in
-the Combos tab as a supplementary signal. It accounts for combo presence, game-changer cards,
-extra-turn spells, and mass land denial.
-
-**Remaining work:**
-- Compare both estimates (hand-rolled vs. Spellbook) on 5–10 real decklists to calibrate accuracy.
-- Consider surfacing the Spellbook bracket in the main analysis header alongside the hand-rolled one.
-- Identify which specific card signals are missing from `BracketEstimator.cs` (fast mana, hard stax)
-  and either patch it or defer to Spellbook exclusively.
-
----
-
 ### LLM Classifier returns all Unmatched on cold cache (2026-07-07) — RESOLVED
 
 **Root cause (confirmed via log analysis 2026-07-09):** Output token truncation. When a forced
@@ -466,13 +447,12 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
 
 **Architecture:**
 - `DecklistParser` (Agent singleton) — parses plain text; skips headers, comments, blanks.
-- `BracketEstimator` (static) — deterministic: primary signal is Tutor count, secondary Land+Protection.
-- `DeckAnalyzer` (Agent scoped) — orchestrates resolve → classify → coverage → bracket → gaps.
+- `DeckAnalyzer` (Agent scoped) — orchestrates resolve → classify → coverage → bracket (via Spellbook `estimate-bracket`) → gaps.
 - `IDeckAnalyzer` interface in Agent/Interfaces.
 - `AnalyzedCard`, `RoleGap`, `DeckAnalysisResult` models.
 - `/analyze` Blazor page with `CommanderPicker` reuse, `BuildProgress` for stages.
   Optional "What isn't working?" field accepted but deferred for v2 weighting.
-- 25 new tests (13 `DecklistParserTests` + 9 `BracketEstimatorTests`); 373 total, all green.
+- 13 new tests (`DecklistParserTests`); 373 total, all green.
 
 **v2 complete (2026-08-04):**
 - [x] **Budget upgrade paths**: `IDeckUpgrader` / `DeckUpgrader` — fetches EDHREC pool per commander,
@@ -501,12 +481,12 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
       Models: `ComboVariant`, `ComboPiece`, `ComboSearchResult`.
 - [x] `CommanderSpellbookClient` in Infrastructure: POST `/find-my-combos/` + `/estimate-bracket/`.
       In-memory cache keyed by SHA256 of sorted card list. Registered as `IComboSource` Singleton.
-- [x] `IComboFinder` / `ComboFinder` in Agent: calls both endpoints in parallel via `Task.WhenAll`.
-      Maps bracketTag ("S"/"R"/"E"/"P"/"C") → `Bracket`. Registered as Scoped.
+- [x] `IComboFinder` / `ComboFinder` in Agent: calls `find-my-combos` on demand. `estimate-bracket`
+      now runs automatically inside `DeckAnalyzer.AnalyzeAsync`; bracket shown in header immediately.
+      `BracketEstimator` (hand-rolled) deleted. Registered as Scoped.
 - [x] **Combos tab** added to Deck Analyzer page. On-demand trigger (button). Shows:
       - Present combos (all pieces in deck) — collapsible with description, mana, prerequisites.
       - Near-miss combos (1 card away, within color identity) — owned pieces (green) + missing (red/grey template).
-      - Combo-aware bracket estimate from Spellbook alongside the hand-rolled estimate.
       - Attribution credit + link to commanderspellbook.com (MIT license).
 - [x] **Integration point 2** (build-time) — done via `ComboPoolSource` / `IComboCardSource` (2026-08-04).
       Near-miss combo pieces injected into the builder pool on every build; locked cards passed as seed deck.
@@ -519,6 +499,47 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
 - Request body: `{"commanders":[{"card":"Name"}],"main":[{"card":"Name"}]}`
 - `almostIncluded` = combos where named pieces in `uses` + template slots in `requires` are ≤1 short.
 - `bracketTag` values: "S"=Spike(B5), "R"=Ruthless(B4), "E"=Escalated(B3); "P"/"C" for lower brackets.
+
+### 3. Upgrade Paths — move input into the tab
+
+Currently the budget cap and "What isn't working?" feedback field are entered before analysis
+runs, at the top of the form. Users may want to change those values and re-run upgrade paths
+after seeing results, without restarting the whole analysis.
+
+**Goal:** Move the budget and feedback inputs out of the pre-analysis form and into the Upgrade
+Paths tab itself, so the user can tweak them and hit "Get Upgrade Paths" again at any time after
+analysis completes.
+
+**Tasks:**
+- [ ] Remove the budget input and feedback textarea from the pre-analysis form.
+- [ ] Add them to the Upgrade Paths tab (both `DeckAnalyzerPage` and `DeckResults`), shown above
+      the "Get Upgrade Paths" / "Refresh" button.
+- [ ] The auto-run-on-analyze trigger (which fires when either value is pre-set) can be removed
+      since the user now controls the run explicitly from the tab.
+
+---
+
+### 4. Mana Curve Analysis
+
+Deck cards carry `ManaValue` (CMC) from Scryfall. We should compute and display a mana curve.
+
+**Display:**
+- Pillar (bar) chart — one bar per CMC bucket (0–1, 2, 3, 4, 5, 6+), height = card count.
+- Average mana value shown alongside the chart.
+- Own section on the Analyzer page (either a new tab or a panel inside Coverage Report).
+
+**Upgrade path integration:**
+- When generating upgrade suggestions, the gap-prioritization step should factor in curve shape:
+  if the curve has a large gap or skews high, up-weight upgrades that fill the missing CMC range
+  and flag it explicitly in the upgrade rationale.
+
+**Tasks:**
+- [ ] Compute CMC distribution from `AnalyzedCard.Card.ManaValue` in the analyzer result.
+- [ ] Render a bar chart (inline SVG or a lightweight approach) in the UI.
+- [ ] Pass curve summary (average MV, sparsely-filled CMC range) into `DeckUpgrader` and
+      incorporate it into the gap-prioritization prompt.
+
+---
 
 ### Explicitly out of scope for Deck Analysis track
 
@@ -602,7 +623,7 @@ must change (key would be browser-side).
 
 ## Summary of completed work
 
-All four projects compile; 407 tests pass.
+All four projects compile; 398 tests pass.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client, EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes).
 
@@ -624,6 +645,6 @@ All four projects compile; 407 tests pass.
 
 **Build progress — sub-step detail:** `ClassifyPool` shows `"N / M cards classified"` (updating per 30-card batch, seeded immediately with cache-hit count). `FillEngine` shows `"Selecting {Role} cards… (N / 9)"` before each selector call. Both stages surface their detail via `CurrentStageDetail` in `BuildProgress.razor`.
 
-**Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket deterministically (`BracketEstimator`), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist. **Combo Finder (v4):** `CommanderSpellbookClient` (`IComboSource`) — `find-my-combos` + `estimate-bracket` endpoints with SHA256 cache. `IComboFinder` / `ComboFinder` runs both in parallel. Combos tab on analyzer page shows complete combos, near-misses (owned + missing pieces), combo-aware bracket from Spellbook. **ComboPoolSource (v5):** `IComboCardSource` / `ComboPoolSource` injects near-miss combo pieces into the builder pool on every build (locked cards passed as seed deck); inclusion score normalized by combo popularity. **DeckResults Upgrade Paths + Combos tabs:** both tabs ported to the build result page; upgrade paths use an independent per-card price input not bound by the build's budget cap.
+**Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket via Commander Spellbook `estimate-bracket` (shown in header), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist. **Combo Finder (v4):** `CommanderSpellbookClient` (`IComboSource`) — `find-my-combos` + `estimate-bracket` endpoints with SHA256 cache. `IComboFinder` / `ComboFinder` calls `find-my-combos` on demand; `estimate-bracket` runs automatically during analysis and is shown in the results header. Combos tab shows complete combos, near-misses (owned + missing pieces). **ComboPoolSource (v5):** `IComboCardSource` / `ComboPoolSource` injects near-miss combo pieces into the builder pool on every build (locked cards passed as seed deck); inclusion score normalized by combo popularity. **DeckResults Upgrade Paths + Combos tabs:** both tabs ported to the build result page; upgrade paths use an independent per-card price input not bound by the build's budget cap.
 
 **Tests:** 407 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.

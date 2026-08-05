@@ -23,8 +23,10 @@ public sealed record DeckAnalysisResult
     /// </summary>
     public required IReadOnlyDictionary<CardRole, double> ActualCoverage { get; init; }
 
-    public required Bracket EstimatedBracket { get; init; }
-    public required string BracketExplanation { get; init; }
+    /// <summary>Raw tag from Commander Spellbook (e.g. "R", "S", "E"), or null if unavailable.</summary>
+    public required string? SpellbookBracketTag { get; init; }
+    /// <summary>Mapped bracket number, or null if the tag is unrecognized or unavailable.</summary>
+    public required Bracket? SpellbookBracket { get; init; }
     public required IReadOnlyList<RoleGap> RoleGaps { get; init; }
     public required IReadOnlyList<string> UnresolvedNames { get; init; }
     public required IReadOnlyList<string> ColorIdentityViolations { get; init; }

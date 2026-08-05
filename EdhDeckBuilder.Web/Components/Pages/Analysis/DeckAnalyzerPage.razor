@@ -42,9 +42,12 @@
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <ColorIdentityPips Identity="@(_result.Commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity))" />
-                    <span class="badge bg-secondary">
-                        Est. Bracket @((int)_result.EstimatedBracket) &mdash; @BracketLibrary.All[_result.EstimatedBracket].Name
-                    </span>
+                    @if (_result.SpellbookBracket is not null)
+                    {
+                        <span class="badge @BracketTagCss(_result.SpellbookBracketTag)" title="Commander Spellbook bracket estimate">
+                            @BracketTagLabel(_result.SpellbookBracketTag)
+                        </span>
+                    }
                     @{
                         var totalCards = _result.Cards.Count + _result.BasicLandCounts.Values.Sum();
                     }
@@ -58,11 +61,6 @@
                         </span>
                     }
                 </div>
-            </div>
-
-            <!-- ── Bracket explanation ───────────────────────────────────────── -->
-            <div class="alert alert-info mx-3 mb-4 py-2">
-                <strong>Bracket estimate:</strong> @_result.BracketExplanation
             </div>
 
             <!-- ── View tabs ─────────────────────────────────────────────────── -->
@@ -624,7 +622,6 @@
                             <p class="text-muted small mb-3">
                                 Searches <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>
                                 for combos fully present in your deck and near-misses (one card away).
-                                Also returns a combo-aware bracket estimate.
                             </p>
                             <button class="btn btn-primary" @onclick="FindCombosAsync">Find Combos</button>
                         </div>
@@ -632,20 +629,6 @@
                 }
                 else if (_comboResult is not null)
                 {
-                    <!-- ── Bracket estimate ─────────────────────────────────────── -->
-                    @if (_comboResult.SpellbookBracketTag is not null)
-                    {
-                        <div class="alert alert-info mx-3 mb-3 py-2 d-flex align-items-center gap-2 flex-wrap">
-                            <strong>Combo-aware bracket (Commander Spellbook):</strong>
-                            <span class="badge @BracketTagCss(_comboResult.SpellbookBracketTag)">
-                                @BracketTagLabel(_comboResult.SpellbookBracketTag)
-                            </span>
-                            <span class="text-muted small ms-auto">
-                                Based on combo presence, tutors, and game-changer cards.
-                            </span>
-                        </div>
-                    }
-
                     <div class="mb-3 mx-3 d-flex justify-content-between align-items-center">
                         <span class="text-muted small">
                             Powered by <a href="https://commanderspellbook.com" target="_blank" rel="noopener noreferrer">Commander Spellbook</a>
