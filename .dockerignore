@@ -1,0 +1,11 @@
+**/.vs
+**/.git
+**/bin
+**/obj
+**/node_modules
+**/*.user
+.claude/
+TODO/
+Logs/
+*.md
+.env

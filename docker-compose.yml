@@ -1,0 +1,36 @@
+services:
+  app:
+    image: ${DOCKER_IMAGE}
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+      - Provider__Default=Anthropic
+    volumes:
+      - edh_appdata:/root/.local/share/EdhDeckBuilder
+      - edh_keys:/root/.aspnet/DataProtection-Keys
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+
+volumes:
+  edh_appdata:
+  edh_keys:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
