@@ -41,7 +41,7 @@ bld/
 #wwwroot/
 
 # LibMan-managed third-party frontend libraries (restored via `dotnet tool run libman restore`)
-**/wwwroot/lib/
+
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
