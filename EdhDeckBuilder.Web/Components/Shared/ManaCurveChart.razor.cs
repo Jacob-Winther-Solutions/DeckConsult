@@ -12,7 +12,6 @@ public partial class ManaCurveChart : ComponentBase
     private static readonly string[] TypeOrder = CardRoleDisplay.TypeOrder;
 
     private sealed record ManaCurveBucket(string Label, int Count, double BarHeightPx);
-    private sealed record BadgeInfo(string CssClass, string Label, string Tooltip);
 
     private readonly HashSet<string> _collapsedMvBuckets = [];
 
@@ -21,20 +20,7 @@ public partial class ManaCurveChart : ComponentBase
         if (!_collapsedMvBuckets.Add(key)) _collapsedMvBuckets.Remove(key);
     }
 
-    private static BadgeInfo SecondaryBadge(RoleContribution contrib)
-    {
-        var name = CardRoleDisplay.RoleName(contrib.Role);
-        return contrib.Relation switch
-        {
-            RoleRelation.Always    => new("bg-info bg-opacity-75 text-dark", name,
-                                         $"Always fills {name} (+{contrib.Weight:0.##} coverage)"),
-            RoleRelation.Modal     => new("bg-secondary bg-opacity-50", name + "?",
-                                         $"Sometimes fills {name} (+{contrib.Weight:0.##} coverage, modal)"),
-            RoleRelation.Transform => new("bg-secondary bg-opacity-50", "→ " + name,
-                                         $"Eventually fills {name} (+{contrib.Weight:0.##} coverage, transform)"),
-            _                      => new("bg-secondary", name, ""),
-        };
-    }
+    private static CardRoleDisplay.BadgeInfo SecondaryBadge(RoleContribution contrib) => CardRoleDisplay.SecondaryBadge(contrib);
 
     private (ManaCurveBucket[] Buckets, double AverageMv, int TotalSpells, int TotalLands, int MdfcLandCount, int MaxScale) GetManaCurveData()
     {

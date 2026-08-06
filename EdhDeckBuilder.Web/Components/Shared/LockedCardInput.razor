@@ -1,0 +1,61 @@
+<div class="card mb-4">
+    <div class="card-header fw-semibold">
+        Must-Include Cards
+        <span class="text-muted fw-normal small ms-2">optional</span>
+    </div>
+    <div class="card-body">
+        <label class="form-label small fw-semibold mb-1">One card name per line</label>
+        <textarea class="form-control" rows="4"
+                  value="@_text"
+                  @oninput="OnTextChanged"
+                  placeholder=@("Sol Ring\nRhystic Study\nCyclonic Rift")
+                  disabled="@(Commanders.Count == 0)"></textarea>
+        <div class="text-muted small mt-1">These cards are locked into the deck regardless of budget, theme, or LLM selection. Budget constraints do not apply to them.</div>
+        <div class="mt-2">
+            <button class="btn btn-outline-secondary btn-sm"
+                    disabled="@(Commanders.Count == 0 || string.IsNullOrWhiteSpace(_text))"
+                    @onclick="ValidateAsync">
+                Validate Cards
+            </button>
+        </div>
+
+        @if (_validated)
+        {
+            @if (_errors.Count > 0)
+            {
+                <div class="alert alert-danger mt-2 mb-0 py-2">
+                    <strong>Could not find these cards — fix them before building:</strong>
+                    <ul class="mb-0 mt-1 small">
+                        @foreach (var name in _errors)
+                        {
+                            <li>@name</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (_colorWarnings.Count > 0)
+            {
+                <div class="alert alert-warning mt-2 mb-0 py-2">
+                    <strong>These cards are outside the commander's color identity:</strong>
+                    <ul class="mb-0 mt-1 small">
+                        @foreach (var card in _colorWarnings)
+                        {
+                            <li>@card.Name — will still be locked in if you proceed</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (_errors.Count == 0 && _validCards.Count + _colorWarnings.Count > 0)
+            {
+                var total = _validCards.Count + _colorWarnings.Count;
+                <div class="alert alert-success mt-2 mb-0 py-2 small">
+                    @total card(s) validated and ready to lock in.
+                    @if (total >= SlotLimit)
+                    {
+                        <strong class="ms-1">Warning: locked cards fill all available slots — the deck builder cannot run.</strong>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>

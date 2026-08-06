@@ -1,0 +1,85 @@
+@using EdhDeckBuilder.Web.Services
+@using EdhDeckBuilder.Agent.Models
+
+@foreach (var typeName in TypeOrder)
+{
+    var cards = Cards
+        .Where(c => CardRoleDisplay.CardTypeBucket(c.Card) == typeName)
+        .OrderBy(c => c.Card.Name)
+        .ToList();
+    if (cards.Count == 0) continue;
+    var typeCollapsed = _collapsedTypeBuckets.Contains(typeName);
+
+    <div class="card mb-3 mx-3">
+        <div class="card-header d-flex align-items-center gap-2"
+             style="cursor: pointer;"
+             @onclick="() => ToggleTypeBucket(typeName)">
+            <span class="fw-semibold me-auto">
+                @typeName
+                <span class="badge bg-secondary ms-1 fw-normal">@cards.Count</span>
+            </span>
+            <span class="text-muted small">@(typeCollapsed ? "&#9654;" : "&#9660;")</span>
+        </div>
+        @if (!typeCollapsed)
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var card in cards)
+                {
+                    var overBudget = IsOverBudget(card.Card);
+                    <div class="list-group-item py-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="fw-semibold me-1">@card.Card.Name</span>
+                            @if (card.IsCommander)
+                            {
+                                <span class="badge bg-secondary" title="Commander">Commander</span>
+                            }
+                            @if (card.IsLocked)
+                            {
+                                <span class="badge bg-secondary" title="Locked by user — will not be cut">&#128274; locked</span>
+                            }
+                            @if (card.Card.ManaValue > 0)
+                            {
+                                <span class="badge bg-light text-dark border" style="font-size: 0.7rem;" title="Mana value">
+                                    @card.Card.ManaValue.ToString("0.#")
+                                </span>
+                            }
+                            @if (card.Card.PriceUsd.HasValue)
+                            {
+                                <span class="badge @(overBudget ? "bg-danger" : "bg-light text-dark border")"
+                                      style="font-size: 0.7rem;"
+                                      title="@(overBudget ? $"Over budget (limit: ${MaxCardPriceUsd:F2})" : "Price")">
+                                    $@card.Card.PriceUsd.Value.ToString("F2")
+                                </span>
+                            }
+                            <span class="text-muted small">@card.Card.TypeLine</span>
+                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
+                                  style="font-size: 0.7rem;">
+                                @CardRoleDisplay.RoleName(card.Roles.Primary)
+                            </span>
+                            @foreach (var contrib in card.Roles.Secondary)
+                            {
+                                var b = CardRoleDisplay.SecondaryBadge(contrib);
+                                <span class="badge @b.CssClass" style="font-size: 0.7rem;" title="@b.Tooltip">@b.Label</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (BasicLandCounts.Count > 0)
+{
+    <div class="card mx-3 mb-3">
+        <div class="card-header small fw-semibold text-muted">Basic Lands</div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-4">
+                @foreach (var (land, count) in BasicLandCounts.OrderByDescending(kv => kv.Value))
+                {
+                    <div><span class="fw-semibold">@count&times;</span> <span class="text-muted small">@land</span></div>
+                }
+            </div>
+        </div>
+    </div>
+}

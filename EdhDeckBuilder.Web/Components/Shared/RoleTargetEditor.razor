@@ -1,0 +1,48 @@
+@using EdhDeckBuilder.Core.Cards
+@using EdhDeckBuilder.Core.Decks
+@using EdhDeckBuilder.Web.Services
+
+<div class="border-top mt-3 pt-3">
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <button class="btn btn-sm btn-link p-0 @(_showEditor ? "text-primary" : "text-muted")"
+                @onclick="() => _showEditor = !_showEditor">
+            @(_showEditor ? "▲ Hide role targets" : "▼ Adjust role targets")
+        </button>
+        @if (CustomIdeal.Count > 0)
+        {
+            <span class="badge bg-primary" style="font-size: 0.65rem;">@CustomIdeal.Count custom</span>
+        }
+    </div>
+    @if (_showEditor)
+    {
+        <p class="text-muted small mt-1 mb-2">
+            Set the ideal count for each role. A higher ideal creates a larger gap and makes that role
+            more likely to appear in upgrade suggestions. Changes here are also reflected in the Coverage tab.
+        </p>
+        <div class="row row-cols-2 row-cols-sm-3 g-2 mb-2">
+            @foreach (var role in RoleDisplayOrder)
+            {
+                if (!DeckTemplate.Balanced.Targets.TryGetValue(role, out var baseTarget)) continue;
+                var effectiveIdeal = CustomIdeal.TryGetValue(role, out var ci) ? ci : baseTarget.Ideal;
+                var isCustom = CustomIdeal.ContainsKey(role);
+                var capturedRole = role;
+                <div class="col">
+                    <label class="form-label small mb-1 @(isCustom ? "text-primary fw-semibold" : "text-muted")">
+                        @CardRoleDisplay.RoleName(role)@(isCustom ? " *" : "")
+                    </label>
+                    <input type="number" class="form-control form-control-sm"
+                           min="0" max="40"
+                           value="@effectiveIdeal"
+                           @onchange="e => OnRoleChanged.InvokeAsync((capturedRole, e.Value))" />
+                </div>
+            }
+        </div>
+        @if (CustomIdeal.Count > 0)
+        {
+            <button class="btn btn-sm btn-link text-danger p-0"
+                    @onclick="() => OnReset.InvokeAsync()">
+                Reset to defaults
+            </button>
+        }
+    }
+</div>

@@ -13,6 +13,20 @@ public sealed record BuildParameters(
 
 public static class BuildRequestFactory
 {
+    public static readonly string[] DeckBuildStages =
+    [
+        "Resolving template",
+        "Gathering card pool",
+        "Filtering pool",
+        "Classifying commanders",
+        "Classifying card pool",
+        "Filling deck",
+        "Applying color fixing",
+        "Repairing illegal cards",
+        "Distributing basic lands",
+        "Assembling result",
+    ];
+
     public static BuildParameters ForGuided(
         IReadOnlyDictionary<Archetype, double> archetypeWeights,
         IReadOnlyList<WeightedTheme> themes,

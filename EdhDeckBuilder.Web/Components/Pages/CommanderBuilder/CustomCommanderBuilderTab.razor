@@ -76,67 +76,9 @@ else
     <BudgetPicker OnChanged="OnBudgetChanged" @key="_budgetResetKey" />
 
     <!-- ── Must-include cards ───────────────────────────────────────────── -->
-    <div class="card mb-4">
-        <div class="card-header fw-semibold">
-            Must-Include Cards
-            <span class="text-muted fw-normal small ms-2">optional</span>
-        </div>
-        <div class="card-body">
-            <label class="form-label small fw-semibold mb-1">One card name per line</label>
-            <textarea class="form-control" rows="4"
-                      value="@_lockedCardsText"
-                      @oninput="OnLockedCardsTextChanged"
-                      placeholder=@("Sol Ring\nRhystic Study\nCyclonic Rift")
-                      disabled="@(_selectedCommanders.Count == 0)"></textarea>
-            <div class="text-muted small mt-1">These cards are locked into the deck regardless of budget, theme, or LLM selection. Budget constraints do not apply to them.</div>
-            <div class="mt-2">
-                <button class="btn btn-outline-secondary btn-sm"
-                        disabled="@(_selectedCommanders.Count == 0 || string.IsNullOrWhiteSpace(_lockedCardsText))"
-                        @onclick="ValidateLockedCardsAsync">
-                    Validate Cards
-                </button>
-            </div>
-
-            @if (_lockedCardsValidated)
-            {
-                @if (_lockedCardErrors.Count > 0)
-                {
-                    <div class="alert alert-danger mt-2 mb-0 py-2">
-                        <strong>Could not find these cards — fix them before building:</strong>
-                        <ul class="mb-0 mt-1 small">
-                            @foreach (var name in _lockedCardErrors)
-                            {
-                                <li>@name</li>
-                            }
-                        </ul>
-                    </div>
-                }
-                @if (_lockedColorWarnings.Count > 0)
-                {
-                    <div class="alert alert-warning mt-2 mb-0 py-2">
-                        <strong>These cards are outside the commander's color identity:</strong>
-                        <ul class="mb-0 mt-1 small">
-                            @foreach (var card in _lockedColorWarnings)
-                            {
-                                <li>@card.Name — will still be locked in if you proceed</li>
-                            }
-                        </ul>
-                    </div>
-                }
-                @if (_lockedCardErrors.Count == 0 && _validatedLockedCards.Count + _lockedColorWarnings.Count > 0)
-                {
-                    var total = _validatedLockedCards.Count + _lockedColorWarnings.Count;
-                    <div class="alert alert-success mt-2 mb-0 py-2 small">
-                        @total card(s) validated and ready to lock in.
-                        @if (total >= LockedCardSlotLimit)
-                        {
-                            <strong class="ms-1">Warning: locked cards fill all available slots — the deck builder cannot run.</strong>
-                        }
-                    </div>
-                }
-            }
-        </div>
-    </div>
+    <LockedCardInput @ref="_lockedInput"
+                     Commanders="_selectedCommanders"
+                     OnChanged="s => _lockedState = s" />
 
     <!-- ── Build button ──────────────────────────────────────────────────── -->
     <div class="d-flex gap-2 flex-wrap">
@@ -153,15 +95,15 @@ else
         {
             <span class="align-self-center text-muted small">Add a deck description to continue.</span>
         }
-        else if (!string.IsNullOrWhiteSpace(_lockedCardsText) && !_lockedCardsValidated)
+        else if (_lockedState.HasText && !_lockedState.IsValidated)
         {
             <span class="align-self-center text-muted small">Validate must-include cards before building.</span>
         }
-        else if (_lockedCardErrors.Count > 0)
+        else if (_lockedState.Errors.Count > 0)
         {
             <span class="align-self-center text-danger small">Fix card errors above before building.</span>
         }
-        else if (_validatedLockedCards.Count + _lockedColorWarnings.Count >= LockedCardSlotLimit)
+        else if (_lockedState.ValidCards.Count + _lockedState.ColorWarnings.Count >= LockedCardSlotLimit)
         {
             <span class="align-self-center text-danger small">Too many locked cards — no slots remain for the deck builder.</span>
         }

@@ -5,6 +5,7 @@ using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
+using EdhDeckBuilder.Web.Components.Shared;
 using EdhDeckBuilder.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
@@ -21,21 +22,8 @@ public partial class CustomCommanderBuilderTab : ComponentBase, IDisposable
     [Inject] private NavigationManager      Navigation      { get; set; } = default!;
     [Inject] private DeckResultStore        ResultStore     { get; set; } = default!;
     [Inject] private IConfiguration         Config          { get; set; } = default!;
-    [Inject] private ILockedCardValidator   LockedCardValidator { get; set; } = default!;
 
-    private static readonly string[] AllStages =
-    [
-        "Resolving template",
-        "Gathering card pool",
-        "Filtering pool",
-        "Classifying commanders",
-        "Classifying card pool",
-        "Filling deck",
-        "Applying color fixing",
-        "Repairing illegal cards",
-        "Distributing basic lands",
-        "Assembling result",
-    ];
+    private static readonly string[] AllStages = BuildRequestFactory.DeckBuildStages;
 
     // ── Form state ─────────────────────────────────────────────────────────
 
@@ -45,11 +33,8 @@ public partial class CustomCommanderBuilderTab : ComponentBase, IDisposable
     private string _customDescription = "";
 
     // Locked cards
-    private string _lockedCardsText = "";
-    private IReadOnlyList<Card>     _validatedLockedCards  = [];
-    private IReadOnlyList<string>   _lockedCardErrors      = [];
-    private IReadOnlyList<Card>     _lockedColorWarnings   = [];
-    private bool _lockedCardsValidated = false;
+    private LockedCardInput? _lockedInput;
+    private LockedCardState  _lockedState = LockedCardState.Empty;
 
     private Dictionary<CardRole, int> _customTemplateValues = BuildDefaultTemplateValues();
 
@@ -109,61 +94,19 @@ public partial class CustomCommanderBuilderTab : ComponentBase, IDisposable
     private void OnCommandersChanged(IReadOnlyList<Card> commanders)
     {
         _selectedCommanders = commanders;
-        // Reset locked card validation when commander changes (color identity may differ).
-        _lockedCardsValidated = false;
-        _validatedLockedCards = [];
-        _lockedCardErrors = [];
-        _lockedColorWarnings = [];
+        _lockedInput?.Reset();
     }
 
     private void OnBudgetChanged(BudgetSelection budget) =>
         _budget = budget;
-
-    private void OnLockedCardsTextChanged(ChangeEventArgs e)
-    {
-        _lockedCardsText = e.Value?.ToString() ?? "";
-        _lockedCardsValidated = false;
-        _validatedLockedCards = [];
-        _lockedCardErrors = [];
-        _lockedColorWarnings = [];
-    }
-
-    internal async Task ValidateLockedCardsAsync()
-    {
-        if (_selectedCommanders.Count == 0) return;
-
-        var names = _lockedCardsText
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(n => n.Length > 0)
-            .ToList();
-
-        if (names.Count == 0)
-        {
-            _validatedLockedCards = [];
-            _lockedCardErrors = [];
-            _lockedColorWarnings = [];
-            _lockedCardsValidated = true;
-            return;
-        }
-
-        var colorIdentity = _selectedCommanders.Aggregate(
-            EdhDeckBuilder.Core.Cards.Color.None,
-            (ci, c) => ci | c.ColorIdentity);
-
-        var result = await LockedCardValidator.ValidateAsync(names, colorIdentity);
-        _validatedLockedCards = result.ValidCards;
-        _lockedCardErrors = result.UnrecognizedNames;
-        _lockedColorWarnings = result.WrongColorCards;
-        _lockedCardsValidated = true;
-    }
 
     private int LockedCardSlotLimit => 99 - _selectedCommanders.Count;
 
     private bool CanBuild =>
         _selectedCommanders.Count > 0
         && !string.IsNullOrWhiteSpace(_customDescription)
-        && (!_lockedCardsValidated || (!_lockedCardErrors.Any() && (_validatedLockedCards.Count + _lockedColorWarnings.Count) < LockedCardSlotLimit))
-        && (string.IsNullOrWhiteSpace(_lockedCardsText) || _lockedCardsValidated);
+        && (!_lockedState.IsValidated || (!_lockedState.Errors.Any() && (_lockedState.ValidCards.Count + _lockedState.ColorWarnings.Count) < LockedCardSlotLimit))
+        && (!_lockedState.HasText || _lockedState.IsValidated);
 
     // ── Build ──────────────────────────────────────────────────────────────
 
@@ -192,9 +135,7 @@ public partial class CustomCommanderBuilderTab : ComponentBase, IDisposable
 
         try
         {
-            var allLocked = _validatedLockedCards
-                .Concat(_lockedColorWarnings)
-                .ToList();
+            var allLocked = _lockedState.AllLockedCards;
 
             var buildResult = await DeckBuilder.BuildAsync(
                 [.. _selectedCommanders],

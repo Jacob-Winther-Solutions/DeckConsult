@@ -1,13 +1,45 @@
+using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Cards;
 
 namespace EdhDeckBuilder.Web.Services;
 
-/// <summary>
-/// Shared display helpers for CardRole — used by DeckResults, DeckReportExporter,
-/// and form components (ThemePicker, custom template editor).
-/// </summary>
 public static class CardRoleDisplay
 {
+    public sealed record BadgeInfo(string CssClass, string Label, string Tooltip);
+
+    public static BadgeInfo SecondaryBadge(RoleContribution contrib)
+    {
+        var name = RoleName(contrib.Role);
+        return contrib.Relation switch
+        {
+            RoleRelation.Always    => new("bg-info bg-opacity-75 text-dark", name,
+                                        $"Always fills {name} (+{contrib.Weight:0.##} coverage)"),
+            RoleRelation.Modal     => new("bg-secondary bg-opacity-50", name + "?",
+                                        $"Sometimes fills {name} (+{contrib.Weight:0.##} coverage, modal)"),
+            RoleRelation.Transform => new("bg-secondary bg-opacity-50", "→ " + name,
+                                        $"Eventually fills {name} (+{contrib.Weight:0.##} coverage, transform)"),
+            _                      => new("bg-secondary", name, ""),
+        };
+    }
+
+    public static string BracketTagLabel(string? tag) => tag switch
+    {
+        "S" => "Spike (cEDH) — Bracket 5",
+        "R" => "Ruthless — Bracket 4",
+        "E" => "Escalated — Bracket 3",
+        "P" => "Precon Appropriate — Bracket 2",
+        "C" => "Casual — Bracket 1",
+        _   => tag ?? "Unknown",
+    };
+
+    public static string BracketTagCss(string? tag) => tag switch
+    {
+        "S" => "bg-danger",
+        "R" => "bg-warning text-dark",
+        "E" => "bg-primary",
+        _   => "bg-secondary",
+    };
+
     public static readonly CardRole[] DisplayOrder =
     [
         CardRole.Plan,
