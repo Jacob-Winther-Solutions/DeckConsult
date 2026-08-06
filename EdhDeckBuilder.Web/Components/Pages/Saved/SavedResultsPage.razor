@@ -1,0 +1,83 @@
+@page "/saved"
+
+<PageTitle>Saved Results — EDH Deck Builder</PageTitle>
+
+<div class="container-fluid py-4" style="max-width: 900px; margin: 0 auto; padding-left: 1.5rem; padding-right: 1.5rem;">
+
+    <div class="mb-4">
+        <h2 class="mb-1">Saved Results</h2>
+        <p class="text-muted mb-0">Your last 3 built decks and analyses, stored in your browser.</p>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted">
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading…</span>
+            </div>
+            <span>Loading saved results…</span>
+        </div>
+    }
+    else if (_decks.Count == 0 && _analyses.Count == 0)
+    {
+        <p class="text-muted">No saved results yet. Build a deck or analyze one to save it here.</p>
+        <div class="d-flex gap-2 mt-3">
+            <a href="/commander" class="btn btn-primary btn-sm">Build a deck</a>
+            <a href="/analyze" class="btn btn-outline-primary btn-sm">Analyze a deck</a>
+        </div>
+    }
+    else
+    {
+        @if (_decks.Count > 0)
+        {
+            <h5 class="mb-3">Built Decks</h5>
+            <div class="row g-3 mb-4">
+                @foreach (var (id, deck) in _decks)
+                {
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <h6 class="card-title mb-1">@CommanderNames(deck.Commanders)</h6>
+                                <div class="text-muted small mb-1">@BracketLabel(deck.Bracket)</div>
+                                @if (deck.ArchetypeWeights.Count > 0)
+                                {
+                                    <div class="text-muted small mb-2">@TopArchetype(deck.ArchetypeWeights)</div>
+                                }
+                                <div class="text-muted small mb-auto">Built @deck.BuiltOn.ToString("MMM d, yyyy")</div>
+                                <a href="/results/@id" class="btn btn-sm btn-outline-primary mt-3">View deck</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_analyses.Count > 0)
+        {
+            <h5 class="mb-3">Analyzed Decks</h5>
+            <div class="row g-3">
+                @foreach (var (id, analysis) in _analyses)
+                {
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <h6 class="card-title mb-1">@CommanderNames(analysis.Result.Commanders)</h6>
+                                @if (analysis.Result.SpellbookBracket is not null)
+                                {
+                                    <div class="text-muted small mb-1">@BracketLabel(analysis.Result.SpellbookBracket.Value)</div>
+                                }
+                                @if (analysis.Result.TotalPriceUsd > 0)
+                                {
+                                    <div class="text-muted small mb-2">$@analysis.Result.TotalPriceUsd.ToString("F2")</div>
+                                }
+                                <div class="text-muted small mb-auto">Analyzed @analysis.AnalyzedOn.ToString("MMM d, yyyy")</div>
+                                <a href="/analyze?load=@id" class="btn btn-sm btn-outline-primary mt-3">View analysis</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+</div>

@@ -21,14 +21,11 @@ function getLocalStorage(key) {
     return localStorage.getItem(key);
 }
 
-// Saves a deck result and evicts the oldest entries beyond maxResults.
-// The index (edh-deck-index) tracks insertion order so we know what to evict.
-// maxResults is passed from the server so it can be subscription-driven later.
-function saveDeckResult(key, value, maxResults) {
-    const INDEX_KEY = 'edh-deck-index';
-
+// Shared helper: saves a result entry and evicts the oldest beyond maxResults.
+// indexKey tracks insertion order so we know what to evict.
+function _saveResult(key, value, maxResults, indexKey) {
     let index = [];
-    try { index = JSON.parse(localStorage.getItem(INDEX_KEY) || '[]'); } catch { }
+    try { index = JSON.parse(localStorage.getItem(indexKey) || '[]'); } catch { }
 
     // Prune stale references (entries removed outside this function, e.g. manual clear).
     index = index.filter(k => localStorage.getItem(k) !== null);
@@ -41,8 +38,24 @@ function saveDeckResult(key, value, maxResults) {
         localStorage.removeItem(index.shift());
     }
 
-    localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+    localStorage.setItem(indexKey, JSON.stringify(index));
     try { localStorage.setItem(key, value); } catch { }
+}
+
+function saveDeckResult(key, value, maxResults) {
+    _saveResult(key, value, maxResults, 'edh-deck-index');
+}
+
+function saveAnalysisResult(key, value, maxResults) {
+    _saveResult(key, value, maxResults, 'edh-analysis-index');
+}
+
+// Returns the ordered array of localStorage keys for the given index, newest-first.
+function getResultIndex(indexKey) {
+    try {
+        const index = JSON.parse(localStorage.getItem(indexKey) || '[]');
+        return index.filter(k => localStorage.getItem(k) !== null).reverse();
+    } catch { return []; }
 }
 
 function downloadTextFile(filename, content, mimeType = 'text/plain') {

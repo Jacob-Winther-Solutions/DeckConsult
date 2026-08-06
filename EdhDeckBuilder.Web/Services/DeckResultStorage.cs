@@ -23,6 +23,8 @@ public static class DeckResultStorage
     /// service when tiered limits are needed — pass the resolved value to <c>saveDeckResult</c> in JS.
     /// </summary>
     public const int DefaultMaxSavedResults = 3;
+    public const string IndexKey = "edh-deck-index";
+    private const string KeyPrefix = "edh-deck-";
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -30,7 +32,10 @@ public static class DeckResultStorage
         WriteIndented = false,
     };
 
-    public static string LocalStorageKey(string id) => $"edh-deck-{id}";
+    public static string LocalStorageKey(string id) => KeyPrefix + id;
+
+    public static string? ExtractId(string key) =>
+        key.StartsWith(KeyPrefix) ? key[KeyPrefix.Length..] : null;
 
     public static string Serialize(StoredDeckResult result) =>
         JsonSerializer.Serialize(result, Options);

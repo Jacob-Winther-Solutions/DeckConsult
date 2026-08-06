@@ -500,26 +500,31 @@ Plain `1 Card Name` format only. Commander in a separate picker. No upgrade path
 - `almostIncluded` = combos where named pieces in `uses` + template slots in `requires` are ≤1 short.
 - `bracketTag` values: "S"=Spike(B5), "R"=Ruthless(B4), "E"=Escalated(B3); "P"/"C" for lower brackets.
 
-### 3. Upgrade Paths — move input into the tab
+### 3. Upgrade Paths — move input into the tab — DONE (2026-08-06)
 
-Currently the budget cap and "What isn't working?" feedback field are entered before analysis
-runs, at the top of the form. Users may want to change those values and re-run upgrade paths
-after seeing results, without restarting the whole analysis.
-
-**Goal:** Move the budget and feedback inputs out of the pre-analysis form and into the Upgrade
-Paths tab itself, so the user can tweak them and hit "Get Upgrade Paths" again at any time after
-analysis completes.
-
-**Tasks:**
-- [ ] Remove the budget input and feedback textarea from the pre-analysis form.
-- [ ] Add them to the Upgrade Paths tab (both `DeckAnalyzerPage` and `DeckResults`), shown above
-      the "Get Upgrade Paths" / "Refresh" button.
-- [ ] The auto-run-on-analyze trigger (which fires when either value is pre-set) can be removed
-      since the user now controls the run explicitly from the tab.
+Budget cap and feedback textarea moved into the Upgrade Paths tab on both `DeckAnalyzerPage`
+and `DeckResults`. Users can tweak and re-run without restarting analysis.
 
 ---
 
-### 4. Mana Curve Analysis — Done (2026-08-05)
+### 4. Saved Results — DONE (2026-08-06)
+
+Analysis results are now saved to `localStorage` alongside built decks. A `/saved` page
+(linked as "Saved Results" in the sidebar) lists both, newest first, and links back to the
+result. Analyses load into `/analyze?load={id}` which restores the full result view without
+re-running the pipeline.
+
+**What changed:**
+- `AnalysisResultStorage` — parallel to `DeckResultStorage`; `StoredAnalysisResult` wraps
+  `DeckAnalysisResult` + `AnalyzedOn` date.
+- `app.js` — `saveDeckResult` and new `saveAnalysisResult` share a `_saveResult` helper;
+  `getResultIndex(indexKey)` returns keys newest-first for the saved page.
+- `DeckAnalyzerPage` — saves to `localStorage` on every successful analysis; reads
+  `?load={id}` on first render to restore a stored result without re-running the pipeline.
+- `SavedResultsPage` (`/saved`) — loads and displays both saved builds and analyses.
+- `NavMenu` — "Saved Results" link (bookmark icon) under a new "History" section.
+
+### 5. Mana Curve Analysis — Done (2026-08-05)
 
 **Implemented:** `ManaCurveChart` shared component (`Components/Shared/ManaCurveChart.razor/.cs`).
 Available as the "By Mana Value" tab on both `/analyze` and the DeckResults page.
@@ -660,5 +665,7 @@ All four projects compile; 398 tests pass.
 **Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket via Commander Spellbook `estimate-bracket` (shown in header), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist. **Combo Finder (v4):** `CommanderSpellbookClient` (`IComboSource`) — `find-my-combos` + `estimate-bracket` endpoints with SHA256 cache. `IComboFinder` / `ComboFinder` calls `find-my-combos` on demand; `estimate-bracket` runs automatically during analysis and is shown in the results header. Combos tab shows complete combos, near-misses (owned + missing pieces). **ComboPoolSource (v5):** `IComboCardSource` / `ComboPoolSource` injects near-miss combo pieces into the builder pool on every build (locked cards passed as seed deck); inclusion score normalized by combo popularity. **DeckResults Upgrade Paths + Combos tabs:** both tabs ported to the build result page; upgrade paths use an independent per-card price input not bound by the build's budget cap.
 
 **Tests:** 398 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.
+
+**Saved Results:** `AnalysisResultStorage` (parallel to `DeckResultStorage`) saves analysis results to `localStorage`. `DeckAnalyzerPage` saves on every successful analysis and restores via `?load={id}` query param. `/saved` page lists all saved builds and analyses (newest first) with links to their results. "Saved Results" nav link (bookmark icon) under a new "History" section.
 
 **Deployment:** Hetzner CX23 VPS (91.98.114.42) + Docker Compose + Caddy reverse proxy (automatic TLS via Let's Encrypt). GitHub Actions CI/CD pipeline: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup guide and troubleshooting in `TODO/DEPLOYMENT.md`.

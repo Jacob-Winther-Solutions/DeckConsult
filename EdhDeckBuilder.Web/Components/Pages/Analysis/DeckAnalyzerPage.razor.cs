@@ -23,6 +23,11 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     [Inject] private IApiKeyStateService    ApiKeyState     { get; set; } = default!;
     [Inject] private IJSRuntime             JS              { get; set; } = default!;
 
+    [SupplyParameterFromQuery(Name = "load")]
+    public string? LoadId { get; set; }
+
+    private bool _triedLoad;
+
     private static readonly string[] AnalysisStages =
     [
         "Resolving card names",
@@ -79,6 +84,24 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     protected override void OnInitialized()
     {
         ApiKeyState.OnChange += OnApiKeyStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _triedLoad || string.IsNullOrEmpty(LoadId)) return;
+        _triedLoad = true;
+
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("getLocalStorage", AnalysisResultStorage.LocalStorageKey(LoadId));
+            if (string.IsNullOrEmpty(json)) return;
+            var stored = AnalysisResultStorage.Deserialize(json);
+            if (stored is null) return;
+            _result = stored.Result;
+            _selectedCommanders = stored.Result.Commanders;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { /* localStorage unavailable or JSON malformed */ }
     }
 
     public void Dispose()
@@ -390,6 +413,20 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 _isAnalyzing = false;
                 StateHasChanged();
             });
+
+            if (_result is not null)
+            {
+                var id = Guid.NewGuid().ToString("N");
+                var stored = new StoredAnalysisResult(_result, DateOnly.FromDateTime(DateTime.UtcNow));
+                try
+                {
+                    await JS.InvokeVoidAsync("saveAnalysisResult",
+                        AnalysisResultStorage.LocalStorageKey(id),
+                        AnalysisResultStorage.Serialize(stored),
+                        AnalysisResultStorage.DefaultMaxSavedResults);
+                }
+                catch { /* localStorage unavailable */ }
+            }
 
         }
         catch (OperationCanceledException)
