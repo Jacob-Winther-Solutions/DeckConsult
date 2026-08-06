@@ -625,39 +625,11 @@ Scryfall bulk data is cached locally with a 24-hour max age. New cards released 
 
 ---
 
-## Deployment
+## Deployment — DONE (2026-08-06)
 
-Plan and execute the first production deployment of the app to a public host.
-
-**Hosting decision (already made):** Single Hetzner VPS (EU data centers — GDPR-respecting,
-cheap). Start on CX22 (~€4/month); scale vertically by resizing the VM if needed. Horizontal
-scaling (multiple instances + sticky sessions + shared Data Protection keyring via managed
-PostgreSQL) is a future concern only if the single VM proves insufficient.
-
-**Hosting model:** Blazor Server. Confirmed — BYOK key lives in a scoped server-side service
-and never reaches the browser. If the project ever moves to Blazor WASM, the BYOK design
-must change (key would be browser-side).
-
-**Tasks:**
-- [ ] **Containerise the app**: write `Dockerfile` (multi-stage: SDK image to build, ASP.NET
-      runtime image to serve) and `docker-compose.yml`. Mount a named volume for the ASP.NET
-      Core Data Protection keyring so it survives container restarts and redeployments.
-- [ ] **TLS termination**: run Caddy (or Nginx + Certbot) as a reverse proxy in the same
-      Compose stack. Caddy handles Let's Encrypt certificate renewal automatically.
-- [ ] **Secrets / config in production**: pass `Anthropic:ApiKey` (the fallback dev key, if
-      kept), `TcgPlayer:AffiliateCode`, and Data Protection configuration via environment
-      variables or a `.env` file excluded from source control. Document required env vars in
-      `README.md`.
-- [ ] **CI/CD**: GitHub Actions workflow — on push to `main`, build + test, build Docker image,
-      push to a registry (GitHub Container Registry is free), SSH into the Hetzner VM and
-      run `docker-compose pull && docker-compose up -d`.
-- [ ] **Domain + DNS**: point a domain at the Hetzner IP. Caddy picks it up automatically
-      for certificate issuance.
-- [ ] **Scaling plan (document, don't implement yet)**: if load outgrows the single VM,
-      the path is: (1) resize VM vertically, (2) add a second instance with sticky sessions
-      and a managed Hetzner PostgreSQL for the shared Data Protection keyring
-      (`PersistKeysToDbContext`). Document this in `README.md` so future-us doesn't have to
-      rediscover it.
+App is live at https://deckconsult.winther-solutions.dk. See `TODO/DEPLOYMENT.md` for the
+full setup guide and troubleshooting notes. The complete CI/CD pipeline (test → build →
+push to ghcr.io → deploy to Hetzner VPS) runs on every push to `main`.
 
 ---
 
@@ -687,4 +659,6 @@ All four projects compile; 398 tests pass.
 
 **Deck Analyzer (v1–v3):** `/analyze` page — paste decklist + pick commander → classify 99 cards via `ILlmClassifier`, compute coverage by role, estimate bracket via Commander Spellbook `estimate-bracket` (shown in header), surface role gaps vs. balanced baseline. `DecklistParser` handles plain `1 Card Name` plus Arena `(SET) ###`, Archidekt/MTGO `[SET]`, Moxfield `#` headers, count-suffixed section headers, and `SB:` sideboard lines. MDFCs resolved by front-face name only. Commanders included in the pasted 99 are de-duplicated automatically. **Upgrade Paths tab** (`IDeckUpgrader` / `DeckUpgrader`): two-LLM-call pipeline per gap — cheap Haiku/Lite prioritization of gaps by user feedback, then per-gap add+cut suggestions from the selected model, validated against the EDHREC pool whitelist and the current decklist. **Combo Finder (v4):** `CommanderSpellbookClient` (`IComboSource`) — `find-my-combos` + `estimate-bracket` endpoints with SHA256 cache. `IComboFinder` / `ComboFinder` calls `find-my-combos` on demand; `estimate-bracket` runs automatically during analysis and is shown in the results header. Combos tab shows complete combos, near-misses (owned + missing pieces). **ComboPoolSource (v5):** `IComboCardSource` / `ComboPoolSource` injects near-miss combo pieces into the builder pool on every build (locked cards passed as seed deck); inclusion score normalized by combo popularity. **DeckResults Upgrade Paths + Combos tabs:** both tabs ported to the build result page; upgrade paths use an independent per-card price input not bound by the build's budget cap.
 
-**Tests:** 407 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.
+**Tests:** 398 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.
+
+**Deployment:** Hetzner CX23 VPS (91.98.114.42) + Docker Compose + Caddy reverse proxy (automatic TLS via Let's Encrypt). GitHub Actions CI/CD pipeline: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup guide and troubleshooting in `TODO/DEPLOYMENT.md`.

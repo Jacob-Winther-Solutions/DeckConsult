@@ -8,12 +8,13 @@ automated CI/CD pipeline takes over.
 
 ## Architecture
 
-- **Host:** Hetzner CX22 VPS (~€4.51/month, EU data center)
+- **Host:** Hetzner CX23 VPS (~€6.80/month, EU data center, Cost-Optimized x86 tier)
 - **App:** Blazor Server in Docker, listening on HTTP port 8080 inside the container
 - **TLS:** Caddy reverse proxy handles HTTPS and fetches a Let's Encrypt certificate automatically
 - **CI/CD:** GitHub Actions — on every push to `main`: run tests → build Docker image →
   push to GitHub Container Registry (`ghcr.io`) → copy compose files to VPS → restart containers
-- **Total monthly cost:** ~€4.51 + your domain registration fee. No other recurring charges.
+- **Live URL:** https://deckconsult.winther-solutions.dk
+- **Total monthly cost:** ~€6.80 + your domain registration fee. No other recurring charges.
 
 ### Persistent volumes (survive container restarts and redeployments)
 
@@ -43,11 +44,6 @@ username placeholder noted below):
 ---
 
 ## Step 1 — Provision the Hetzner VPS
-
-> **Status:** Hetzner account created and credit card added. Waiting for identity
-> verification (passport upload) before a project can be created.
-
-Once your account is verified:
 
 1. Log in at https://console.hetzner.cloud
 2. Click **+ New project**, name it `deckconsult`, click **Add project**
@@ -87,8 +83,8 @@ Click **Servers** → **Add server** and fill in:
 |---|---|
 | **Location** | Any EU location (Frankfurt or Helsinki) |
 | **Image** | Ubuntu 24.04 |
-| **Type** | Shared vCPU → x86 → **CX22** (2 vCPU, 4 GB RAM, 40 GB SSD) |
-| **Networking** | Leave defaults (public IPv4 + IPv6) |
+| **Type** | Shared vCPU → **Cost-Optimized** → x86 → **CX23** (2 vCPU, 4 GB RAM, 40 GB SSD, ~€6.80/month) |
+| **Networking** | Enable **Public IPv4** (required — IPv6-only servers are not reachable via SSH by default) |
 | **SSH keys** | Check the `deckconsult` key you added |
 | **Name** | `deckconsult` |
 
@@ -218,7 +214,7 @@ closing `-----END OPENSSH PRIVATE KEY-----` line) as the secret value.
 
 Push any commit to `main`. The GitHub Actions workflow will:
 
-1. Run all 407 tests
+1. Run all tests
 2. Build the Docker image and push it to `ghcr.io/YOUR_GITHUB_USERNAME/edh-deck-builder:latest`
 3. Copy `docker-compose.yml` and `Caddyfile` to `/opt/deckconsult` on the VPS
 4. Pull the new image and restart the containers
@@ -263,11 +259,71 @@ docker compose logs app --tail 50
 
 ## Resumption checklist
 
-- [ ] Hetzner identity verification approved
-- [ ] Step 1 — VPS created, IP noted
-- [ ] Step 2 — Docker installed on VPS
-- [ ] Step 3 — `/opt/deckconsult/.env` created with correct GitHub username
-- [ ] Step 4 — `docker login ghcr.io` on VPS with PAT
-- [ ] Step 5 — DNS A record added, propagation confirmed
-- [ ] Step 6 — `HETZNER_HOST` and `HETZNER_SSH_KEY` secrets added to GitHub repo
-- [ ] Step 7 — Pushed to `main`, workflow passed, site live at https://deckconsult.winther-solutions.dk
+- [x] Hetzner identity verification approved
+- [x] Step 1 — VPS created (CX23, IP: 91.98.114.42)
+- [x] Step 2 — Docker installed on VPS
+- [x] Step 3 — `/opt/deckconsult/.env` created (`DOCKER_IMAGE=ghcr.io/jacob-winther-solutions/edh-deck-builder:latest`)
+- [x] Step 4 — `docker login ghcr.io` on VPS with PAT (`read:packages` scope)
+- [x] Step 5 — DNS A record `deckconsult` → `91.98.114.42` added at Simply.com
+- [x] Step 6 — `HETZNER_HOST` and `HETZNER_SSH_KEY` secrets added to GitHub repo
+- [x] Step 7 — Site live at https://deckconsult.winther-solutions.dk
+
+---
+
+## Troubleshooting — issues encountered during initial setup
+
+### Image tag must be lowercase
+
+`github.repository_owner` preserves the original casing of the GitHub username. Docker
+requires all image references to be lowercase. Fix: hardcode the image name in the
+workflow instead of deriving it from `github.repository_owner`:
+
+```yaml
+env:
+  IMAGE: ghcr.io/jacob-winther-solutions/edh-deck-builder
+```
+
+### Bootstrap CSS returns 404
+
+The default `.gitignore` template for .NET excludes `**/wwwroot/lib/`, which strips the
+LibMan-managed Bootstrap files from the repository. The Docker image therefore never
+contains them. Fix: remove `**/wwwroot/lib/` from `.gitignore` and commit the Bootstrap
+files with:
+
+```powershell
+git add -f EdhDeckBuilder.Web/wwwroot/lib
+```
+
+### `blazor.web.js` returns 404 (SDK version mismatch)
+
+The stable .NET SDK (`10.0.3xx`) does not publish `blazor.web.js` as a physical file in
+the publish output. The preview SDK (`10.0.4xx-preview`) does. Because the Docker build
+image uses the stable SDK, the file is absent from the container.
+
+**Fix applied** (two parts):
+
+1. The file is committed at `docker/framework/blazor.web.js` (sourced from a local
+   `dotnet publish` with the preview SDK). The Dockerfile copies it into the publish
+   output after `dotnet publish` runs:
+
+   ```dockerfile
+   # Stable SDK (10.0.3xx) doesn't publish blazor.web.js; copy it from the repo
+   RUN mkdir -p /app/publish/wwwroot/_framework && \
+       cp /src/docker/framework/blazor.web.js /app/publish/wwwroot/_framework/blazor.web.js
+   ```
+
+2. `app.UseStaticFiles()` is added before `app.MapStaticAssets()` in `Program.cs` so
+   that physical files in `wwwroot/` are served even when they have no entry in the
+   static asset manifest.
+
+The file is **not** placed in `EdhDeckBuilder.Web/wwwroot/_framework/` because the
+preview SDK already generates it as a framework asset — placing it in `wwwroot/` creates
+a duplicate-key build error on the preview SDK.
+
+### Retrieving your local .NET API key secrets
+
+API keys for local development are stored as .NET user secrets. To list them:
+
+```powershell
+dotnet user-secrets list --project EdhDeckBuilder.Web
+```
