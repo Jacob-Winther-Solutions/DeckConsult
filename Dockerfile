@@ -15,6 +15,10 @@ RUN dotnet publish EdhDeckBuilder.Web/EdhDeckBuilder.Web.csproj \
     --configuration Release \
     --output /app/publish
 
+RUN echo "=== SDK version ===" && dotnet --version && \
+    echo "=== _framework contents ===" && \
+    ls /app/publish/wwwroot/_framework/ 2>/dev/null || echo "_framework NOT found"
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
