@@ -81,302 +81,42 @@
 
     @if (_view == DeckView.ByRole)
     {
-        <!-- ── Coverage summary ───────────────────────────────────────────── -->
-        <div class="card mb-3 mx-3">
-            <div class="card-header d-flex align-items-center">
-                <span class="fw-semibold me-auto">Coverage Summary</span>
-                <button class="btn btn-sm btn-link text-muted py-0" @onclick="() => _showCoverage = !_showCoverage">
-                    @(_showCoverage ? "Hide" : "Show")
-                </button>
-            </div>
-            @if (_showCoverage)
-            {
-                <table class="table table-sm mb-0 align-middle">
-                    <thead class="text-muted" style="font-size: 0.8rem;">
-                        <tr>
-                            <th class="ps-3 fw-normal">Role</th>
-                            <th class="text-center fw-normal">Planned (min&ndash;ideal&ndash;max)</th>
-                            <th class="text-center fw-normal">Actual</th>
-                            <th class="pe-3 fw-normal" style="min-width: 140px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var role in RoleDisplayOrder)
-                        {
-                            if (!Result.PlannedTemplate.Targets.TryGetValue(role, out var target)) continue;
-                            // For Land, add basic lands so the row reflects the full land count.
-                            var actual = role == CardRole.Land
-                                ? Result.ActualCoverage.GetValueOrDefault(role, 0.0) + Result.BasicLandCounts.Values.Sum()
-                                : Result.ActualCoverage.GetValueOrDefault(role, 0.0);
-                            var barPct = target.Ideal > 0
-                                ? Math.Min(100.0, actual / target.Ideal * 100.0)
-                                : 0.0;
-                            var isOk = actual >= target.Min;
-                            <tr>
-                                <td class="ps-3">@RoleName(role)</td>
-                                <td class="text-center text-muted" style="font-size: 0.8rem;">
-                                    @target.Min&ndash;@target.Ideal&ndash;@target.Max
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge @(isOk ? "bg-success" : "bg-warning text-dark")">
-                                        @actual.ToString("0.#")
-                                    </span>
-                                </td>
-                                <td class="pe-3">
-                                    <div class="progress" style="height: 5px;">
-                                        <div class="progress-bar @(isOk ? "bg-success" : "bg-warning")"
-                                             style="width: @barPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;">
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-        </div>
-
-        <!-- ── Coverage warnings ──────────────────────────────────────────── -->
-        @if (Result.CoverageWarnings.Count > 0)
-        {
-            <div class="alert alert-warning mx-3 mb-3">
-                <strong>Coverage warnings</strong>
-                <ul class="mb-0 mt-1 small">
-                    @foreach (var warning in Result.CoverageWarnings)
-                    {
-                        <li>@warning</li>
-                    }
-                </ul>
-            </div>
-        }
-
-        <!-- ── Budget warnings ───────────────────────────────────────────── -->
-        @if (Result.BudgetWarnings.Count > 0)
-        {
-            <div class="alert alert-danger mx-3 mb-3">
-                <strong>Budget warnings</strong>
-                <ul class="mb-0 mt-1 small">
-                    @foreach (var warning in Result.BudgetWarnings)
-                    {
-                        <li>@warning</li>
-                    }
-                </ul>
-            </div>
-        }
-
-        <!-- ── Role buckets ───────────────────────────────────────────────── -->
-        @foreach (var role in RoleDisplayOrder)
-        {
-            var primaryCards = Result.Deck
-                .Where(c => c.Roles.Primary == role)
-                .OrderBy(c => c.Rank)
-                .ToList();
-            var secondaryCards = Result.Deck
-                .Where(c => c.Roles.Primary != role && c.Roles.Secondary.Any(s => s.Role == role))
-                .OrderByDescending(c => c.Roles.Secondary.First(s => s.Role == role).Weight)
-                .ThenBy(c => c.Card.Name)
-                .ToList();
-            if (primaryCards.Count == 0 && secondaryCards.Count == 0) continue;
-
-            var actual    = Result.ActualCoverage.GetValueOrDefault(role, 0.0);
-            var cutIds    = Result.CutSuggestions.TryGetValue(role, out var cuts)
-                ? cuts.Select(c => c.Card.OracleId).ToHashSet()
-                : new HashSet<Guid>();
-            var collapsed = _collapsedBuckets.Contains(role);
-
-            <div class="card mb-3 mx-3">
-                <div class="card-header d-flex align-items-center gap-2"
-                     style="cursor: pointer;"
-                     @onclick="() => ToggleBucket(role)">
-                    <span class="fw-semibold me-auto">
-                        @RoleName(role)
-                        <span class="badge bg-secondary ms-1 fw-normal">@primaryCards.Count</span>
-                        @if (secondaryCards.Count > 0)
-                        {
-                            <span class="badge bg-secondary bg-opacity-50 ms-1 fw-normal"
-                                  title="@secondaryCards.Count card(s) also contribute to this role">
-                                +@secondaryCards.Count
-                            </span>
-                        }
-                    </span>
-                    <span class="text-muted small">@actual.ToString("0.#") coverage</span>
-                    @if (cutIds.Count > 0)
-                    {
-                        <span class="badge bg-warning text-dark">
-                            @cutIds.Count cut suggestion@(cutIds.Count > 1 ? "s" : "")
-                        </span>
-                    }
-                    <span class="text-muted small">@(collapsed ? "&#9654;" : "&#9660;")</span>
-                </div>
-
-                @if (!collapsed)
+        <CoverageReportPanel Cards="AnalysisResult.Cards"
+                             ActualCoverage="Result.ActualCoverage"
+                             BasicLandCounts="Result.BasicLandCounts"
+                             Targets="Result.PlannedTemplate.Targets"
+                             ExtraLandCoverage="Result.BasicLandCounts.Values.Sum()"
+                             MaxCardPriceUsd="MaxCardPriceUsd"
+                             CardRanks="CardRankLookup"
+                             CutOracleIds="CutOracleIdsByRole"
+                             RunnerUps="Result.RunnerUps">
+            <Alerts>
+                @if (Result.CoverageWarnings.Count > 0)
                 {
-                    <div class="list-group list-group-flush">
-                        @foreach (var suggestion in primaryCards)
-                        {
-                            var isCut = cutIds.Contains(suggestion.Card.OracleId);
-                            var isOver = !suggestion.IsLocked && IsOverBudget(suggestion.Card);
-                            <div class="list-group-item @(isCut ? "list-group-item-warning" : "") py-2">
-                                <div class="d-flex gap-3 align-items-start">
-                                    <span class="text-muted small mt-1" style="min-width:1.8rem; text-align:right;">
-                                        #@suggestion.Rank
-                                    </span>
-                                    <div class="flex-grow-1 min-width-0">
-                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                            <span class="fw-semibold">@suggestion.Card.Name</span>
-                                            @if (suggestion.Card.ManaValue > 0)
-                                            {
-                                                <span class="badge bg-light text-dark border"
-                                                      style="font-size: 0.7rem;"
-                                                      title="Mana value">
-                                                    @suggestion.Card.ManaValue.ToString("0.#")
-                                                </span>
-                                            }
-                                            @if (suggestion.Card.PriceUsd.HasValue)
-                                            {
-                                                <span class="badge @(isOver ? "bg-danger" : "bg-light text-dark border")"
-                                                      style="font-size: 0.7rem;"
-                                                      title="@(isOver ? $"Over budget (limit: ${MaxCardPriceUsd:F2})" : "Price")">
-                                                    $@suggestion.Card.PriceUsd.Value.ToString("F2")
-                                                </span>
-                                            }
-                                            <span class="text-muted small">@suggestion.Card.TypeLine</span>
-                                            @foreach (var contrib in suggestion.Roles.Secondary)
-                                            {
-                                                var b = SecondaryBadge(contrib);
-                                                <span class="badge @b.CssClass" title="@b.Tooltip">@b.Label</span>
-                                            }
-                                                            @if (suggestion.IsLocked)
-                                            {
-                                                <span class="badge bg-secondary" title="Locked by user — will not be cut">&#128274; locked</span>
-                                            }
-                                            @if (isCut)
-                                            {
-                                                <span class="badge bg-warning text-dark">consider cutting</span>
-                                            }
-                                            @if (isOver)
-                                            {
-                                                <span class="badge bg-danger">over budget</span>
-                                            }
-                                        </div>
-                                        <p class="mb-0 text-muted fst-italic" style="font-size: 0.82rem;">
-                                            @suggestion.Reason
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-
-                    @if (secondaryCards.Count > 0)
-                    {
-                        <div class="px-3 py-2 border-top" style="background: rgba(0,0,0,0.02);">
-                            <div class="text-muted fw-semibold text-uppercase mb-2"
-                                 style="font-size: 0.65rem; letter-spacing: 0.05em;">
-                                Also contributes
-                            </div>
-                            @foreach (var suggestion in secondaryCards)
+                    <div class="alert alert-warning mx-3 mb-3">
+                        <strong>Coverage warnings</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var warning in Result.CoverageWarnings)
                             {
-                                var contrib = suggestion.Roles.Secondary.First(s => s.Role == role);
-                                var b = SecondaryBadge(contrib);
-                                <div class="d-flex flex-wrap align-items-center gap-2 py-1">
-                                    <span class="text-muted" style="font-size: 0.85rem;">@suggestion.Card.Name</span>
-                                    @if (suggestion.Card.ManaValue > 0)
-                                    {
-                                        <span class="badge bg-light text-dark border"
-                                              style="font-size: 0.65rem;"
-                                              title="Mana value">
-                                            @suggestion.Card.ManaValue.ToString("0.#")
-                                        </span>
-                                    }
-                                    <span class="badge @PrimaryRoleBadgeClass(suggestion.Roles.Primary)"
-                                          style="font-size: 0.65rem;"
-                                          title="Primary role">
-                                        @RoleName(suggestion.Roles.Primary)
-                                    </span>
-                                    <span class="badge @b.CssClass"
-                                          style="font-size: 0.65rem;"
-                                          title="@b.Tooltip">@b.Label</span>
-                                </div>
+                                <li>@warning</li>
                             }
-                        </div>
-                    }
-                }
-            </div>
-        }
-
-        <!-- ── Basic lands ────────────────────────────────────────────────── -->
-        @if (Result.BasicLandCounts.Count > 0)
-        {
-            <div class="card mb-3 mx-3">
-                <div class="card-header d-flex align-items-center gap-2"
-                     style="cursor: pointer;"
-                     @onclick="() => _showBasics = !_showBasics">
-                    <span class="fw-semibold me-auto">
-                        Basic Lands
-                        <span class="badge bg-secondary ms-1 fw-normal">
-                            @Result.BasicLandCounts.Values.Sum()
-                        </span>
-                    </span>
-                    <span class="text-muted small">@(_showBasics ? "&#9660;" : "&#9654;")</span>
-                </div>
-                @if (_showBasics)
-                {
-                    <div class="card-body">
-                        <div class="d-flex flex-wrap gap-4">
-                            @foreach (var (land, count) in Result.BasicLandCounts.OrderByDescending(kv => kv.Value))
-                            {
-                                <div class="text-center">
-                                    <div class="fw-semibold fs-5">@count&times;</div>
-                                    <div class="text-muted small">@land</div>
-                                </div>
-                            }
-                        </div>
+                        </ul>
                     </div>
                 }
-            </div>
-        }
-
-        <!-- ── Runner-ups ─────────────────────────────────────────────────── -->
-        @if (Result.RunnerUps.Count > 0)
-        {
-            <div class="card mb-3 mx-3">
-                <div class="card-header d-flex align-items-center gap-2"
-                     style="cursor: pointer;"
-                     @onclick="() => _showRunnerUps = !_showRunnerUps">
-                    <span class="fw-semibold me-auto">
-                        Runner-Ups
-                        <span class="badge bg-secondary ms-1 fw-normal">@Result.RunnerUps.Count</span>
-                    </span>
-                    <span class="text-muted small">Evaluated but not selected &mdash; swap candidates</span>
-                    <span class="text-muted small">@(_showRunnerUps ? "&#9660;" : "&#9654;")</span>
-                </div>
-                @if (_showRunnerUps)
+                @if (Result.BudgetWarnings.Count > 0)
                 {
-                    @foreach (var group in Result.RunnerUps.GroupBy(r => r.Section).OrderBy(g => g.Key))
-                    {
-                        <div class="px-3 py-2 border-top">
-                            <div class="text-muted small text-uppercase fw-semibold mb-2"
-                                 style="font-size: 0.7rem; letter-spacing: 0.05em;">
-                                @group.Key
-                            </div>
-                            <div class="d-flex flex-wrap gap-2">
-                                @foreach (var candidate in group.OrderByDescending(c => c.Inclusion).Take(12))
-                                {
-                                    <span class="badge bg-light text-dark border"
-                                          title="@candidate.Inclusion.ToString("P0") inclusion · @candidate.Card.TypeLine">
-                                        @candidate.Card.Name
-                                        <span class="text-muted ms-1" style="font-size:0.7em;">
-                                            @candidate.Inclusion.ToString("P0")
-                                        </span>
-                                    </span>
-                                }
-                            </div>
-                        </div>
-                    }
+                    <div class="alert alert-danger mx-3 mb-3">
+                        <strong>Budget warnings</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var warning in Result.BudgetWarnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
                 }
-            </div>
-        }
+            </Alerts>
+        </CoverageReportPanel>
     }
 
     @if (_view == DeckView.ByType)

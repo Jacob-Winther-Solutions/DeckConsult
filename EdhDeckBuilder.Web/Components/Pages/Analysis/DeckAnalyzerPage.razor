@@ -123,13 +123,15 @@
 
             @if (_view == AnalysisView.ByRole)
             {
-                <!-- ── Coverage summary ──────────────────────────────────────── -->
                 var effectiveTargets = GetEffectiveTargets();
-                <div class="card mb-3 mx-3">
-                    <div class="card-header d-flex align-items-center gap-2">
-                        <span class="fw-semibold me-auto">
-                            Coverage vs. @(_customIdeal.Count > 0 ? "custom" : "balanced midrange") targets
-                        </span>
+                var currentGaps = GetCurrentGaps();
+                <CoverageReportPanel Cards="@(_result.CommanderCards.Concat(_result.Cards).ToList())"
+                                     ActualCoverage="_result.ActualCoverage"
+                                     BasicLandCounts="_result.BasicLandCounts"
+                                     Targets="effectiveTargets"
+                                     SummaryTitle='@($"Coverage vs. {(_customIdeal.Count > 0 ? "custom" : "balanced midrange")} targets")'
+                                     TargetsColumnLabel='@(_editingTargets ? "Ideal" : "Baseline (min–ideal–max)")'>
+                    <SummaryHeaderActions>
                         @if (_customIdeal.Count > 0 && !_editingTargets)
                         {
                             <button class="btn btn-sm btn-link text-muted py-0"
@@ -139,12 +141,8 @@
                                 @onclick="() => _editingTargets = !_editingTargets">
                             @(_editingTargets ? "Done" : "Customize")
                         </button>
-                        <button class="btn btn-sm btn-link text-muted py-0" @onclick="() => _showCoverage = !_showCoverage">
-                            @(_showCoverage ? "Hide" : "Show")
-                        </button>
-                    </div>
-                    @if (_showCoverage)
-                    {
+                    </SummaryHeaderActions>
+                    <SummaryBodyPrefix>
                         @if (!_editingTargets)
                         {
                             <div class="px-3 pt-2 pb-1">
@@ -155,248 +153,62 @@
                                 </small>
                             </div>
                         }
-                        <table class="table table-sm mb-0 align-middle">
-                            <thead class="text-muted" style="font-size: 0.8rem;">
-                                <tr>
-                                    <th class="ps-3 fw-normal">Role</th>
-                                    <th class="text-center fw-normal">
-                                        @(_editingTargets ? "Ideal" : "Baseline (min–ideal–max)")
-                                    </th>
-                                    <th class="text-center fw-normal">Actual</th>
-                                    <th class="pe-3 fw-normal" style="min-width: 140px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var role in RoleDisplayOrder)
-                                {
-                                    if (!effectiveTargets.TryGetValue(role, out var target)) continue;
-                                    var actual = _result.ActualCoverage.GetValueOrDefault(role, 0.0);
-                                    var barPct = target.Ideal > 0
-                                        ? Math.Min(100.0, actual / target.Ideal * 100.0)
-                                        : 0.0;
-                                    var isOk = actual >= target.Min;
-                                    var isCustom = _customIdeal.ContainsKey(role);
-                                    <tr>
-                                        <td class="ps-3">@CardRoleDisplay.RoleName(role)</td>
-                                        @if (_editingTargets)
-                                        {
-                                            <td class="text-center">
-                                                <input type="number" class="form-control form-control-sm text-center"
-                                                       style="width: 72px; display: inline-block;"
-                                                       min="0" max="40"
-                                                       value="@target.Ideal"
-                                                       @onchange="e => SetCustomIdeal(role, e.Value)" />
-                                            </td>
-                                        }
-                                        else
-                                        {
-                                            <td class="text-center text-muted" style="font-size: 0.8rem;">
-                                                @target.Min&ndash;<strong class="@(isCustom ? "text-primary" : "")">@target.Ideal</strong>&ndash;@target.Max
-                                            </td>
-                                        }
-                                        <td class="text-center">
-                                            <span class="badge @(isOk ? "bg-success" : "bg-warning text-dark")">
-                                                @actual.ToString("0.#")
-                                            </span>
-                                        </td>
-                                        <td class="pe-3">
-                                            <div class="progress" style="height: 5px;">
-                                                <div class="progress-bar @(isOk ? "bg-success" : "bg-warning")"
-                                                     style="width: @barPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;">
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
-                </div>
-
-                <!-- ── Role gaps ─────────────────────────────────────────────── -->
-                var currentGaps = GetCurrentGaps();
-                @if (currentGaps.Count > 0)
-                {
-                    <div class="alert alert-warning mx-3 mb-3">
-                        <strong>Role gaps vs. @(_customIdeal.Count > 0 ? "custom" : "balanced") targets</strong>
-                        <ul class="mb-0 mt-1 small">
-                            @foreach (var gap in currentGaps)
-                            {
-                                <li>
-                                    <strong>@CardRoleDisplay.RoleName(gap.Role):</strong>
-                                    @gap.ActualCoverage.ToString("0.#") / @gap.IdealTarget ideal
-                                    (@gap.Shortfall.ToString("0.#") short)
-                                </li>
-                            }
-                        </ul>
-                    </div>
-                }
-
-                <!-- ── Input warnings ─────────────────────────────────────────── -->
-                @if (_result.UnresolvedNames.Count > 0)
-                {
-                    <div class="alert alert-warning mx-3 mb-3">
-                        <strong>@_result.UnresolvedNames.Count card name(s) could not be resolved and are excluded from the analysis:</strong>
-                        <ul class="mb-0 mt-1 small">
-                            @foreach (var name in _result.UnresolvedNames) { <li>@name</li> }
-                        </ul>
-                    </div>
-                }
-                @if (_result.ColorIdentityViolations.Count > 0)
-                {
-                    <div class="alert alert-warning mx-3 mb-3">
-                        <strong>Color identity violations — these cards are outside your commander's color identity:</strong>
-                        <ul class="mb-0 mt-1 small">
-                            @foreach (var v in _result.ColorIdentityViolations) { <li>@v</li> }
-                        </ul>
-                    </div>
-                }
-
-                <!-- ── Role buckets ───────────────────────────────────────────── -->
-                var allAnalyzed = _result.CommanderCards.Concat(_result.Cards).ToList();
-                @foreach (var role in RoleDisplayOrder)
-                {
-                    var primaryCards = allAnalyzed
-                        .Where(c => c.Roles.Primary == role)
-                        .OrderBy(c => c.IsCommander ? 0 : 1)
-                        .ThenBy(c => c.Card.Name)
-                        .ToList();
-                    var secondaryCards = allAnalyzed
-                        .Where(c => c.Roles.Primary != role && c.Roles.Secondary.Any(s => s.Role == role))
-                        .OrderByDescending(c => c.Roles.Secondary.First(s => s.Role == role).Weight)
-                        .ThenBy(c => c.Card.Name)
-                        .ToList();
-                    if (primaryCards.Count == 0 && secondaryCards.Count == 0) continue;
-
-                    var actual    = _result.ActualCoverage.GetValueOrDefault(role, 0.0);
-                    var collapsed = _collapsedBuckets.Contains(role);
-
-                    <div class="card mb-3 mx-3">
-                        <div class="card-header d-flex align-items-center gap-2"
-                             style="cursor: pointer;"
-                             @onclick="() => ToggleBucket(role)">
-                            <span class="fw-semibold me-auto">
-                                @CardRoleDisplay.RoleName(role)
-                                <span class="badge bg-secondary ms-1 fw-normal">@primaryCards.Count</span>
-                                @if (secondaryCards.Count > 0)
-                                {
-                                    <span class="badge bg-secondary bg-opacity-50 ms-1 fw-normal"
-                                          title="@secondaryCards.Count card(s) also contribute to this role">
-                                        +@secondaryCards.Count
-                                    </span>
-                                }
-                            </span>
-                            <span class="text-muted small">@actual.ToString("0.#") coverage</span>
-                            <span class="text-muted small">@(collapsed ? "&#9654;" : "&#9660;")</span>
-                        </div>
-
-                        @if (!collapsed)
+                    </SummaryBodyPrefix>
+                    <TargetCellContent Context="ctx">
+                        @if (_editingTargets)
                         {
-                            <div class="list-group list-group-flush">
-                                @foreach (var card in primaryCards)
-                                {
-                                    <div class="list-group-item py-2">
-                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                            <span class="fw-semibold">@card.Card.Name</span>
-                                            @if (card.IsCommander)
-                                            {
-                                                <span class="badge bg-secondary" title="Commander">&#128081; Commander</span>
-                                            }
-                                            @if (card.Card.ManaValue > 0)
-                                            {
-                                                <span class="badge bg-light text-dark border"
-                                                      style="font-size: 0.7rem;" title="Mana value">
-                                                    @card.Card.ManaValue.ToString("0.#")
-                                                </span>
-                                            }
-                                            @if (card.Card.PriceUsd.HasValue)
-                                            {
-                                                <span class="badge bg-light text-dark border"
-                                                      style="font-size: 0.7rem;" title="Price">
-                                                    $@card.Card.PriceUsd.Value.ToString("F2")
-                                                </span>
-                                            }
-                                            <span class="text-muted small">@card.Card.TypeLine</span>
-                                            @foreach (var contrib in card.Roles.Secondary)
-                                            {
-                                                var b = SecondaryBadge(contrib);
-                                                <span class="badge @b.CssClass"
-                                                      style="font-size: 0.7rem;"
-                                                      title="@b.Tooltip">@b.Label</span>
-                                            }
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-
-                            @if (secondaryCards.Count > 0)
-                            {
-                                <div class="px-3 py-2 border-top" style="background: rgba(0,0,0,0.02);">
-                                    <div class="text-muted fw-semibold text-uppercase mb-2"
-                                         style="font-size: 0.65rem; letter-spacing: 0.05em;">
-                                        Also contributes
-                                    </div>
-                                    @foreach (var card in secondaryCards)
-                                    {
-                                        var contrib = card.Roles.Secondary.First(s => s.Role == role);
-                                        var b = SecondaryBadge(contrib);
-                                        <div class="d-flex flex-wrap align-items-center gap-2 py-1">
-                                            <span class="text-muted" style="font-size: 0.85rem;">@card.Card.Name</span>
-                                            @if (card.IsCommander)
-                                            {
-                                                <span class="badge bg-secondary" style="font-size: 0.65rem;">Commander</span>
-                                            }
-                                            @if (card.Card.ManaValue > 0)
-                                            {
-                                                <span class="badge bg-light text-dark border"
-                                                      style="font-size: 0.65rem;" title="Mana value">
-                                                    @card.Card.ManaValue.ToString("0.#")
-                                                </span>
-                                            }
-                                            <span class="badge @CardRoleDisplay.PrimaryRoleBadgeClass(card.Roles.Primary)"
-                                                  style="font-size: 0.65rem;" title="Primary role">
-                                                @CardRoleDisplay.RoleName(card.Roles.Primary)
-                                            </span>
-                                            <span class="badge @b.CssClass"
-                                                  style="font-size: 0.65rem;" title="@b.Tooltip">@b.Label</span>
-                                        </div>
-                                    }
-                                </div>
-                            }
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm text-center"
+                                       style="width: 72px; display: inline-block;"
+                                       min="0" max="40"
+                                       value="@ctx.Target.Ideal"
+                                       @onchange="e => SetCustomIdeal(ctx.Role, e.Value)" />
+                            </td>
                         }
-                    </div>
-                }
-
-                <!-- ── Basic lands ────────────────────────────────────────────── -->
-                @if (_result.BasicLandCounts.Count > 0)
-                {
-                    <div class="card mb-3 mx-3">
-                        <div class="card-header d-flex align-items-center gap-2"
-                             style="cursor: pointer;" @onclick="() => _showBasics = !_showBasics">
-                            <span class="fw-semibold me-auto">
-                                Basic Lands
-                                <span class="badge bg-secondary ms-1 fw-normal">
-                                    @_result.BasicLandCounts.Values.Sum()
-                                </span>
-                            </span>
-                            <span class="text-muted small">@(_showBasics ? "&#9660;" : "&#9654;")</span>
-                        </div>
-                        @if (_showBasics)
+                        else
                         {
-                            <div class="card-body">
-                                <div class="d-flex flex-wrap gap-4">
-                                    @foreach (var (land, count) in _result.BasicLandCounts.OrderByDescending(kv => kv.Value))
+                            <td class="text-center text-muted" style="font-size: 0.8rem;">
+                                @ctx.Target.Min&ndash;<strong class="@(_customIdeal.ContainsKey(ctx.Role) ? "text-primary" : "")">@ctx.Target.Ideal</strong>&ndash;@ctx.Target.Max
+                            </td>
+                        }
+                    </TargetCellContent>
+                    <Alerts>
+                        @if (currentGaps.Count > 0)
+                        {
+                            <div class="alert alert-warning mx-3 mb-3">
+                                <strong>Role gaps vs. @(_customIdeal.Count > 0 ? "custom" : "balanced") targets</strong>
+                                <ul class="mb-0 mt-1 small">
+                                    @foreach (var gap in currentGaps)
                                     {
-                                        <div class="text-center">
-                                            <div class="fw-semibold fs-5">@count&times;</div>
-                                            <div class="text-muted small">@land</div>
-                                        </div>
+                                        <li>
+                                            <strong>@CardRoleDisplay.RoleName(gap.Role):</strong>
+                                            @gap.ActualCoverage.ToString("0.#") / @gap.IdealTarget ideal
+                                            (@gap.Shortfall.ToString("0.#") short)
+                                        </li>
                                     }
-                                </div>
+                                </ul>
                             </div>
                         }
-                    </div>
-                }
+                        @if (_result.UnresolvedNames.Count > 0)
+                        {
+                            <div class="alert alert-warning mx-3 mb-3">
+                                <strong>@_result.UnresolvedNames.Count card name(s) could not be resolved and are excluded from the analysis:</strong>
+                                <ul class="mb-0 mt-1 small">
+                                    @foreach (var name in _result.UnresolvedNames) { <li>@name</li> }
+                                </ul>
+                            </div>
+                        }
+                        @if (_result.ColorIdentityViolations.Count > 0)
+                        {
+                            <div class="alert alert-warning mx-3 mb-3">
+                                <strong>Color identity violations — these cards are outside your commander's color identity:</strong>
+                                <ul class="mb-0 mt-1 small">
+                                    @foreach (var v in _result.ColorIdentityViolations) { <li>@v</li> }
+                                </ul>
+                            </div>
+                        }
+                    </Alerts>
+                </CoverageReportPanel>
             }
 
             @if (_view == AnalysisView.AllCards)

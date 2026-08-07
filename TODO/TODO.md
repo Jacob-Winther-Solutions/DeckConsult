@@ -211,13 +211,7 @@ Core and UI infrastructure complete. Edge-case tuning deferred:
 is near-identical. Extracting these into shared components follows the same pattern as
 `ManaCurveChart` and makes both files easier to read and reason about.
 
-Remaining candidate:
-
-- [ ] **`<CoverageReportPanel>` shared component.**
-  The By Role (Coverage Report) tab is ~300 lines in each page and is the largest remaining
-  duplicated block. Most parameters but structurally the same pattern.
-
-After this extraction, both host files become thin nav-tab shells with `<ComponentName ... />` blocks.
+All candidates extracted. Both host files are now thin nav-tab shells.
 
 ---
 
@@ -308,6 +302,6 @@ All four projects compile; 436 tests pass. All items below are complete.
 
 **Tests:** 436 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source, creature type catalog pluralisation and slug matching). All green. Web project exposes internals to the test project via `InternalsVisibleTo`.
 
-**Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells; `<CoverageReportPanel>` remains the last large block pending extraction.
+**Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). `CoverageReportPanel` (in `Components/Results/`) owns the full Coverage Report tab — summary table, role buckets, basic lands, runner-ups — parameterised with `RenderFragment` slots (`SummaryHeaderActions`, `SummaryBodyPrefix`, `TargetCellContent`, `Alerts`) for host-specific customisation. Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells.
 
 **Deployment:** Hetzner CX23 VPS + Docker Compose + Caddy reverse proxy (automatic TLS). GitHub Actions CI/CD: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup in `TODO/DEPLOYMENT.md`.

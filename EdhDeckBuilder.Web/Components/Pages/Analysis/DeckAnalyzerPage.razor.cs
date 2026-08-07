@@ -158,18 +158,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     private enum AnalysisView { ByRole, AllCards, ByType, ByManaValue, UpgradePaths, Combos }
     private AnalysisView _view = AnalysisView.ByRole;
 
-    private bool _showCoverage = true;
-    private bool _showBasics   = true;
-    private readonly HashSet<CardRole> _collapsedBuckets = [];
-
-    private void ToggleBucket(CardRole role)
-    {
-        if (!_collapsedBuckets.Add(role)) _collapsedBuckets.Remove(role);
-    }
-
     // ── Display helpers ─────────────────────────────────────────────────────
-
-    private static readonly CardRole[] RoleDisplayOrder = CardRoleDisplay.DisplayOrder;
 
     private static CardRoleDisplay.BadgeInfo SecondaryBadge(RoleContribution contrib) => CardRoleDisplay.SecondaryBadge(contrib);
     private static string BracketTagLabel(string? tag) => CardRoleDisplay.BracketTagLabel(tag);

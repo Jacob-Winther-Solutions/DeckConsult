@@ -32,27 +32,25 @@ public partial class DeckResults : ComponentBase, IDisposable
     private enum DeckView { ByRole, AllCards, ByType, ByManaValue, UpgradePaths, Combos }
     private DeckView _view = DeckView.AllCards;
 
-    private bool _showCoverage  = true;
-    private bool _showBasics    = true;
-    private bool _showRunnerUps = false;
-    private readonly HashSet<CardRole> _collapsedBuckets = [];
+    // ── Display helpers ─────────────────────────────────────────────────────
 
-    private void ToggleBucket(CardRole role)
-    {
-        if (!_collapsedBuckets.Add(role)) _collapsedBuckets.Remove(role);
-    }
-
-    // ── Display order ──────────────────────────────────────────────────────
-
-    private static readonly CardRole[] RoleDisplayOrder = CardRoleDisplay.DisplayOrder;
-
-    // ── Helpers ────────────────────────────────────────────────────────────
-
-    private static string RoleName(CardRole role)              => CardRoleDisplay.RoleName(role);
     private static string PrimaryRoleBadgeClass(CardRole role) => CardRoleDisplay.PrimaryRoleBadgeClass(role);
+    private static string RoleName(CardRole role)              => CardRoleDisplay.RoleName(role);
     private static CardRoleDisplay.BadgeInfo SecondaryBadge(RoleContribution contrib) => CardRoleDisplay.SecondaryBadge(contrib);
     private static string BracketTagLabel(string? tag) => CardRoleDisplay.BracketTagLabel(tag);
     private static string BracketTagCss(string? tag)   => CardRoleDisplay.BracketTagCss(tag);
+
+    // ── CoverageReportPanel data ────────────────────────────────────────────
+
+    private IReadOnlyDictionary<Guid, int>? _cardRankLookup;
+    private IReadOnlyDictionary<Guid, int> CardRankLookup =>
+        _cardRankLookup ??= Result.Deck.ToDictionary(s => s.Card.OracleId, s => s.Rank);
+
+    private IReadOnlyDictionary<CardRole, IReadOnlyCollection<Guid>>? _cutOracleIdsByRole;
+    private IReadOnlyDictionary<CardRole, IReadOnlyCollection<Guid>> CutOracleIdsByRole =>
+        _cutOracleIdsByRole ??= Result.CutSuggestions.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyCollection<Guid>)kv.Value.Select(c => c.Card.OracleId).ToHashSet());
 
     private Color CommanderColorIdentity =>
         Commanders.Aggregate(Color.None, (ci, c) => ci | c.ColorIdentity);
