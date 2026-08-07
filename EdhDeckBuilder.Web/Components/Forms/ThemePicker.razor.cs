@@ -45,6 +45,27 @@ public partial class ThemePicker : ComponentBase
     private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
         DeckTemplate.Balanced.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Ideal);
 
+    private static readonly IReadOnlyDictionary<ThemeGroup, IReadOnlyList<Theme>> ThemesByGroup =
+        Enum.GetValues<ThemeGroup>().ToDictionary(
+            g => g,
+            g => (IReadOnlyList<Theme>)Enum.GetValues<Theme>()
+                     .Where(t => ThemeLibrary.All[t].Group == g)
+                     .ToList());
+
+    private static string GroupLabel(ThemeGroup group) => group switch
+    {
+        ThemeGroup.Permanents        => "Permanents",
+        ThemeGroup.Graveyard         => "Graveyard",
+        ThemeGroup.Spells            => "Spells",
+        ThemeGroup.Lands             => "Lands",
+        ThemeGroup.Counters          => "Counters",
+        ThemeGroup.Combat            => "Combat",
+        ThemeGroup.PoliticsAndControl => "Politics & Control",
+        ThemeGroup.Synergy           => "Synergy",
+        ThemeGroup.Tribal            => "Tribal",
+        _                            => group.ToString(),
+    };
+
     private static readonly CardRole[] FormRoles =
         Enum.GetValues<CardRole>().Where(r => r != CardRole.Unclassified).ToArray();
 

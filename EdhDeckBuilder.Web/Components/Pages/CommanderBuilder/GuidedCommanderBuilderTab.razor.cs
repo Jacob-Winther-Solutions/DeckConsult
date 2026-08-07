@@ -250,6 +250,17 @@ public partial class GuidedCommanderBuilderTab : ComponentBase, IDisposable
                 StateHasChanged();
             });
         }
+        catch (QuotaExceededException ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isBuilding = false;
+                _currentStage = null;
+                _completedStages.Clear();
+                _errorMessage = LlmErrorMessages.ForQuotaException(ex);
+                StateHasChanged();
+            });
+        }
         catch (Exception ex)
         {
             await InvokeAsync(() =>

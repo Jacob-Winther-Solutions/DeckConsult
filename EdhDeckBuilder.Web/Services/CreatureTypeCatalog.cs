@@ -73,6 +73,7 @@ internal sealed class CreatureTypeCatalog
         "Mouse" => "Mice",
         "Ox" => "Oxen",
         "Louse" => "Lice",
+        "Fungus" => "Fungi",
         // Double-f words stay regular
         _ when singular.EndsWith("ff") => singular + "s",
         // -f / -fe → -ves  (Elf→Elves, Wolf→Wolves, Dwarf→Dwarves, Leaf→Leaves)

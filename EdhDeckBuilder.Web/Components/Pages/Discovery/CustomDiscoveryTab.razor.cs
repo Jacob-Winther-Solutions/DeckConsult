@@ -108,6 +108,10 @@ public partial class CustomDiscoveryTab : ComponentBase, IDisposable
             ApiKeyState.NotifyChanged();
             _errorMessage = "API key rejected. Please check your API key.";
         }
+        catch (QuotaExceededException ex)
+        {
+            _errorMessage = LlmErrorMessages.ForQuotaException(ex);
+        }
         catch (Exception ex)
         {
             _errorMessage = $"Error: {ex.Message}";

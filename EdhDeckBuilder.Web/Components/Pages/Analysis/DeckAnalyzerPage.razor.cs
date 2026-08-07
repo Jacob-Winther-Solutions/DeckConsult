@@ -347,6 +347,18 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 StateHasChanged();
             });
         }
+        catch (QuotaExceededException ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isAnalyzing = false;
+                _completedStages = new List<string>();
+                _currentStage = null;
+                _currentStageDetail = null;
+                _errorMessage = LlmErrorMessages.ForQuotaException(ex);
+                StateHasChanged();
+            });
+        }
         catch (Exception ex)
         {
             await InvokeAsync(() =>

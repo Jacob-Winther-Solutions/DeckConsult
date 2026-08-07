@@ -116,23 +116,69 @@ Peasant Commander allows up to 5 uncommon cards in the deck.
 
 ### Adding more themes
 
-Our theme list covers the most common EDHREC strategies, but several popular tags are not yet
-implemented. New themes follow the same pattern: add the enum value, a `ThemeProfile` with
-`Adjustments` in `ThemeLibrary`, and a slug entry in `EdhrecThemeSlugger`.
+New themes follow the same pattern: add the enum value, a `ThemeProfile` with `Adjustments` in
+`ThemeLibrary`, a slug entry in `EdhrecThemeSlugger`, and a `ThemeGroup` assignment. The UI
+groups themes by category with section headers (see `ThemePicker.razor`).
 
-Candidate themes to add (slug in parentheses):
-- ETB / Enter the Battlefield (`etb`)
-- Combo (`combo`)
-- Blink — already implemented; verify EDHREC slug is `blink`
-- Legends matter (`legends`)
-- Spell copy (`spell-copy`)
-- Extra combats (`extra-combats`)
-- Commander matters (`commander-matters`)
-- Birthing Pod / Sacrifice chains (`birthing-pod`)
-- Triggered abilities (`triggered-abilities`)
+Verified against EDHREC `/tags` page (2026-08-07). Creature-type tags are excluded (covered
+by `Theme.Tribal`). Deck counts shown for reference. All slugs verified on EDHREC.
 
-Before adding, check the commander page's `panels.taglinks` to confirm the slug and popularity
-are worth the effort — some tags appear on very few commanders.
+**Tier 1 — >15 k decks (implement first):**
+- [x] Burn (`burn`, 63 k) — direct damage as win condition
+- [x] Sacrifice (`sacrifice`, 40 k) — broader sacrifice payoffs beyond Aristocrats drain
+- [x] Auras (`auras`, 35 k) — aura-matters, distinct from Enchantress (which is about enchantments drawing cards)
+- [x] Treasure (`treasure`, 50 k) — treasure token generation/payoffs
+- [x] Legends (`legends`, 34 k) — legendary-matters (Sisay, Jodah, etc.)
+- [x] Discard (`discard`, 33 k) — madness, hand-emptying synergies
+- [x] Clones (`clones`, 30 k) — copy/clone creatures
+- [x] Landfall (`landfall`, 24 k) — landfall trigger payoffs
+- [x] Group Slug (`group-slug`, 23 k) — everyone takes damage/loses life
+- [x] Historic (`historic`, 23 k) — artifacts + legends + sagas matter
+- [x] Extra Combats (`extra-combats`, 21 k) — take multiple combat steps
+- [x] Theft (`theft`, 20 k) — steal opponents' permanents or spells
+- [x] Self-Mill (`self-mill`, 20 k) — fill own graveyard (distinct from Mill which targets opponents)
+- [x] Birthing Pod (`birthing-pod`, 17 k) — creature-chain tutor strategies
+- [x] Forced Combat (`forced-combat`, 16 k) — goad and forced-attack effects
+- [x] Vehicles (`vehicles`, 16 k) — vehicle-matters
+- [x] X Spells (`x-spells`, 16 k) — large-X spell strategies
+- [x] Commander Matters (`commander-matters`, 14 k) — build around commander mechanics
+
+**Tier 2 — 10–15 k decks:**
+- [x] Exile (`exile`, 13 k) — exile zone manipulation (Prosper, Gonti, etc.)
+- [x] Cascade (`cascade`, 12 k) — cascade trigger chains
+- [x] Hatebears (`hatebears`, 12 k) — creature-based disruption/taxing
+- [x] Toughness Matters (`toughness-matters`, 11 k) — toughness as power or payoff
+- [x] Spell Copy (`spell-copy`, 10 k) — fork/copy spells
+- [x] Extra Turns (`extra-turns`, 10 k) — time-walk effects
+
+**Tier 3 — 5–10 k decks:**
+- [x] ETB (`etb`, 9 k) — enters-the-battlefield triggers (broader than Blink)
+- [x] Energy (`energy`, 9 k) — energy counter generation and payoffs
+- [x] Ninjutsu (`ninjutsu`, 9 k) — ninjutsu mechanic strategies
+- [x] Sagas (`sagas`, 8 k) — saga-matters payoffs
+- [x] Attack Triggers (`attack-triggers`, 7 k) — on-attack trigger payoffs
+- [x] Clues (`clues`, 6 k) — investigate/clue token generation
+- [x] Food (`food`, 6 k) — food token generation
+- [x] Monarch (`monarch`, 6 k) — monarch mechanic
+
+**UI grouping** (section headers in `ThemePicker.razor`, search still spans all):
+- **Permanents:** Artifacts, Equipment, Enchantress, Auras, Vehicles, Sagas, Superfriends, Tokens, Treasure
+- **Graveyard:** Reanimator, Graveyard, Self-Mill, Aristocrats, Sacrifice, Birthing Pod
+- **Spells:** Spellslinger, Storm, Wheels, Discard, Spell Copy, X Spells, Cascade, Cycling, Extra Turns
+- **Lands:** Lands, Landfall, Big Mana
+- **Counters:** +1/+1 Counters, -1/-1 Counters, Counters Matter, Proliferate, Energy, Infect
+- **Combat:** Voltron, Burn, Extra Combats, Attack Triggers, Forced Combat, Theft, Ninjutsu
+- **Politics & Control:** Stax, Pillowfort, Hatebears, Group Hug, Group Slug, Chaos, Monarch, Mill
+- **Synergy:** Blink, ETB, Commander Matters, Legends, Exile, Historic, Clones, Toughness Matters, Lifegain, Clues, Food
+- **Tribal:** (special — with creature-type picker)
+
+### EDHREC theme selection in Custom Builder
+
+- [ ] Allow users to pick a theme directly from EDHREC in the Custom commander builder tab.
+      Fetch popular theme tags from the selected commander's EDHREC page (`panels.taglinks`)
+      and surface them as clickable suggestions alongside the built-in theme picker.
+      Clicking a tag pre-selects the matching built-in `Theme` (if one exists) or creates a
+      lightweight custom theme derived from the tag name and EDHREC slug.
 
 ---
 

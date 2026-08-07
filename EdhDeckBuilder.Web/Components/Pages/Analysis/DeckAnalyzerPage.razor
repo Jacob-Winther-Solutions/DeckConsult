@@ -64,16 +64,16 @@
             </div>
 
             <!-- ── EDHREC popular themes ─────────────────────────────────────── -->
-            @if (_popularThemes.Count > 0)
+            @if (_popularThemes.Any(IsPrimary))
             {
                 <div class="px-3 mb-3">
                     <div class="text-muted fw-semibold text-uppercase mb-1" style="font-size:0.65rem;letter-spacing:0.05em;">
                         Popular EDHREC themes for @_selectedCommanders[0].Name
                     </div>
                     <div class="d-flex flex-wrap gap-1">
-                        @foreach (var t in _popularThemes.Take(8))
+                        @foreach (var t in _popularThemes.Where(IsPrimary).Take(8))
                         {
-                            <span class="badge @(IsPrimary(t) ? "bg-primary" : "bg-secondary")"
+                            <span class="badge bg-primary"
                                   title="@t.Count decks on EDHREC">@t.Name</span>
                         }
                     </div>

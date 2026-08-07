@@ -111,6 +111,16 @@ public partial class UpgradePathsPanel : ComponentBase, IDisposable
                 StateHasChanged();
             });
         }
+        catch (QuotaExceededException ex)
+        {
+            await InvokeAsync(() =>
+            {
+                _isLoadingUpgrades   = false;
+                _upgradeCurrentStage = null;
+                _upgradeError        = LlmErrorMessages.ForQuotaException(ex);
+                StateHasChanged();
+            });
+        }
         catch (Exception ex)
         {
             await InvokeAsync(() =>
