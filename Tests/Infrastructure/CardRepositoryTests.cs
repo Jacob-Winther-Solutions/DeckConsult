@@ -324,6 +324,12 @@ public sealed class CardRepositoryTests : IDisposable
         }
 
         public Task<EdhrecPage?> GetPartnerPairRecommendationsAsync(string firstSlug, string secondSlug, CancellationToken ct = default)
-            => Task.FromResult<EdhrecPage?>(null);  // Mock returns null; real implementation tested separately
+            => Task.FromResult<EdhrecPage?>(null);
+
+        public Task<EdhrecPage?> GetCommanderThemePageAsync(string commanderSlug, string themeSlug, CancellationToken ct = default)
+            => Task.FromResult<EdhrecPage?>(null);
+
+        public Task<EdhrecPage?> GetTagsPageAsync(string themeSlug, CancellationToken ct = default)
+            => Task.FromResult<EdhrecPage?>(null);
     }
 }

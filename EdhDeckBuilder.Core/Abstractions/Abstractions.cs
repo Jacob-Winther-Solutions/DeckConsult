@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Core.Cards;
+using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Core.Partnerships;
 
 namespace EdhDeckBuilder.Core.Abstractions;
@@ -95,6 +96,32 @@ public interface ISuggestionSource
     /// Returns null if the partner pair is not recognized by EDHREC.
     /// </summary>
     Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card first, Card second, CancellationToken ct = default);
+
+    /// <summary>
+    /// Cards from the EDHREC commander+theme page (<c>/commanders/{slug}/{themeSlug}</c>).
+    /// Returns <see langword="null"/> when the theme has no EDHREC slug or the page does not exist (404).
+    /// </summary>
+    Task<IReadOnlyList<CardCandidate>?> GetCommanderThemeRecommendationsAsync(
+        Card commander, WeightedTheme theme, CancellationToken ct = default);
+
+    /// <summary>
+    /// Cards and commanders from the EDHREC global theme tag page (<c>/tags/{themeSlug}</c>).
+    /// <c>Cards</c> contains all non-commander cardlist sections (13 sections covering all card types).
+    /// <c>Commanders</c> contains the Top and New commander entries resolved to <see cref="Card"/> objects.
+    /// Returns <see langword="null"/> when the theme has no EDHREC slug or the page does not exist (404).
+    /// </summary>
+    Task<(IReadOnlyList<CardCandidate> Cards, IReadOnlyList<Card> Commanders)?> GetTagsAsync(
+        WeightedTheme theme, CancellationToken ct = default);
+
+    /// <summary>
+    /// The most popular EDHREC themes for this commander, parsed from <c>panels.taglinks</c>
+    /// on the commander's EDHREC page.  Ordered by deck count descending.
+    /// Each entry is (Slug, DisplayName, DeckCount, KnownTheme).
+    /// <c>KnownTheme</c> is non-null when the slug maps to a <see cref="EdhDeckBuilder.Core.Decks.Theme"/> enum value.
+    /// Returns an empty list when the page is unavailable or has no tag data.
+    /// </summary>
+    Task<IReadOnlyList<(string Slug, string Name, int Count, Theme? KnownTheme, Archetype? KnownArchetype)>> GetPopularThemesAsync(
+        Card commander, CancellationToken ct = default);
 }
 
 /// <summary>Assigns a functional role to a card. Heuristic and LLM implementations live elsewhere.</summary>

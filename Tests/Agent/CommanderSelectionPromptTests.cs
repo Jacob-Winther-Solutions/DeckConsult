@@ -35,15 +35,19 @@ public sealed class CommanderSelectionPromptTests
         var request = new CommanderDiscoveryRequest
         {
             Archetypes = [],
-            Themes = [Theme.BigMana, Theme.Tokens],
+            Themes =
+            [
+                new WeightedTheme(ThemeLibrary.All[Theme.BigMana]),
+                new WeightedTheme(ThemeLibrary.All[Theme.Tokens]),
+            ],
             ColorFilter = null,
         };
 
         // Act
         var message = CommanderSelectionPrompt.FormatUserMessage(commanders, request);
 
-        // Assert
-        Assert.Contains("BigMana", message);
+        // Assert — profile names, not enum names
+        Assert.Contains("Big Mana", message);
         Assert.Contains("Tokens", message);
     }
 

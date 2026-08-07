@@ -5,6 +5,7 @@ using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Core.Partnerships;
+using EdhDeckBuilder.Tests.Agent.Shared;
 
 namespace EdhDeckBuilder.Tests.Agent;
 
@@ -18,7 +19,7 @@ public sealed class CommanderDiscoveryTests
     {
         _selector = new MockCommanderSelector();
         _repository = new FakeCardRepository();
-        _discovery = new CommanderDiscovery(_repository, _selector);
+        _discovery = new CommanderDiscovery(_repository, new NoOpSuggestionSource(), _selector);
     }
 
     [Fact]

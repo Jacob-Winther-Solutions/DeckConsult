@@ -4,6 +4,7 @@ using EdhDeckBuilder.Agent.Models;
 using EdhDeckBuilder.Core.Abstractions;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Partnerships;
+using EdhDeckBuilder.Core.Decks;
 
 namespace EdhDeckBuilder.Agent.Discovery;
 
@@ -16,6 +17,7 @@ namespace EdhDeckBuilder.Agent.Discovery;
 /// </summary>
 public sealed class CommanderDiscovery(
     ICardRepository repository,
+    ISuggestionSource suggestionSource,
     ICommanderSelector selector) : ICommanderDiscovery
 {
     private const int SingleBatchLimit = 150;
@@ -84,6 +86,8 @@ public sealed class CommanderDiscovery(
             await AddPartnerCandidatesAsync(partnerCombos, allCandidates, candidateIds, partnerMap, ct);
         }
 
+        await AddTagsCommandersAsync(request, allCandidates, candidateIds, ct);
+
         return (allCandidates, partnerMap);
     }
     /// <summary>
@@ -129,6 +133,44 @@ public sealed class CommanderDiscovery(
             // Track the partnership so we can group them in results
             partnerMap[firstId] = combo;
             partnerMap[secondId] = combo;
+        }
+    }
+
+    /// <summary>
+    /// Fetches EDHREC tags pages for each requested theme and adds their top/new commander
+    /// entries to the candidate pool. Applies the same color-identity filter as the main query.
+    /// Commanders already in the pool (by OracleId) are skipped.
+    /// </summary>
+    private async Task AddTagsCommandersAsync(
+        CommanderDiscoveryRequest request,
+        List<Card> candidates,
+        HashSet<Guid> candidateIds,
+        CancellationToken ct)
+    {
+        if (request.Themes.Count == 0) return;
+
+        var tasks = request.Themes
+            .Select(t => suggestionSource.GetTagsAsync(t, ct))
+            .ToList();
+
+        var results = await Task.WhenAll(tasks);
+
+        foreach (var result in results)
+        {
+            if (result is null) continue;
+            foreach (var card in result.Value.Commanders)
+            {
+                if (!card.CanBeCommander) continue;
+                if (request.ColorFilter.HasValue)
+                {
+                    var passes = request.ExactColorMatch
+                        ? card.ColorIdentity == request.ColorFilter.Value
+                        : card.ColorIdentity.IsWithin(request.ColorFilter.Value);
+                    if (!passes) continue;
+                }
+                if (candidateIds.Add(card.OracleId))
+                    candidates.Add(card);
+            }
         }
     }
 

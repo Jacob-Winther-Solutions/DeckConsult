@@ -42,8 +42,17 @@ archetypes and themes upfront. This is useful if you have a specific play patter
 doesn't neatly fit preset categories.
 
 Both tabs show results as a ranked list of suggested commanders. Each suggestion includes the
-commander's image, ability text, and a written explanation of why it fits your criteria. Click
-any card to build a deck with that commander pre-selected in the builder.
+commander's image, ability text, and a written explanation of why it fits your criteria.
+
+Each result also shows **popular EDHREC themes** for that commander — the top 6 themes from
+EDHREC's tag data, ranked by how many decks on EDHREC use them. Themes already tracked in the
+app (archetypes like Aggro/Control, mechanical themes like Aristocrats or Voltron, and creature
+type tribes) are highlighted in blue; unknown EDHREC-specific tags are shown in grey.
+
+Click any suggestion to jump to the builder with that commander pre-selected. If you have not
+chosen a theme yourself, the builder link automatically presets the top popular EDHREC theme that
+maps to one of the app's known themes — giving you a reasonable starting point without requiring
+you to pick one manually.
 
 ---
 
@@ -127,6 +136,11 @@ build direction.
 
 Weights on themes work the same way as on archetypes: `Tokens: 0.7, Aristocrats: 0.3` means
 a primarily token deck that also sacrifices them for value.
+
+The **Tribal** theme has an additional creature type field. As you type, a dropdown suggests
+matching creature types (sourced from Scryfall's creature type catalog) to help with spelling
+and singular-vs-plural form — for example, "Elv" completes to "Elves". Custom tribe names are
+also accepted if the type doesn't appear in the list.
 
 ### Optional
 
@@ -297,6 +311,12 @@ resolves correctly even if the export omits the " // Bala Ged Sanctuary" back fa
 prevents mis-classification if the site included the commander in the 99.
 
 ### What you see
+
+**Popular EDHREC themes** — shown above the result tabs once analysis completes. The top 8 themes
+from EDHREC's tag data for your commander, ranked by deck count. Blue badges are themes the app
+recognises (archetypes, mechanical themes, tribal types); grey badges are EDHREC-specific tags
+without a direct app equivalent. Useful for comparing how the community typically builds this
+commander against your actual card choices.
 
 **Coverage Report** — how many cards you have in each functional role (Ramp, Card Advantage,
 Disruption, etc.) vs. the balanced-deck baseline. Roles that fall short are highlighted.

@@ -75,7 +75,7 @@ public sealed class DeckBuilder(
         // 2. Gather candidate pool from EDHREC (one call per commander; merged or partner-pair).
         await (progress?.Invoke("Gathering card pool") ?? Task.CompletedTask);
         var stageTimer = Stopwatch.StartNew();
-        var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, lockedCards, ct);
+        var rawPool = await GatherPoolAsync(commanders, isLegalPartnerPair, lockedCards, themes, ct);
         stageTimer.Stop();
         logger.LogInformation("GatherPool: {PoolSize} cards, {ElapsedMs}ms", rawPool.Count, stageTimer.ElapsedMilliseconds);
 
@@ -241,6 +241,7 @@ public sealed class DeckBuilder(
         IReadOnlyList<Card> commanders,
         bool isLegalPartnerPair,
         IReadOnlyList<Card>? lockedCards,
+        IReadOnlyList<WeightedTheme>? themes,
         CancellationToken ct)
     {
         // Launch combo pool fetch immediately so it runs in parallel with EDHREC
@@ -258,18 +259,58 @@ public sealed class DeckBuilder(
             edhrecPool = await GetIndividualPoolAsync(commanders, ct);
         }
 
-        var comboCandidates = await comboTask;
-        if (comboCandidates.Count == 0)
-            return edhrecPool;
+        if (themes is { Count: > 0 })
+        {
+            var themePool = await GetThemePoolAsync(commanders, themes, ct);
+            if (themePool.Count > 0)
+            {
+                logger.LogInformation("ThemePool: {ThemeCount} cards merged from theme pages", themePool.Count);
+                edhrecPool = MergePools(edhrecPool, themePool);
+            }
+        }
 
-        // Merge: start from EDHREC pool; combo candidates upgrade or extend it
+        var comboCandidates = await comboTask;
+        return comboCandidates.Count == 0
+            ? edhrecPool
+            : MergePools(edhrecPool, comboCandidates);
+    }
+
+    private async Task<IReadOnlyList<CardCandidate>> GetThemePoolAsync(
+        IReadOnlyList<Card> commanders,
+        IReadOnlyList<WeightedTheme> themes,
+        CancellationToken ct)
+    {
+        // Commander-theme pages: (commander × theme) in parallel
+        var commanderThemeTasks = commanders
+            .SelectMany(commander => themes
+                .Select(t => suggestionSource.GetCommanderThemeRecommendationsAsync(commander, t, ct)))
+            .ToList();
+
+        // Tags pages: one per theme (null slug → skipped; duplicates land in cache anyway)
+        var tagsTasks = themes
+            .Select(t => suggestionSource.GetTagsAsync(t, ct))
+            .ToList();
+
+        var commanderThemeResults = await Task.WhenAll(commanderThemeTasks);
+        var tagsResults           = await Task.WhenAll(tagsTasks);
+
         var merged = new Dictionary<Guid, CardCandidate>();
-        foreach (var c in edhrecPool)
-            merged[c.Card.OracleId] = c;
-        foreach (var c in comboCandidates)
-            if (!merged.TryGetValue(c.Card.OracleId, out var existing)
-                || c.Inclusion > existing.Inclusion)
-                merged[c.Card.OracleId] = c;
+
+        foreach (var batch in commanderThemeResults)
+        {
+            if (batch is null) continue;
+            foreach (var c in batch)
+                if (!merged.TryGetValue(c.Card.OracleId, out var existing) || c.Inclusion > existing.Inclusion)
+                    merged[c.Card.OracleId] = c;
+        }
+
+        foreach (var result in tagsResults)
+        {
+            if (result is null) continue;
+            foreach (var c in result.Value.Cards)
+                if (!merged.TryGetValue(c.Card.OracleId, out var existing) || c.Inclusion > existing.Inclusion)
+                    merged[c.Card.OracleId] = c;
+        }
 
         return merged.Values.ToList();
     }
@@ -290,6 +331,19 @@ public sealed class DeckBuilder(
                     || candidate.Inclusion > existing.Inclusion)
                     merged[candidate.Card.OracleId] = candidate;
 
+        return merged.Values.ToList();
+    }
+
+    private static IReadOnlyList<CardCandidate> MergePools(
+        IReadOnlyList<CardCandidate> primary,
+        IReadOnlyList<CardCandidate> secondary)
+    {
+        var merged = new Dictionary<Guid, CardCandidate>();
+        foreach (var c in primary)
+            merged[c.Card.OracleId] = c;
+        foreach (var c in secondary)
+            if (!merged.TryGetValue(c.Card.OracleId, out var existing) || c.Inclusion > existing.Inclusion)
+                merged[c.Card.OracleId] = c;
         return merged.Values.ToList();
     }
 

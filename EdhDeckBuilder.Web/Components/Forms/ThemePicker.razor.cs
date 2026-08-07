@@ -9,6 +9,7 @@ public partial class ThemePicker : ComponentBase
 {
     [Parameter] public EventCallback<IReadOnlyList<WeightedTheme>> OnChanged { get; set; }
     [Parameter] public IReadOnlyList<WeightedTheme>? InitialThemes { get; set; }
+    [Inject] private CreatureTypeCatalog CreatureTypes { get; set; } = null!;
 
     private readonly List<WeightedTheme> _selectedThemes = new();
     private string _themeFilter = "";
@@ -18,6 +19,10 @@ public partial class ThemePicker : ComponentBase
     private string _formThemeName = string.Empty;
     private string _formThemeDesc = string.Empty;
     private Dictionary<CardRole, int> _formEffectiveValues = new();
+    private string _tribalName = string.Empty;
+    private IReadOnlyList<string> _creatureTypes = [];
+    private bool _tribalDropdownOpen;
+    private List<string> _filteredTribes = [];
 
     protected override void OnInitialized()
     {
@@ -26,8 +31,15 @@ public partial class ThemePicker : ComponentBase
             foreach (var theme in InitialThemes)
             {
                 _selectedThemes.Add(theme);
+                if (theme.Profile.Theme == Theme.Tribal && theme.TribeName is not null)
+                    _tribalName = theme.TribeName;
             }
         }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _creatureTypes = await CreatureTypes.GetTypesAsync();
     }
 
     private static readonly IReadOnlyDictionary<CardRole, int> BaselineIdeals =
@@ -54,8 +66,46 @@ public partial class ThemePicker : ComponentBase
     {
         var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == t);
         if (i >= 0) _selectedThemes.RemoveAt(i);
-        else _selectedThemes.Add(new WeightedTheme(ThemeLibrary.All[t], 1.0));
+        else
+        {
+            var tribeName = t == Theme.Tribal ? _tribalName : null;
+            _selectedThemes.Add(new WeightedTheme(ThemeLibrary.All[t], 1.0, tribeName));
+        }
         await NotifyChanged();
+    }
+
+    private async Task SetTribalName(string name)
+    {
+        _tribalName = name;
+        UpdateFilteredTribes();
+        var i = _selectedThemes.FindIndex(wt => wt.Profile.Theme == Theme.Tribal);
+        if (i >= 0)
+            _selectedThemes[i] = _selectedThemes[i] with { TribeName = name.Trim() };
+        await NotifyChanged();
+    }
+
+    private void UpdateFilteredTribes()
+    {
+        _filteredTribes = string.IsNullOrEmpty(_tribalName)
+            ? [.. _creatureTypes.Take(30)]
+            : [.. _creatureTypes
+                .Where(t => t.StartsWith(_tribalName, StringComparison.OrdinalIgnoreCase)
+                         || t.Contains(_tribalName, StringComparison.OrdinalIgnoreCase))
+                .Take(30)];
+    }
+
+    private void OpenTribalDropdown()
+    {
+        UpdateFilteredTribes();
+        _tribalDropdownOpen = true;
+    }
+
+    private void CloseTribalDropdown() => _tribalDropdownOpen = false;
+
+    private async Task SelectTribalType(string type)
+    {
+        _tribalDropdownOpen = false;
+        await SetTribalName(type);
     }
 
     private async Task SetPresetWeight(Theme t, double w)

@@ -75,6 +75,36 @@
                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                 @onclick="() => OpenTuneForm(theme)">Tune</button>
                                     </div>
+                                    @if (theme == Theme.Tribal)
+                                    {
+                                        <div class="mt-2 position-relative" @onclick:stopPropagation>
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   placeholder="e.g. Elves, Dragons, Wizards"
+                                                   value="@_tribalName"
+                                                   autocomplete="off"
+                                                   @oninput="e => SetTribalName(e.Value?.ToString() ?? string.Empty)"
+                                                   @onfocus="OpenTribalDropdown"
+                                                   @onblur="CloseTribalDropdown" />
+                                            @if (_tribalDropdownOpen && _filteredTribes.Count > 0)
+                                            {
+                                                <div class="list-group list-group-flush position-absolute w-100 shadow border rounded"
+                                                     style="z-index:1050;max-height:200px;overflow-y:auto;top:calc(100% + 2px);">
+                                                    @foreach (var tribe in _filteredTribes)
+                                                    {
+                                                        var t = tribe;
+                                                        <button type="button"
+                                                                class="list-group-item list-group-item-action py-1 px-2 small"
+                                                                @onmousedown:preventDefault
+                                                                @onclick="() => SelectTribalType(t)">@t</button>
+                                                    }
+                                                </div>
+                                            }
+                                            <div class="form-text text-muted" style="font-size:0.7rem;">
+                                                Use plural form (Elves, not Elf). Custom types are allowed.
+                                            </div>
+                                        </div>
+                                    }
                                 }
                             </div>
                         </div>

@@ -53,7 +53,10 @@ public static class CommanderSelectionPrompt
 
         sb.Append("- Themes: ");
         sb.AppendLine(request.Themes.Count > 0
-            ? string.Join(", ", request.Themes)
+            ? string.Join(", ", request.Themes.Select(t =>
+                t.Profile.Theme == Theme.Tribal && !string.IsNullOrWhiteSpace(t.TribeName)
+                    ? $"{t.Profile.Name} ({t.TribeName})"
+                    : t.Profile.Name))
             : "None specified");
 
         var bracket = BracketLibrary.All[request.Bracket];

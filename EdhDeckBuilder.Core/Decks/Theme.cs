@@ -18,7 +18,9 @@ public enum Theme
     Reanimator,
     Spellslinger,
     Blink,
-    Counters,
+    CountersMatter,
+    PlusOneCounters,
+    MinusOneCounters,
     Enchantress,
     Equipment,
     Tribal,
@@ -31,14 +33,11 @@ public enum Theme
     GroupHug,
     Mill,
     Cycling,
-    Clones,
     Wheels,
     Infect,
     Artifacts,
     Superfriends,
     Chaos,
-    DrawGo,
-    Stompy,
 }
 
 /// <summary>
@@ -55,8 +54,13 @@ public sealed record ThemeProfile
     public required IReadOnlyDictionary<CardRole, int> Adjustments { get; init; }
 }
 
-/// <summary>A theme paired with how strongly it applies (1.0 = full, 0.5 = a splash of it).</summary>
-public readonly record struct WeightedTheme(ThemeProfile Profile, double Weight = 1.0);
+/// <summary>
+/// A theme paired with how strongly it applies (1.0 = full, 0.5 = a splash of it).
+/// <see cref="TribeName"/> is only meaningful when <see cref="ThemeProfile.Theme"/> is
+/// <see cref="Theme.Tribal"/>; it holds the creature type (e.g. "Elves", "Dragons") and
+/// drives the EDHREC slug for pool enrichment.
+/// </summary>
+public readonly record struct WeightedTheme(ThemeProfile Profile, double Weight = 1.0, string? TribeName = null);
 
 /// <summary>The built-in theme profiles. Add new entries here as data, not code.</summary>
 public static class ThemeLibrary
@@ -181,20 +185,55 @@ public static class ThemeLibrary
                     [CardRole.MassDisruption]     = -2,
                 },
             },
-            [Theme.Counters] = new ThemeProfile
+            [Theme.CountersMatter] = new ThemeProfile
             {
-                Theme       = Theme.Counters,
-                Name        = "Counters",
-                Description = "+1/+1 counter synergies and doubling effects; grow threats and convert to wins.",
+                Theme       = Theme.CountersMatter,
+                Name        = "Counters Matter",
+                Description = "All counter types matter — loyalty, experience, charge, and +1/+1; build synergies across the board.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
                     [CardRole.Synergy]            = +4,
                     [CardRole.Plan]               = +3,
                     [CardRole.Payoff]             = +2,
+                    [CardRole.CardAdvantage]      = +1,
                     [CardRole.TargetedDisruption] = -3,
                     [CardRole.MassDisruption]     = -3,
                     [CardRole.Protection]         = -2,
-                    [CardRole.Ramp]               = -1,
+                    [CardRole.Ramp]               = -2,
+                },
+            },
+            [Theme.PlusOneCounters] = new ThemeProfile
+            {
+                Theme       = Theme.PlusOneCounters,
+                Name        = "+1/+1 Counters",
+                Description = "Grow creatures with +1/+1 counters; doubling effects and proliferate scale threats and convert to wins.",
+                Adjustments = new Dictionary<CardRole, int>
+                {
+                    [CardRole.Synergy]            = +5,
+                    [CardRole.Plan]               = +3,
+                    [CardRole.Payoff]             = +3,
+                    [CardRole.CardAdvantage]      = +1,
+                    [CardRole.MassDisruption]     = -4,
+                    [CardRole.TargetedDisruption] = -3,
+                    [CardRole.Protection]         = -3,
+                    [CardRole.Ramp]               = -2,
+                },
+            },
+            [Theme.MinusOneCounters] = new ThemeProfile
+            {
+                Theme       = Theme.MinusOneCounters,
+                Name        = "-1/-1 Counters",
+                Description = "Wither, Persist, and -1/-1 counter synergies shrink opposing creatures and trigger recursive value.",
+                Adjustments = new Dictionary<CardRole, int>
+                {
+                    [CardRole.Plan]               = +5,
+                    [CardRole.Synergy]            = +4,
+                    [CardRole.Payoff]             = +2,
+                    [CardRole.MassDisruption]     = +1,
+                    [CardRole.TargetedDisruption] = -3,
+                    [CardRole.Protection]         = -3,
+                    [CardRole.Ramp]               = -3,
+                    [CardRole.CardAdvantage]      = -3,
                 },
             },
             [Theme.Enchantress] = new ThemeProfile
@@ -232,8 +271,8 @@ public static class ThemeLibrary
             [Theme.Tribal] = new ThemeProfile
             {
                 Theme       = Theme.Tribal,
-                Name        = "Tribal",
-                Description = "Creature type lords and tribal payoffs reward a focused creature base.",
+                Name        = "Tribal / Typal",
+                Description = "Creature type lords and tribal payoffs reward a focused creature base. Specify a creature type for EDHREC enrichment.",
                 Adjustments = new Dictionary<CardRole, int>
                 {
                     [CardRole.Plan]               = +4,
@@ -398,23 +437,6 @@ public static class ThemeLibrary
                     [CardRole.Protection]         = -2,
                 },
             },
-            [Theme.Clones] = new ThemeProfile
-            {
-                Theme       = Theme.Clones,
-                Name        = "Clones",
-                Description = "Copy and duplicate the best creatures on the board; scale off opponents' threats.",
-                Adjustments = new Dictionary<CardRole, int>
-                {
-                    [CardRole.Plan]               = +4,
-                    [CardRole.Synergy]            = +3,
-                    [CardRole.CardAdvantage]      = +2,
-                    [CardRole.Payoff]             = +1,
-                    [CardRole.TargetedDisruption] = -3,
-                    [CardRole.MassDisruption]     = -3,
-                    [CardRole.Ramp]               = -2,
-                    [CardRole.Protection]         = -2,
-                },
-            },
             [Theme.Wheels] = new ThemeProfile
             {
                 Theme       = Theme.Wheels,
@@ -498,40 +520,6 @@ public static class ThemeLibrary
                     [CardRole.Protection]         = -4,
                     [CardRole.TargetedDisruption] = -3,
                     [CardRole.Ramp]               = -2,
-                },
-            },
-            [Theme.DrawGo] = new ThemeProfile
-            {
-                Theme       = Theme.DrawGo,
-                Name        = "Draw-Go",
-                Description = "Reactive play at instant speed; counter and remove, win slowly.",
-                Adjustments = new Dictionary<CardRole, int>
-                {
-                    [CardRole.CardAdvantage]      = +5,
-                    [CardRole.TargetedDisruption] = +4,
-                    [CardRole.MassDisruption]     = +2,
-                    [CardRole.Protection]         = +2,
-                    [CardRole.Plan]               = -4,
-                    [CardRole.Payoff]             = -4,
-                    [CardRole.Synergy]            = -3,
-                    [CardRole.Ramp]               = -2,
-                },
-            },
-            [Theme.Stompy] = new ThemeProfile
-            {
-                Theme       = Theme.Stompy,
-                Name        = "Stompy",
-                Description = "Big threats that go tall; beat face with large creatures that need no setup.",
-                Adjustments = new Dictionary<CardRole, int>
-                {
-                    [CardRole.Plan]               = +5,
-                    [CardRole.Payoff]             = +3,
-                    [CardRole.Ramp]               = +2,
-                    [CardRole.Synergy]            = +1,
-                    [CardRole.CardAdvantage]      = -3,
-                    [CardRole.TargetedDisruption] = -3,
-                    [CardRole.MassDisruption]     = -3,
-                    [CardRole.Protection]         = -2,
                 },
             },
         };

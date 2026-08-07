@@ -32,6 +32,12 @@ internal sealed class EdhrecClient : IEdhrecClient
     public Task<EdhrecPage?> GetAverageDeckPageAsync(string slug, CancellationToken ct = default)
         => FetchPageAsync($"average-decks/{slug}", $"avg-{slug}", ct);
 
+    public Task<EdhrecPage?> GetCommanderThemePageAsync(string commanderSlug, string themeSlug, CancellationToken ct = default)
+        => FetchPageAsync($"commanders/{commanderSlug}/{themeSlug}", $"{commanderSlug}-theme-{themeSlug}", ct);
+
+    public Task<EdhrecPage?> GetTagsPageAsync(string themeSlug, CancellationToken ct = default)
+        => FetchPageAsync($"tags/{themeSlug}", $"tag-{themeSlug}", ct);
+
     public async Task<EdhrecPartnerPage?> GetPartnersPageAsync(CancellationToken ct = default)
     {
         var opts = _options.Value;
@@ -107,9 +113,10 @@ internal sealed class EdhrecClient : IEdhrecClient
                 var content = await _http.GetStringAsync(url, ct);
                 await File.WriteAllTextAsync(cachePath, content, ct);
             }
-            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.NotFound
+                                                                   or System.Net.HttpStatusCode.Forbidden)
             {
-                _logger.LogWarning("EDHREC has no page for {Path}", path);
+                _logger.LogWarning("EDHREC page unavailable ({StatusCode}): {Path}", ex.StatusCode, path);
                 return null;
             }
         }

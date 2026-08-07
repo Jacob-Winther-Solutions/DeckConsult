@@ -120,6 +120,28 @@ Peasant Commander allows up to 5 uncommon cards in the deck.
 
 ## Partially deferred features
 
+### Adding more themes
+
+Our theme list covers the most common EDHREC strategies, but several popular tags are not yet
+implemented. New themes follow the same pattern: add the enum value, a `ThemeProfile` with
+`Adjustments` in `ThemeLibrary`, and a slug entry in `EdhrecThemeSlugger`.
+
+Candidate themes to add (slug in parentheses):
+- ETB / Enter the Battlefield (`etb`)
+- Combo (`combo`)
+- Blink — already implemented; verify EDHREC slug is `blink`
+- Legends matter (`legends`)
+- Spell copy (`spell-copy`)
+- Extra combats (`extra-combats`)
+- Commander matters (`commander-matters`)
+- Birthing Pod / Sacrifice chains (`birthing-pod`)
+- Triggered abilities (`triggered-abilities`)
+
+Before adding, check the commander page's `panels.taglinks` to confirm the slug and popularity
+are worth the effort — some tags appear on very few commanders.
+
+---
+
 ### Gemini context caching
 
 `GeminiHttpLlmClient` currently ignores `LlmRequest.EnableCaching`. Gemini caching is a separate
@@ -256,7 +278,7 @@ until the app restarts and re-downloads. This creates a 24–48 hour lag.
 
 ## Summary of completed work
 
-All four projects compile; 398 tests pass. All items below are complete.
+All four projects compile; 436 tests pass. All items below are complete.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client (JSONL.gz format), EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes). Commander Spellbook client (`find-my-combos` + `estimate-bracket`, SHA256-cached). `ComboPoolSource` injects near-miss combo pieces into the builder pool.
 
@@ -278,7 +300,13 @@ All four projects compile; 398 tests pass. All items below are complete.
 
 **Saved Results:** `AnalysisResultStorage` (parallel to `DeckResultStorage`) saves analysis results to `localStorage`. `DeckAnalyzerPage` saves on every successful analysis and restores via `?load={id}`. `/saved` page lists all saved builds and analyses (newest first).
 
-**Tests:** 398 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source). All green.
+**Popular EDHREC themes:** `ISuggestionSource.GetPopularThemesAsync` fetches `panels.taglinks` from the EDHREC commander page and returns a ranked list of `(Slug, Name, Count, Theme?, Archetype?)` tuples. Commander Discovery shows the top 6 as badge chips on each suggestion card; clicking "Build this deck" with no user-selected themes presets the top known theme in the builder link. Deck Analyzer shows the top 8 after analysis completes. Badge color is primary (blue) for known `Theme` values, known `Archetype` slugs (aggro/midrange/control/combo), and any creature-type tribal slug matched against the `CreatureTypeCatalog`; secondary (grey) for unrecognised tags.
+
+**Tribal theme picker:** Replaced the non-interactive `<datalist>` with a Blazor combobox — text input backed by a filtered dropdown from the `CreatureTypeCatalog` (Scryfall creature type API → pluralised → sorted). Custom values are still allowed; the dropdown just guides spelling and singular-vs-plural. `@onmousedown:preventDefault` on each option prevents the blur-before-click race.
+
+**Duplicate card fix:** `FillEngine.FillAsync` inner loop now guards against the same `OracleId` appearing twice in a ranked LLM response. `BuildState.Commit` also has a defensive early-return for the same case.
+
+**Tests:** 436 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source, creature type catalog pluralisation and slug matching). All green. Web project exposes internals to the test project via `InternalsVisibleTo`.
 
 **Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells; `<CoverageReportPanel>` remains the last large block pending extraction.
 

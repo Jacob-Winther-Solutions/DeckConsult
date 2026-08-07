@@ -33,6 +33,13 @@ public sealed class LockedCardsTests
             => Task.FromResult<IReadOnlyList<(string, string)>>([]);
         public Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card _, Card __, CancellationToken ___)
             => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);
+        public Task<IReadOnlyList<CardCandidate>?> GetCommanderThemeRecommendationsAsync(Card _, WeightedTheme __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);
+        public Task<(IReadOnlyList<CardCandidate> Cards, IReadOnlyList<Card> Commanders)?> GetTagsAsync(WeightedTheme _, CancellationToken __)
+            => Task.FromResult<(IReadOnlyList<CardCandidate>, IReadOnlyList<Card>)?>(null);
+
+        public Task<IReadOnlyList<(string Slug, string Name, int Count, Theme? KnownTheme, Archetype? KnownArchetype)>> GetPopularThemesAsync(Card _, CancellationToken __)
+            => Task.FromResult<IReadOnlyList<(string, string, int, Theme?, Archetype?)>>([]);
     }
 
     private sealed class RoleParsingClassifier : ILlmClassifier

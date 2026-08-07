@@ -14,4 +14,8 @@
     <UserSecretsId>3ac1fc87-c6d2-4c18-b8c0-03dc4ef87717</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EdhDeckBuilder.Tests" />
+  </ItemGroup>
+
 </Project>

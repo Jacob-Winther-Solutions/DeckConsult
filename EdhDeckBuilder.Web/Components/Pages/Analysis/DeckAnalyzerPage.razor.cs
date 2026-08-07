@@ -15,14 +15,16 @@ namespace EdhDeckBuilder.Web.Components.Pages.Analysis;
 
 public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 {
-    [Inject] private IDeckAnalyzer          Analyzer        { get; set; } = default!;
-    [Inject] private IDeckUpgrader          Upgrader        { get; set; } = default!;
-    [Inject] private IComboFinder           ComboFinder     { get; set; } = default!;
-    [Inject] private DecklistParser         Parser          { get; set; } = default!;
-    [Inject] private ICardRepository        CardRepository  { get; set; } = default!;
-    [Inject] private SessionApiKeyProvider  Keys            { get; set; } = default!;
-    [Inject] private IApiKeyStateService    ApiKeyState     { get; set; } = default!;
-    [Inject] private IJSRuntime             JS              { get; set; } = default!;
+    [Inject] private IDeckAnalyzer          Analyzer          { get; set; } = default!;
+    [Inject] private IDeckUpgrader          Upgrader          { get; set; } = default!;
+    [Inject] private IComboFinder           ComboFinder       { get; set; } = default!;
+    [Inject] private DecklistParser         Parser            { get; set; } = default!;
+    [Inject] private ICardRepository        CardRepository    { get; set; } = default!;
+    [Inject] private ISuggestionSource      SuggestionSource  { get; set; } = default!;
+    [Inject] private CreatureTypeCatalog    CreatureTypes     { get; set; } = default!;
+    [Inject] private SessionApiKeyProvider  Keys              { get; set; } = default!;
+    [Inject] private IApiKeyStateService    ApiKeyState       { get; set; } = default!;
+    [Inject] private IJSRuntime             JS                { get; set; } = default!;
 
     [SupplyParameterFromQuery(Name = "load")]
     public string? LoadId { get; set; }
@@ -61,6 +63,8 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
 
     private DeckAnalysisResult? _result;
     private bool _copiedReport;
+    private IReadOnlyList<(string Slug, string Name, int Count, Theme? KnownTheme, Archetype? KnownArchetype)> _popularThemes = [];
+    private HashSet<string> _tribeSlugSet = [];
 
     // ── Combo state ──────────────────────────────────────────────────────────
 
@@ -171,6 +175,9 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     private static string BracketTagLabel(string? tag) => CardRoleDisplay.BracketTagLabel(tag);
     private static string BracketTagCss(string? tag)   => CardRoleDisplay.BracketTagCss(tag);
 
+    private bool IsPrimary((string Slug, string Name, int Count, Theme? KnownTheme, Archetype? KnownArchetype) t)
+        => t.KnownTheme.HasValue || t.KnownArchetype.HasValue || _tribeSlugSet.Contains(t.Slug);
+
     private void OnApiKeyStateChanged() => InvokeAsync(StateHasChanged);
 
     private void OnCommandersChanged(IReadOnlyList<Card> commanders)
@@ -178,6 +185,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _selectedCommanders = commanders;
         _result = null;
         _upgradeResult = null;
+        _popularThemes = [];
         ClearValidation();
     }
 
@@ -241,6 +249,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
         _errorMessage = null;
         _result = null;
         _upgradeResult = null;
+        _popularThemes = [];
         _completedStages = new List<string>();
         _currentStage = null;
         _currentStageDetail = null;
@@ -293,6 +302,22 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
                 _isAnalyzing = false;
                 StateHasChanged();
             });
+
+            if (_result is not null && _selectedCommanders.Count > 0)
+            {
+                try
+                {
+                    _popularThemes = await SuggestionSource.GetPopularThemesAsync(
+                        _selectedCommanders[0], _cts?.Token ?? CancellationToken.None);
+                    if (_tribeSlugSet.Count == 0)
+                    {
+                        var types = await CreatureTypes.GetTypesAsync();
+                        _tribeSlugSet = types.Select(t => t.ToLowerInvariant().Replace(' ', '-')).ToHashSet();
+                    }
+                }
+                catch { _popularThemes = []; }
+                await InvokeAsync(StateHasChanged);
+            }
 
             if (_result is not null)
             {

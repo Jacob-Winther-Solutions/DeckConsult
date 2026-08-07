@@ -1,8 +1,24 @@
+using System.Text.Json.Serialization;
+
 namespace EdhDeckBuilder.Infrastructure.Edhrec.Dto;
 
 internal sealed class EdhrecPage
 {
     public EdhrecContainer? Container { get; init; }
+    public EdhrecPanels? Panels { get; init; }
+}
+
+internal sealed class EdhrecPanels
+{
+    [JsonPropertyName("taglinks")]
+    public List<EdhrecTagLink> TagLinks { get; init; } = [];
+}
+
+internal sealed class EdhrecTagLink
+{
+    public string Slug { get; init; } = "";
+    public string Value { get; init; } = "";
+    public int Count { get; init; }
 }
 
 internal sealed class EdhrecContainer

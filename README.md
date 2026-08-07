@@ -194,7 +194,7 @@ effect, clear the cookie or use an incognito window.
 dotnet restore
 dotnet build
 
-# Run all 399 tests:
+# Run all 436 tests:
 dotnet test Tests
 
 # Run the app:

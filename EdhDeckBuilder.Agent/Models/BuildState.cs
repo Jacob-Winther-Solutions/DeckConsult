@@ -69,6 +69,9 @@ public sealed class BuildState
         double confidence = 1.0,
         bool isLocked = false)
     {
+        if (_committedCandidates.ContainsKey(candidate.Card.OracleId))
+            return; // defensive guard — fill engine should prevent this via committed HashSet
+
         var slot = new DeckSlot
         {
             Card = candidate.Card,

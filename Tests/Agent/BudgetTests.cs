@@ -35,7 +35,14 @@ public sealed class BudgetTests
         public Task<IReadOnlyList<(string FirstCardName, string SecondCardName)>> GetPartnerWithPairsAsync(CancellationToken __)
             => Task.FromResult<IReadOnlyList<(string, string)>>(new List<(string, string)>());
         public Task<IReadOnlyList<CardCandidate>?> GetPartnerPairRecommendationsAsync(Card _, Card __, CancellationToken ___)
-            => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);  // Mock returns null; real implementation tested separately
+            => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);
+        public Task<IReadOnlyList<CardCandidate>?> GetCommanderThemeRecommendationsAsync(Card _, WeightedTheme __, CancellationToken ___)
+            => Task.FromResult<IReadOnlyList<CardCandidate>?>(null);
+        public Task<(IReadOnlyList<CardCandidate> Cards, IReadOnlyList<Card> Commanders)?> GetTagsAsync(WeightedTheme _, CancellationToken __)
+            => Task.FromResult<(IReadOnlyList<CardCandidate>, IReadOnlyList<Card>)?>(null);
+
+        public Task<IReadOnlyList<(string Slug, string Name, int Count, Theme? KnownTheme, Archetype? KnownArchetype)>> GetPopularThemesAsync(Card _, CancellationToken __)
+            => Task.FromResult<IReadOnlyList<(string, string, int, Theme?, Archetype?)>>([]);
     }
 
     /// <summary>Assigns roles by parsing the card name prefix ("Ramp_0" → Ramp, etc.).</summary>

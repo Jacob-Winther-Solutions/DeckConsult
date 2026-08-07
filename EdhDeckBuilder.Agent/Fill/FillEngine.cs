@@ -94,6 +94,7 @@ public sealed class FillEngine(ICardSelector selector)
             foreach (var pick in validRanked)
             {
                 if (state.Coverage.GetValueOrDefault(role) >= target.Ideal) break;
+                if (committed.Contains(pick.OracleId)) continue;    // LLM may echo the same id twice
 
                 var candidate = byId[pick.OracleId];
                 bool isLand = candidate.Card.Types.HasFlag(CardType.Land);

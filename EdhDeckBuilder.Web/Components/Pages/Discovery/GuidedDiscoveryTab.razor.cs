@@ -79,7 +79,7 @@ public partial class GuidedDiscoveryTab : IDisposable
             var request = new CommanderDiscoveryRequest
             {
                 Archetypes = _archetypeWeights.Keys.ToList(),
-                Themes = _themes.Where(t => t.Profile.Theme.HasValue).Select(t => t.Profile.Theme!.Value).ToList(),
+                Themes = _themes,
                 ColorFilter = _colorFilter,
                 ExactColorMatch = _exactColorMatch,
                 Bracket = _bracketSelection.Bracket,
