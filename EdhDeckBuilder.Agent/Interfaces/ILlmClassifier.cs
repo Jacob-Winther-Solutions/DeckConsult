@@ -35,4 +35,15 @@ public interface ILlmClassifier
         IReadOnlyList<Card> commanders,
         CancellationToken ct = default,
         Func<string, Task>? subProgress = null);
+
+    /// <summary>
+    /// Generates a short natural-language description of the deck's core strategy based on
+    /// its Plan-classified cards. Returns null if <paramref name="planCards"/> is empty or
+    /// the call fails.
+    /// </summary>
+    Task<string?> DescribePlanAsync(
+        IReadOnlyList<Card> commanders,
+        IReadOnlyList<Card> planCards,
+        CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
 }

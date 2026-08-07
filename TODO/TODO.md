@@ -4,12 +4,6 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## UX Enhancements
-
-1. In the Analyzer, let the LLM return a description of the "Plan" it found for the deck and be shown in the UI. This lets the user understand why the cards are categorized as the "Plan".
-
----
-
 ## Additional card sources — TopDeck.gg + EDHREC Brawl  (prerequisite for Brawl / Duel Commander)
 
 See `TODO/DATA_SOURCES.md` for the full spec, verified API details, and the excluded-sources
@@ -305,3 +299,5 @@ All four projects compile; 436 tests pass. All items below are complete.
 **Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). `CoverageReportPanel` (in `Components/Results/`) owns the full Coverage Report tab — summary table, role buckets, basic lands, runner-ups — parameterised with `RenderFragment` slots (`SummaryHeaderActions`, `SummaryBodyPrefix`, `TargetCellContent`, `Alerts`) for host-specific customisation. Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells.
 
 **Deployment:** Hetzner CX23 VPS + Docker Compose + Caddy reverse proxy (automatic TLS). GitHub Actions CI/CD: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup in `TODO/DEPLOYMENT.md`.
+
+**Deck Strategy description:** `DeckAnalyzer` collects Plan-primary cards after classification and makes a single lightweight LLM call (`describe_plan` forced tool, Haiku/lite model, 512 tokens) to produce a 2–3 sentence natural-language description of the deck's win condition. Shown as a "Deck Strategy" callout at the top of the Coverage Report tab and included in exported analysis markdown. Gemini path supported via `GeminiSchemas.BuildPlanDescriptionSchema`.

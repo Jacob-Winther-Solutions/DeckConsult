@@ -163,6 +163,58 @@ public static class ClassificationPrompt
         return sb.ToString();
     }
 
+    // ── Plan description ──────────────────────────────────────────────────────
+
+    public const string PlanDescriptionToolName = "describe_plan";
+
+    public const string PlanDescriptionSystemPrompt =
+        "You are an expert Magic: the Gathering deck analyst. Describe deck strategies concisely and accurately.";
+
+    public static LlmToolDefinition PlanDescriptionToolDefinition => new()
+    {
+        Name        = PlanDescriptionToolName,
+        Description = "Describe the deck's core strategy based on its Plan cards.",
+        InputSchema = JsonNode.Parse("""
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "description": { "type": "string" }
+              },
+              "required": ["description"]
+            }
+            """)!,
+    };
+
+    public static string FormatPlanDescriptionMessage(IReadOnlyList<Card> commanders, IReadOnlyList<Card> planCards)
+    {
+        var sb = new StringBuilder();
+        sb.Append("Commanders: ");
+        sb.AppendJoin(", ", commanders.Select(c => c.Name));
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine($"The following {planCards.Count} card(s) have been classified as this deck's Plan (core strategy):");
+
+        foreach (var card in planCards)
+        {
+            sb.AppendLine("---");
+            sb.AppendLine($"Name: {card.Name}");
+            if (!string.IsNullOrEmpty(card.ManaCost))
+                sb.AppendLine($"Mana Cost: {card.ManaCost}");
+            sb.AppendLine($"Type: {card.TypeLine}");
+            if (!string.IsNullOrWhiteSpace(card.OracleText))
+                sb.AppendLine($"Text: {card.OracleText}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(
+            "In 2–3 sentences, describe what this deck is trying to do. " +
+            "Be specific about the win condition or core mechanism, mentioning key card interactions where relevant. " +
+            "Do not mention card counts or roles — focus on the strategy.");
+
+        return sb.ToString();
+    }
+
     private static string BuildSchemaJson()
     {
         const string roleEnum = """["Land","Ramp","CardAdvantage","TargetedDisruption","MassDisruption","Tutor","Protection","Recursion","Plan","Payoff","Synergy","Unmatched"]""";

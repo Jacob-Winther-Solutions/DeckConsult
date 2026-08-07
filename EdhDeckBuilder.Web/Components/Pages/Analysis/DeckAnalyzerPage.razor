@@ -125,6 +125,15 @@
             {
                 var effectiveTargets = GetEffectiveTargets();
                 var currentGaps = GetCurrentGaps();
+
+                @if (!string.IsNullOrWhiteSpace(_result.PlanDescription))
+                {
+                    <div class="mx-3 mb-3 p-3 rounded border" style="background: color-mix(in srgb, var(--bs-primary) 8%, transparent);">
+                        <div class="fw-semibold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em; color: var(--bs-primary);">Deck Strategy</div>
+                        <span>@_result.PlanDescription</span>
+                    </div>
+                }
+
                 <CoverageReportPanel Cards="@(_result.CommanderCards.Concat(_result.Cards).ToList())"
                                      ActualCoverage="_result.ActualCoverage"
                                      BasicLandCounts="_result.BasicLandCounts"

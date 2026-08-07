@@ -222,6 +222,14 @@ public static class DeckReportExporter
         sb.AppendLine("---");
         sb.AppendLine();
 
+        if (!string.IsNullOrWhiteSpace(result.PlanDescription))
+        {
+            sb.AppendLine("## Deck Strategy");
+            sb.AppendLine();
+            sb.AppendLine(result.PlanDescription);
+            sb.AppendLine();
+        }
+
         if (result.RoleGaps.Count > 0)
         {
             sb.AppendLine("## Role Gaps");

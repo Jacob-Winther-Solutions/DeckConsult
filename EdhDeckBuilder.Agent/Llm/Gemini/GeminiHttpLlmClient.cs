@@ -135,8 +135,9 @@ public sealed class GeminiHttpLlmClient(
         ClassificationPrompt.ToolName           => GeminiSchemas.BuildClassificationSchema(ClassificationPrompt.IsReasoningEnabled),
         SelectionPrompt.ToolName                => GeminiSchemas.BuildSelectionSchema(),
         CommanderSelectionPrompt.ToolName       => GeminiSchemas.BuildCommanderSelectionSchema(),
-        UpgradeSelectionPrompt.PrioritizationToolName => GeminiSchemas.BuildGapPrioritizationSchema(),
-        UpgradeSelectionPrompt.SelectionToolName      => GeminiSchemas.BuildUpgradeSelectionSchema(),
+        UpgradeSelectionPrompt.PrioritizationToolName  => GeminiSchemas.BuildGapPrioritizationSchema(),
+        UpgradeSelectionPrompt.SelectionToolName       => GeminiSchemas.BuildUpgradeSelectionSchema(),
+        ClassificationPrompt.PlanDescriptionToolName   => GeminiSchemas.BuildPlanDescriptionSchema(),
         _ => throw new InvalidOperationException($"No Gemini schema registered for tool '{toolName}'."),
     };
 

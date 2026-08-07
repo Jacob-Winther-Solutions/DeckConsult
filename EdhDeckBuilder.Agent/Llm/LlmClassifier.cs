@@ -104,6 +104,48 @@ public sealed class LlmClassifier(
         return ParseResponse(response, candidates);
     }
 
+    public async Task<string?> DescribePlanAsync(
+        IReadOnlyList<Card> commanders,
+        IReadOnlyList<Card> planCards,
+        CancellationToken ct = default)
+    {
+        if (planCards.Count == 0) return null;
+
+        var client      = factory.CreateForCurrentUser();
+        var model       = factory.ClassificationModel;
+        var userMessage = ClassificationPrompt.FormatPlanDescriptionMessage(commanders, planCards);
+
+        var request = new LlmRequest
+        {
+            Model          = model,
+            MaxTokens      = 512,
+            Temperature    = Temperature,
+            SystemPrompt   = ClassificationPrompt.PlanDescriptionSystemPrompt,
+            Messages       = [new LlmMessage { Role = LlmRole.User, Content = [new LlmTextBlock { Text = userMessage }] }],
+            Tools          = [ClassificationPrompt.PlanDescriptionToolDefinition],
+            ForcedToolName = ClassificationPrompt.PlanDescriptionToolName,
+            EnableCaching  = false,
+        };
+
+        var response = await client.SendAsync(request, ct);
+
+        if (_usageTracker is not null)
+            _usageTracker.RecordCall(
+                "DescribePlan", model,
+                response.Usage.InputTokens,
+                response.Usage.OutputTokens,
+                0, 0);
+
+        var toolUse = response.Content.OfType<LlmToolUseBlock>().FirstOrDefault();
+        if (toolUse is null)
+        {
+            logger.LogWarning("DescribePlan: no tool use block in response");
+            return null;
+        }
+
+        return toolUse.Input["description"]?.GetValue<string>();
+    }
+
     private IReadOnlyList<ClassificationResult> ParseResponse(
         LlmResponse response,
         IReadOnlyList<CardCandidate> candidates)

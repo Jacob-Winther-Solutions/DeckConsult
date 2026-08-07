@@ -31,4 +31,10 @@ public sealed record DeckAnalysisResult
     public required IReadOnlyList<string> UnresolvedNames { get; init; }
     public required IReadOnlyList<string> ColorIdentityViolations { get; init; }
     public required decimal TotalPriceUsd { get; init; }
+
+    /// <summary>
+    /// LLM-generated description of the deck's core strategy, derived from its Plan-classified
+    /// cards. Null when no Plan cards exist or the call is unavailable (e.g. no API key).
+    /// </summary>
+    public string? PlanDescription { get; init; }
 }

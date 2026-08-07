@@ -135,6 +135,19 @@ internal static class GeminiSchemas
             }
             """)!;
 
+    public static JsonNode BuildPlanDescriptionSchema() =>
+        JsonNode.Parse(
+            """
+            {
+              "type": "OBJECT",
+              "properties": {
+                "description": { "type": "STRING" }
+              },
+              "propertyOrdering": ["description"],
+              "required": ["description"]
+            }
+            """)!;
+
     public static JsonNode BuildUpgradeSelectionSchema() =>
         JsonNode.Parse(
             """

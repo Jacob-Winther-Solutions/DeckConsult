@@ -98,7 +98,14 @@ public sealed class DeckAnalyzer(
             };
         }).ToList();
 
-        // 5. Compute coverage and estimate bracket via Commander Spellbook
+        // 5. Describe the deck's Plan (non-blocking: null if no plan cards or no API key)
+        var planCards = commanderCards.Concat(analyzedCards)
+            .Where(c => c.Roles.Primary == CardRole.Plan)
+            .Select(c => c.Card)
+            .ToList();
+        var planDescription = await classifier.DescribePlanAsync(commanders, planCards, ct);
+
+        // 6. Compute coverage and estimate bracket via Commander Spellbook
         await (progress?.Invoke("Computing analysis") ?? Task.CompletedTask);
         var coverage = ComputeCoverage(commanderCards, analyzedCards, basicLandCounts);
 
@@ -126,6 +133,7 @@ public sealed class DeckAnalyzer(
             UnresolvedNames         = unresolvedNames,
             ColorIdentityViolations = violations,
             TotalPriceUsd           = totalPrice,
+            PlanDescription         = planDescription,
         };
     }
 
