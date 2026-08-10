@@ -4,210 +4,17 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## Additional card sources — EDHREC Brawl  (prerequisite for Brawl / Duel Commander)
-
-See `TODO/DATA_SOURCES.md` for the full spec, verified API details, and the excluded-sources
-list. Aetherhub and mtgrocks are explicitly excluded. Commander Spellbook (`find-my-combos` +
-`estimate-bracket`) is fully implemented via `CommanderSpellbookClient`. Remaining sources:
-
-- **EDHREC — extend to Brawl paths** — the existing client already handles Commander; extend
-  it to resolve the Brawl URL variants for Historic Brawl support.
-- **MTGJSON** — optional; only adopt if offline bulk card data or preconstructed deck seed
-  lists become a goal. Defer until there is a concrete use case.
-
-**Owner decisions required before implementation:**
-
-- [ ] **Adopt MTGJSON now or defer.**
-- [ ] **Historic Brawl competitive popularity gap.** No sanctioned open source exists
-      (Untapped.gg is commercial). Decide whether to accept EDHREC + Scryfall alone for Brawl.
-
-**Implementation tasks:**
-
-- [ ] Extend `EdhrecClient` to resolve Brawl URL path variants alongside existing Commander paths.
-
-
----
-
-## Multi-format support  (new formats — depends on Additional sources above)
-
-### Historic Brawl on MTG Arena
-
-Historic Brawl is 100-card singleton, same physical count as Commander, but
-with meaningful differences: 1-vs-1, an **eternal** card pool, and two distinct queues.
-
-Key differences from EDH to plan around:
-
-- **Card pool:** Scryfall exposes `legalities.historicbrawl`. Card ingestion needs a separate
-  flag. The pool is eternal — no rotation, just a separate ban list.
-- **Two queues — ranked vs. casual:** the builder should know which queue the user is targeting
-  and adjust the `DeckTemplate` baseline and selector guidance accordingly.
-- **1v1 meta:** Board wipes are weaker, reactive spells matter more. The `DeckTemplate` targets
-  need a Brawl-specific baseline.
-- **Sources:** EDHREC does not cover Historic Brawl.
-- **Commander legality:** Any legendary creature or planeswalker legal in the format can be the
-  commander. `CanBeCommander` logic needs a format-aware variant.
-- **Arena-only cards:** Alchemy and Historic Anthology cards exist only on Arena. The card model
-  may need an `IsArenaOnly` flag.
-
-- [ ] Define `FormatProfile` (or equivalent) in Core: legality check, deck size, commander
-      count, baseline `DeckTemplate`, and queue/power-level model.
-- [ ] Add `historicbrawl` legality flag and `IsArenaOnly` flag to `Card` ingestion.
-- [ ] Implement `AetherhubBrawlSource` and `MtgdecksBrawlSource` in Infrastructure.
-- [ ] Create Brawl `DeckTemplate` baselines — ranked and casual variants.
-- [ ] Update `IDeckBuilder.BuildAsync` (or a new `IBrawlDeckBuilder`) to accept a
-      `FormatProfile` and route to the correct template, sources, and legality rules.
-- [ ] Test with a known strong Historic Brawl commander (e.g. Atraxa, Raffine, Sheoldred).
-
-### Duel Commander (French Commander)
-
-Duel Commander is 1v1 100-card singleton with a separate, more aggressive banlist than EDH.
-
-- [ ] Research Duel Commander legality — Scryfall does not expose a dedicated legality flag.
-- [ ] Create Duel Commander `DeckTemplate` baseline — tuned for 1v1 faster pace.
-- [ ] Update `FormatProfile` to support Duel Commander legality and bracket/queue model.
-
-### Pauper EDH (Pauper Commander)
-
-Pauper EDH requires all cards (including commander) to have been printed at common rarity.
-
-- [ ] Integrate Scryfall's rarity data — cards must be `rarity == "common"`.
-- [ ] Confirm banlist source (if any) — Pauper EDH is community-managed.
-- [ ] Create Pauper EDH `DeckTemplate` baseline.
-- [ ] Update `FormatProfile` to support Pauper EDH legality.
-
-### Peasant Commander
-
-Peasant Commander allows up to 5 uncommon cards in the deck.
-
-- [ ] Research Peasant Commander rules and banlist source.
-- [ ] Implement rarity-counting logic — track uncommons per deck, flag when exceeding 5.
-- [ ] Create Peasant Commander `DeckTemplate` baseline.
-- [ ] Update `FormatProfile` to support Peasant Commander legality and rarity constraints.
-
----
-
-## Partially deferred features
-
-### Adding more themes
-
-New themes follow the same pattern: add the enum value, a `ThemeProfile` with `Adjustments` in
-`ThemeLibrary`, a slug entry in `EdhrecThemeSlugger`, and a `ThemeGroup` assignment. The UI
-groups themes by category with section headers (see `ThemePicker.razor`).
-
-Verified against EDHREC `/tags` page (2026-08-07). Creature-type tags are excluded (covered
-by `Theme.Tribal`). Deck counts shown for reference. All slugs verified on EDHREC.
-
-**Tier 1 — >15 k decks (implement first):**
-- [x] Burn (`burn`, 63 k) — direct damage as win condition
-- [x] Sacrifice (`sacrifice`, 40 k) — broader sacrifice payoffs beyond Aristocrats drain
-- [x] Auras (`auras`, 35 k) — aura-matters, distinct from Enchantress (which is about enchantments drawing cards)
-- [x] Treasure (`treasure`, 50 k) — treasure token generation/payoffs
-- [x] Legends (`legends`, 34 k) — legendary-matters (Sisay, Jodah, etc.)
-- [x] Discard (`discard`, 33 k) — madness, hand-emptying synergies
-- [x] Clones (`clones`, 30 k) — copy/clone creatures
-- [x] Landfall (`landfall`, 24 k) — landfall trigger payoffs
-- [x] Group Slug (`group-slug`, 23 k) — everyone takes damage/loses life
-- [x] Historic (`historic`, 23 k) — artifacts + legends + sagas matter
-- [x] Extra Combats (`extra-combats`, 21 k) — take multiple combat steps
-- [x] Theft (`theft`, 20 k) — steal opponents' permanents or spells
-- [x] Self-Mill (`self-mill`, 20 k) — fill own graveyard (distinct from Mill which targets opponents)
-- [x] Birthing Pod (`birthing-pod`, 17 k) — creature-chain tutor strategies
-- [x] Forced Combat (`forced-combat`, 16 k) — goad and forced-attack effects
-- [x] Vehicles (`vehicles`, 16 k) — vehicle-matters
-- [x] X Spells (`x-spells`, 16 k) — large-X spell strategies
-- [x] Commander Matters (`commander-matters`, 14 k) — build around commander mechanics
-
-**Tier 2 — 10–15 k decks:**
-- [x] Exile (`exile`, 13 k) — exile zone manipulation (Prosper, Gonti, etc.)
-- [x] Cascade (`cascade`, 12 k) — cascade trigger chains
-- [x] Hatebears (`hatebears`, 12 k) — creature-based disruption/taxing
-- [x] Toughness Matters (`toughness-matters`, 11 k) — toughness as power or payoff
-- [x] Spell Copy (`spell-copy`, 10 k) — fork/copy spells
-- [x] Extra Turns (`extra-turns`, 10 k) — time-walk effects
-
-**Tier 3 — 5–10 k decks:**
-- [x] ETB (`etb`, 9 k) — enters-the-battlefield triggers (broader than Blink)
-- [x] Energy (`energy`, 9 k) — energy counter generation and payoffs
-- [x] Ninjutsu (`ninjutsu`, 9 k) — ninjutsu mechanic strategies
-- [x] Sagas (`sagas`, 8 k) — saga-matters payoffs
-- [x] Attack Triggers (`attack-triggers`, 7 k) — on-attack trigger payoffs
-- [x] Clues (`clues`, 6 k) — investigate/clue token generation
-- [x] Food (`food`, 6 k) — food token generation
-- [x] Monarch (`monarch`, 6 k) — monarch mechanic
-
-**UI grouping** (section headers in `ThemePicker.razor`, search still spans all):
-- **Permanents:** Artifacts, Equipment, Enchantress, Auras, Vehicles, Sagas, Superfriends, Tokens, Treasure
-- **Graveyard:** Reanimator, Graveyard, Self-Mill, Aristocrats, Sacrifice, Birthing Pod
-- **Spells:** Spellslinger, Storm, Wheels, Discard, Spell Copy, X Spells, Cascade, Cycling, Extra Turns
-- **Lands:** Lands, Landfall, Big Mana
-- **Counters:** +1/+1 Counters, -1/-1 Counters, Counters Matter, Proliferate, Energy, Infect
-- **Combat:** Voltron, Burn, Extra Combats, Attack Triggers, Forced Combat, Theft, Ninjutsu
-- **Politics & Control:** Stax, Pillowfort, Hatebears, Group Hug, Group Slug, Chaos, Monarch, Mill
-- **Synergy:** Blink, ETB, Commander Matters, Legends, Exile, Historic, Clones, Toughness Matters, Lifegain, Clues, Food
-- **Tribal:** (special — with creature-type picker)
-
-### EDHREC budget/price filtering
-
-The builder lets users set a per-card price cap and total budget, but these constraints
-are applied after the EDHREC pool is gathered (cards are filtered out in `FilterPool`).
-EDHREC exposes budget-specific recommendation pages (e.g. `/commanders/{slug}/budget`)
-that return cards already pre-filtered to lower price points.
-
-- [ ] Investigate EDHREC's budget URL variants (e.g. `/budget`, `/ultra-budget`) and
-      whether they return a meaningfully different card set.
-- [ ] If they do, extend `ISuggestionSource` with a budget-aware overload and call the
-      budget endpoint when the user has set a per-card price cap below a threshold (e.g. $2).
-      This would improve pool quality for budget builds rather than just filtering out
-      expensive cards after the fact.
-
-### EDHREC theme selection in Custom Builder
-
-- [ ] Allow users to pick a theme directly from EDHREC in the Custom commander builder tab.
-      Fetch popular theme tags from the selected commander's EDHREC page (`panels.taglinks`)
-      and surface them as clickable suggestions alongside the built-in theme picker.
-      Clicking a tag pre-selects the matching built-in `Theme` (if one exists) or creates a
-      lightweight custom theme derived from the tag name and EDHREC slug.
-
----
-
-### Gemini context caching
-
-`GeminiHttpLlmClient` currently ignores `LlmRequest.EnableCaching`. Gemini caching is a separate
-API call (not inline like Anthropic's `cache_control` blocks) and requires billing enabled.
-
-**How it works:** POST `systemInstruction` + `responseSchema` to `/v1beta/cachedContents` →
-get a `name` token → include `"cachedContent": name` in subsequent `generateContent` calls.
-Cached reads cost ~25% of normal input; there is a storage charge (~$1/1M tokens/hour). TTL
-is set per cache (1 min–1 hour).
-
-**Implementation gaps before this can land:**
-
-- [ ] Add `CreateCachedContentAsync` / `DeleteCachedContentAsync` to `GeminiRestClient`.
-      The `cachedContent` name field must be added to the `GeminiRequest` record (replaces
-      `systemInstruction`; the two are mutually exclusive in the request body).
-- [ ] Introduce a build-session concept (extend `GeminiRateLimiter` or add a new
-      `GeminiBuildSession` scoped service) to hold the 2–3 cache names across calls in one build.
-- [ ] `GeminiHttpLlmClient.SendAsync`: on first call with `EnableCaching = true`, create the
-      cached content and store the name; on subsequent calls, include it.
-- [ ] Add `CachedContentTokenCount` to `LlmUsage` and add cached-read pricing tier to `ModelPricing`.
-- [ ] Verify minimum cached-content size threshold is met; add graceful no-op fallback.
-
-**Blocked on:** paid Gemini account — context caching is not available on the free tier.
-
----
-
-### LLM step progress — percentage bar
-
-- [ ] Percentage bar in `BuildProgress.razor` — would require a structured
-      `(string Stage, int? PercentComplete)` progress type; the 10 fixed stages plus ~13
-      sub-steps give granular 0–100%. Deferred: the text counter is sufficient for now.
-
----
+## Features
 
 ### Multi-role classification
 
-Core and UI infrastructure complete. Edge-case tuning deferred:
+Core and UI infrastructure are complete. The following enhancements remain:
 
+- [ ] **User-selectable multi-role classification** — add an opt-in toggle (clearly labelled
+      as slower and more expensive) that allows the LLM to assign 2+ roles per card. When
+      disabled (default), classification assigns one primary role per card. When enabled,
+      secondary overlaps are also resolved, expanding coverage accounting at the cost of
+      increased classification latency and token spend.
 - [ ] Context-aware classification: e.g. Jeska's Will behaves differently with vs. without
       the commander on board; depends on commander castability and deck context.
 - [ ] Tune default coverage weights (Always=1.0, Modal=0.5, Transform=0.75 are currently
@@ -215,8 +22,10 @@ Core and UI infrastructure complete. Edge-case tuning deferred:
 
 ---
 
-### Saved results — subscription tier limits
+### Subscription Tier
 
+- [ ] **Define subscription tiers** (e.g. Free, Pro) and their corresponding feature limits —
+      saved builds, saved analyses, and future gated features such as multi-role classification.
 - [ ] **Wire saved-result limit to subscription tier.** Currently hardcoded as
       `DeckResultStorage.DefaultMaxSavedResults = 3` in `EdhDeckBuilder.Web/Services/DeckResultStorage.cs`.
       The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
@@ -226,24 +35,7 @@ Core and UI infrastructure complete. Edge-case tuning deferred:
 
 ---
 
-### Mana curve — curve-aware upgrade prioritization
-
-- [ ] Pass avg MV / sparse-CMC summary into `DeckUpgrader` gap-prioritization prompt.
-      Low priority; the visual chart is the primary deliverable.
-
----
-
-## Component refactoring
-
-`DeckResults.razor` and `DeckAnalyzerPage.razor` each host several view-tab blocks whose markup
-is near-identical. Extracting these into shared components follows the same pattern as
-`ManaCurveChart` and makes both files easier to read and reason about.
-
-All candidates extracted. Both host files are now thin nav-tab shells.
-
----
-
-## TCGPlayer affiliate linking
+### TCGPlayer affiliate linking
 
 A "Buy this deck on TCGplayer" action on a finished deck. Sends the full decklist into
 TCGplayer's Mass Entry cart tool, tagged with an affiliate code.
@@ -268,24 +60,24 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 ---
 
-## Potential upgrades
+### Refactoring
 
-- [ ] **Opening-hand / curve simulation** — Sanity-check deck consistency by simulating
-      opening hands and mana curves.
-- [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
-      while keeping the builder interface slot-in-ready.
-- [ ] **Split pages: Input+Calculating vs. Results** — The builder (`GuidedCommanderBuilderTab`,
-      `CustomCommanderBuilderTab`) and analyzer (`DeckAnalyzerPage`) currently host input,
-      live progress, and results all in one Razor component. Consider splitting each into a
-      dedicated Input+Calculating page (navigates away on completion) and a Results page
-      (purely presentational, driven by the saved result). This would let the Results page be
-      bookmarkable/shareable and reduce component complexity. Requires deciding how in-flight
-      state (progress, cancellation) transfers across a navigation boundary — one option is
-      completing the build in a background service and redirecting once done.
+- [ ] **Split builder and analyzer pages into Input, Processing, and Results sub-pages.**
+      `GuidedCommanderBuilderTab`, `CustomCommanderBuilderTab`, and `DeckAnalyzerPage` currently
+      host input, live progress, and results all in one Razor component. Split each into:
+      - **Input page** — collects commander, themes, budget, and other user preferences.
+      - **Processing page** — shows live build/analysis progress; navigates away on completion.
+        Carries a build ID so the in-flight operation can be referenced.
+      - **Results page** — purely presentational; driven by the saved result and accessible via
+        a stable ID in the URL (e.g. `/results/{id}`, `/analysis/{id}`). The ID matches the
+        saved result's storage key so a result can be re-opened directly — results become
+        bookmarkable and shareable without a rebuild.
+      Requires deciding how in-flight state (progress, cancellation) transfers across a navigation
+      boundary — one option is completing the build in a background service and redirecting once done.
 
 ---
 
-## Public documentation and How-To pages
+### Public documentation and How-To pages
 
 Explain to users how each page works — what their input drives, what external data is fetched,
 and how the LLM steps are structured. This builds trust, helps users interpret results, and is
@@ -314,9 +106,9 @@ just genuinely interesting.
 **Supporting pages / sections:**
 
 - [ ] **Data sources** — attribution page listing Scryfall, EDHREC and Commander Spellbook,
-      a sentence on what each provides, and the required
-      visible credit. Scryfall bulk data is CC BY 4.0; Commander Spellbook
-      is MIT-licensed; EDHREC are attributed by agreement/requirement.
+      a sentence on what each provides, and the required visible credit. Scryfall bulk data is
+      CC BY 4.0; Commander Spellbook is MIT-licensed; EDHREC are attributed by
+      agreement/requirement.
 - [ ] **AI limitations** — the LLM classifies and selects heuristically; it can mis-classify
       cards, misread synergies, or produce a suboptimal distribution. The deck is a strong
       starting point, not a guaranteed optimal build. Encourage manual review and adjustment.
@@ -344,10 +136,10 @@ just genuinely interesting.
 
 ---
 
-## Card Data Refresh (Cache Updates)
+### Card Data Refresh (Cache Updates)
 
-Scryfall bulk data is cached locally with a 24-hour max age. New cards released are not available
-until the app restarts and re-downloads. This creates a 24–48 hour lag.
+Scryfall bulk data is cached locally with a 24-hour max age. New cards released are not
+available until the app restarts and re-downloads. This creates a 24–48 hour lag.
 
 **Options:**
 - **(a) Manual refresh button** — User clicks to force re-download if stale.
@@ -362,6 +154,95 @@ until the app restarts and re-downloads. This creates a 24–48 hour lag.
 - [ ] Background job: scheduled task runs nightly
 
 **Scope:** ~2–3 hours for manual refresh (option a); add another 2–3 hours for background job (option b).
+
+---
+
+## Potential upgrades
+
+- [ ] **EDHREC budget/price filtering** — The builder lets users set a per-card price cap
+      and total budget, but these constraints are applied after the EDHREC pool is gathered
+      (cards are filtered out in `FilterPool`). EDHREC exposes budget-specific recommendation
+      pages (e.g. `/commanders/{slug}/budget`) that return cards already pre-filtered to lower
+      price points.
+  - [ ] Investigate EDHREC's budget URL variants (e.g. `/budget`, `/ultra-budget`) and
+        whether they return a meaningfully different card set.
+  - [ ] If they do, extend `ISuggestionSource` with a budget-aware overload and call the
+        budget endpoint when the user has set a per-card price cap below a threshold (e.g. $2).
+        This would improve pool quality for budget builds rather than just filtering out
+        expensive cards after the fact.
+
+- [ ] **Opening-hand / curve simulation** — Sanity-check deck consistency by simulating
+      opening hands and mana curves.
+
+- [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
+      while keeping the builder interface slot-in-ready.
+
+---
+
+## Future
+
+### Historic Brawl on MTG Arena
+
+Historic Brawl is 100-card singleton, same physical count as Commander, but with meaningful
+differences: 1-vs-1, an **eternal** card pool, and two distinct queues.
+
+Key differences from EDH to plan around:
+
+- **Card pool:** Scryfall exposes `legalities.historicbrawl`. Card ingestion needs a separate
+  flag. The pool is eternal — no rotation, just a separate ban list.
+- **Two queues — ranked vs. casual:** the builder should know which queue the user is targeting
+  and adjust the `DeckTemplate` baseline and selector guidance accordingly.
+- **1v1 meta:** Board wipes are weaker, reactive spells matter more. The `DeckTemplate` targets
+  need a Brawl-specific baseline.
+- **Sources:** EDHREC does not cover Historic Brawl well; the existing client would need
+  extension to Brawl URL path variants. No sanctioned competitive popularity source exists
+  (Untapped.gg is commercial).
+- **Commander legality:** Any legendary creature or planeswalker legal in the format can be the
+  commander. `CanBeCommander` logic needs a format-aware variant.
+- **Arena-only cards:** Alchemy and Historic Anthology cards exist only on Arena. The card model
+  may need an `IsArenaOnly` flag.
+
+**Owner decisions required before implementation:**
+
+- [ ] **Historic Brawl competitive popularity gap.** No sanctioned open source exists.
+      Decide whether to accept EDHREC + Scryfall alone for Brawl recommendations.
+
+**Implementation tasks:**
+
+- [ ] Define `FormatProfile` (or equivalent) in Core: legality check, deck size, commander
+      count, baseline `DeckTemplate`, and queue/power-level model.
+- [ ] Add `historicbrawl` legality flag and `IsArenaOnly` flag to `Card` ingestion.
+- [ ] Extend `EdhrecClient` to resolve Brawl URL path variants alongside existing Commander paths.
+- [ ] Create Brawl `DeckTemplate` baselines — ranked and casual variants.
+- [ ] Update `IDeckBuilder.BuildAsync` (or a new `IBrawlDeckBuilder`) to accept a
+      `FormatProfile` and route to the correct template, sources, and legality rules.
+- [ ] Test with a known strong Historic Brawl commander (e.g. Atraxa, Raffine, Sheoldred).
+
+---
+
+### Gemini context caching
+
+`GeminiHttpLlmClient` currently ignores `LlmRequest.EnableCaching`. Gemini caching is a separate
+API call (not inline like Anthropic's `cache_control` blocks) and requires billing enabled.
+
+**How it works:** POST `systemInstruction` + `responseSchema` to `/v1beta/cachedContents` →
+get a `name` token → include `"cachedContent": name` in subsequent `generateContent` calls.
+Cached reads cost ~25% of normal input; there is a storage charge (~$1/1M tokens/hour). TTL
+is set per cache (1 min–1 hour).
+
+**Implementation gaps before this can land:**
+
+- [ ] Add `CreateCachedContentAsync` / `DeleteCachedContentAsync` to `GeminiRestClient`.
+      The `cachedContent` name field must be added to the `GeminiRequest` record (replaces
+      `systemInstruction`; the two are mutually exclusive in the request body).
+- [ ] Introduce a build-session concept (extend `GeminiRateLimiter` or add a new
+      `GeminiBuildSession` scoped service) to hold the 2–3 cache names across calls in one build.
+- [ ] `GeminiHttpLlmClient.SendAsync`: on first call with `EnableCaching = true`, create the
+      cached content and store the name; on subsequent calls, include it.
+- [ ] Add `CachedContentTokenCount` to `LlmUsage` and add cached-read pricing tier to `ModelPricing`.
+- [ ] Verify minimum cached-content size threshold is met; add graceful no-op fallback.
+
+**Blocked on:** paid Gemini account — context caching is not available on the free tier.
 
 ---
 
