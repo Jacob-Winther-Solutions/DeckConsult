@@ -4,16 +4,12 @@ A living list of deferred work. Check items off as they land.
 
 ---
 
-## Additional card sources — TopDeck.gg + EDHREC Brawl  (prerequisite for Brawl / Duel Commander)
+## Additional card sources — EDHREC Brawl  (prerequisite for Brawl / Duel Commander)
 
 See `TODO/DATA_SOURCES.md` for the full spec, verified API details, and the excluded-sources
 list. Aetherhub and mtgrocks are explicitly excluded. Commander Spellbook (`find-my-combos` +
 `estimate-bracket`) is fully implemented via `CommanderSpellbookClient`. Remaining sources:
 
-- **TopDeck.gg** (free API key, attribution required) — competitive card-frequency signal
-  for Commander and Duel Commander (Brawl is not covered). A **periodic ingest job**, not a
-  live per-build call: pull tournaments, aggregate card frequency by commander, store locally.
-  Visible credit + link to TopDeck.gg must appear in the UI wherever this data is surfaced.
 - **EDHREC — extend to Brawl paths** — the existing client already handles Commander; extend
   it to resolve the Brawl URL variants for Historic Brawl support.
 - **MTGJSON** — optional; only adopt if offline bulk card data or preconstructed deck seed
@@ -21,35 +17,14 @@ list. Aetherhub and mtgrocks are explicitly excluded. Commander Spellbook (`find
 
 **Owner decisions required before implementation:**
 
-- [ ] **TopDeck.gg aggregation weighting:** raw card frequency vs. standing-weighted.
-      Determines whether the local aggregate table stores standings alongside counts.
 - [ ] **Adopt MTGJSON now or defer.**
 - [ ] **Historic Brawl competitive popularity gap.** No sanctioned open source exists
       (Untapped.gg is commercial). Decide whether to accept EDHREC + Scryfall alone for Brawl.
 
 **Implementation tasks:**
 
-- [ ] Implement `TopDeckIngestJob` in Infrastructure: periodic pull of EDH/DC tournaments,
-      aggregate `deckObj` card frequency by commander into a local store. Define
-      `ICompetitiveMetaSource` in Core Abstractions.
 - [ ] Extend `EdhrecClient` to resolve Brawl URL path variants alongside existing Commander paths.
-- [ ] Decide how multiple `ISuggestionSource` implementations are merged in `DeckBuilder`.
-      The current merge keeps the highest inclusion per card; revisit once sources with
-      different inclusion scales are combined.
-- [ ] Add TopDeck.gg attribution credit to the Web UI wherever competitive frequency data is surfaced.
 
-### EDHREC theme-specific tag endpoints
-
-EDHREC provides theme-focused recommendation endpoints that filter to only cards aligned with a
-specific theme. These can reduce filtering and improve pool quality for unusual theme combinations.
-
-- [ ] Example: `https://json.edhrec.com/pages/commanders/{commander-slug}/{theme-name}.json`
-- [ ] New method: `ISuggestionSource.GetThemeRecommendationsAsync(Card commander, WeightedTheme theme, ...)`
-- [ ] In `GatherPoolAsync()`, try theme endpoints for each weighted theme before merging single-commander pools
-- [ ] Fallback to single-commander pools if theme endpoints return null
-- [ ] Cache by theme (e.g., `{commander-slug}-{theme-name}.json`)
-
-**Status:** Deferred. Current partner-pair support is production-ready; this is an optimization for edge cases.
 
 ---
 
@@ -88,7 +63,6 @@ Key differences from EDH to plan around:
 Duel Commander is 1v1 100-card singleton with a separate, more aggressive banlist than EDH.
 
 - [ ] Research Duel Commander legality — Scryfall does not expose a dedicated legality flag.
-- [ ] Integrate competitive meta source — TopDeck.gg covers Duel Commander tournaments.
 - [ ] Create Duel Commander `DeckTemplate` baseline — tuned for 1v1 faster pace.
 - [ ] Update `FormatProfile` to support Duel Commander legality and bracket/queue model.
 
@@ -171,6 +145,20 @@ by `Theme.Tribal`). Deck counts shown for reference. All slugs verified on EDHRE
 - **Politics & Control:** Stax, Pillowfort, Hatebears, Group Hug, Group Slug, Chaos, Monarch, Mill
 - **Synergy:** Blink, ETB, Commander Matters, Legends, Exile, Historic, Clones, Toughness Matters, Lifegain, Clues, Food
 - **Tribal:** (special — with creature-type picker)
+
+### EDHREC budget/price filtering
+
+The builder lets users set a per-card price cap and total budget, but these constraints
+are applied after the EDHREC pool is gathered (cards are filtered out in `FilterPool`).
+EDHREC exposes budget-specific recommendation pages (e.g. `/commanders/{slug}/budget`)
+that return cards already pre-filtered to lower price points.
+
+- [ ] Investigate EDHREC's budget URL variants (e.g. `/budget`, `/ultra-budget`) and
+      whether they return a meaningfully different card set.
+- [ ] If they do, extend `ISuggestionSource` with a budget-aware overload and call the
+      budget endpoint when the user has set a per-card price cap below a threshold (e.g. $2).
+      This would improve pool quality for budget builds rather than just filtering out
+      expensive cards after the fact.
 
 ### EDHREC theme selection in Custom Builder
 
@@ -286,6 +274,73 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
       opening hands and mana curves.
 - [ ] **Multi-retailer support** — Extend affiliate linking beyond TCGPlayer (Card Kingdom, etc.)
       while keeping the builder interface slot-in-ready.
+- [ ] **Split pages: Input+Calculating vs. Results** — The builder (`GuidedCommanderBuilderTab`,
+      `CustomCommanderBuilderTab`) and analyzer (`DeckAnalyzerPage`) currently host input,
+      live progress, and results all in one Razor component. Consider splitting each into a
+      dedicated Input+Calculating page (navigates away on completion) and a Results page
+      (purely presentational, driven by the saved result). This would let the Results page be
+      bookmarkable/shareable and reduce component complexity. Requires deciding how in-flight
+      state (progress, cancellation) transfers across a navigation boundary — one option is
+      completing the build in a background service and redirecting once done.
+
+---
+
+## Public documentation and How-To pages
+
+Explain to users how each page works — what their input drives, what external data is fetched,
+and how the LLM steps are structured. This builds trust, helps users interpret results, and is
+just genuinely interesting.
+
+**Scope — one page per feature:**
+
+- [ ] **Commander Builder** — the 12-stage pipeline in plain language: pool gathering
+      (EDHREC + theme endpoints + Commander Spellbook near-miss combos),
+      LLM classification (role assignment per card), LLM selection (ranked picks per role),
+      fill engine (greedy slot-filling + reconciliation), color-fixing and repair passes.
+      Explain how theme/archetype weights shift the template targets. Explain what the
+      Coverage Report tab shows (overlap-aware coverage vs. physical count).
+- [ ] **Commander Discovery** — how suggestions are generated (LLM `ICommanderSelector`
+      using EDHREC tag-page data), what the power-level / popularity signals mean,
+      how partner pairs are handled (EDHREC partner index + merged recommendation pools).
+- [ ] **Deck Analyzer** — paste-in flow: classification → coverage report → bracket estimate
+      (Commander Spellbook) → role gaps → Upgrade Paths → Combo Finder. Explain that
+      "bracket" is Spellbook's combo-based estimate, not a manual review.
+- [ ] **Upgrade Paths** — two-LLM-call pipeline: cheap model prioritises gaps by user
+      feedback text, selector model proposes add+cut pairs. All suggested cards are validated
+      against the EDHREC pool (whitelist check) before being shown.
+- [ ] **Combo Finder** — what Commander Spellbook returns: complete combos the deck already
+      enables, and near-misses (one named piece away). Explain the near-miss threshold.
+
+**Supporting pages / sections:**
+
+- [ ] **Data sources** — attribution page listing Scryfall, EDHREC and Commander Spellbook,
+      a sentence on what each provides, and the required
+      visible credit. Scryfall bulk data is CC BY 4.0; Commander Spellbook
+      is MIT-licensed; EDHREC are attributed by agreement/requirement.
+- [ ] **AI limitations** — the LLM classifies and selects heuristically; it can mis-classify
+      cards, misread synergies, or produce a suboptimal distribution. The deck is a strong
+      starting point, not a guaranteed optimal build. Encourage manual review and adjustment.
+- [ ] **Glossary** — card roles (Plan, Ramp, Removal, Interaction, Wipe, Draw, Threat,
+      Synergy, Payoff, Land, Unmatched), coverage vs. physical count, archetypes vs. themes,
+      bracket definitions (1–5 scale), partner variants. Aimed at newer players.
+- [ ] **Privacy notice** — API keys and saved results are stored only in the user's own
+      browser (encrypted cookies / localStorage). Nothing is stored server-side or shared
+      with third parties. State this clearly; it is also the GDPR-relevant disclosure for
+      EU users.
+- [ ] **Fan content disclaimer** — Magic: The Gathering card names, mana symbols, and oracle
+      text are Wizards of the Coast IP. This is an unofficial fan tool, not affiliated with
+      or endorsed by Wizards of the Coast. Card data is sourced via Scryfall, which operates
+      under WotC's fan content and data policies. Required under the WotC Fan Content Policy.
+
+**Legal / policy actions (non-code, owner's responsibility):**
+
+- [ ] **EDHREC ToS review** — the current client hits EDHREC's public JSON endpoints
+      (`json.edhrec.com`). Their ToS permits fan tools with attribution but prohibits
+      commercial scraping. If the app grows or monetises (e.g. TCGPlayer affiliate links),
+      get explicit written permission from EDHREC before proceeding.
+- [ ] **WotC Fan Content Policy compliance check** — confirm the tool's use of card names
+      and Scryfall data falls within the policy before adding any monetisation feature.
+      (Already flagged under TCGPlayer affiliate linking — resolve that one first.)
 
 ---
 
@@ -345,5 +400,7 @@ All four projects compile; 436 tests pass. All items below are complete.
 **Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). `CoverageReportPanel` (in `Components/Results/`) owns the full Coverage Report tab — summary table, role buckets, basic lands, runner-ups — parameterised with `RenderFragment` slots (`SummaryHeaderActions`, `SummaryBodyPrefix`, `TargetCellContent`, `Alerts`) for host-specific customisation. Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells.
 
 **Deployment:** Hetzner CX23 VPS + Docker Compose + Caddy reverse proxy (automatic TLS). GitHub Actions CI/CD: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup in `TODO/DEPLOYMENT.md`.
+
+**EDHREC theme-specific tag endpoints:** `IEdhrecClient.GetCommanderThemePageAsync` (`/commanders/{slug}/{themeSlug}.json`) and `GetTagsPageAsync` (`/tags/{themeSlug}.json`) implemented. `SuggestionSource.GetCommanderThemeRecommendationsAsync` and `GetTagsAsync` map pages to `CardCandidate` lists. `DeckBuilder.GetThemePoolAsync` fires all `(commander × theme)` and per-theme tags-page requests in parallel, merges into `edhrecPool` before classification.
 
 **Deck Strategy description:** `DeckAnalyzer` collects Plan-primary cards after classification and makes a single lightweight LLM call (`describe_plan` forced tool, Haiku/lite model, 512 tokens) to produce a 2–3 sentence natural-language description of the deck's win condition. Shown as a "Deck Strategy" callout at the top of the Coverage Report tab and included in exported analysis markdown. Gemini path supported via `GeminiSchemas.BuildPlanDescriptionSchema`.
