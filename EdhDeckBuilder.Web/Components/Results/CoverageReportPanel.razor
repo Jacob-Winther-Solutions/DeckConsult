@@ -30,7 +30,13 @@
                         : 0.0;
                     var isOk = actual >= target.Min;
                     <tr>
-                        <td class="ps-3">@RoleName(role)</td>
+                        <td class="ps-3">
+                            @RoleName(role)
+                            @if (RoleTooltip(role) is { } tip)
+                            {
+                                <RoleHelpTip Description="@tip" />
+                            }
+                        </td>
                         @if (TargetCellContent is not null)
                         {
                             @TargetCellContent(new TargetCellContext(role, target))
@@ -90,6 +96,10 @@
              @onclick="() => ToggleBucket(role)">
             <span class="fw-semibold me-auto">
                 @RoleName(role)
+                @if (RoleTooltip(role) is { } tip)
+                {
+                    <RoleHelpTip Description="@tip" />
+                }
                 <span class="badge bg-secondary ms-1 fw-normal">@primaryCards.Count</span>
                 @if (secondaryCards.Count > 0)
                 {

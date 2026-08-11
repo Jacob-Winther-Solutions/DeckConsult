@@ -41,6 +41,10 @@
     <!-- ── View tabs ──────────────────────────────────────────────────────── -->
     <ul class="nav nav-tabs px-3 mb-3">
         <li class="nav-item">
+            <button class="nav-link @(_view == DeckView.ByRole ? "active" : "")"
+                    @onclick="() => _view = DeckView.ByRole">Coverage Report</button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link @(_view == DeckView.AllCards ? "active" : "")"
                     @onclick="() => _view = DeckView.AllCards">All Cards</button>
         </li>
@@ -51,10 +55,6 @@
         <li class="nav-item">
             <button class="nav-link @(_view == DeckView.ByManaValue ? "active" : "")"
                     @onclick="() => _view = DeckView.ByManaValue">By Mana Value</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link @(_view == DeckView.ByRole ? "active" : "")"
-                    @onclick="() => _view = DeckView.ByRole">Coverage Report</button>
         </li>
         <li class="nav-item">
             <button class="nav-link @(_view == DeckView.UpgradePaths ? "active" : "")"

@@ -5,9 +5,14 @@
 <div class="container-fluid">
 
     <div style="padding: 1.5rem 1.5rem 0 1.5rem;">
-        <h2 class="mb-1">Deck Analyzer</h2>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h2 class="mb-0">Deck Analyzer</h2>
+            <InfoIconButton OnClick="() => _showModal = true" />
+        </div>
         <p class="text-muted mb-0">Paste an existing decklist to classify it, see its coverage profile, and estimate its power bracket.</p>
     </div>
+
+    <DeckAnalyzerInfoModal Visible="@_showModal" OnClose="() => _showModal = false" />
 
     @if (_isAnalyzing)
     {
@@ -403,6 +408,7 @@
                     @onclick="AnalyzeAsync">
                 Analyze Deck
             </button>
+            <AiLimitationsNotice />
 
         </div>
     }

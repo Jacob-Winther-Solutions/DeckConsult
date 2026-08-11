@@ -1,0 +1,109 @@
+@if (Visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" @onclick="OnClose">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document" @onclick:stopPropagation>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How the Commander Builder works</h5>
+                    <button type="button" class="btn-close" @onclick="OnClose"></button>
+                </div>
+                <div class="modal-body">
+
+                    <p class="text-muted">
+                        The builder runs a staged pipeline that consults the AI at exactly two points.
+                        Everything else is deterministic code.
+                    </p>
+
+                    <p>
+                        Two pathways are available. <strong>Guided</strong> lets you pick archetypes and themes —
+                        the tool derives coverage targets from those generic traits. <strong>Custom</strong> lets
+                        you describe the deck in your own words instead, without breaking it into preset categories.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">Choose your commander(s)</h6>
+                    <p>
+                        Your commander is the single most important input — it determines the color identity the
+                        entire 99 must respect and shapes how the AI classifies every card. Partner pairs are
+                        fully supported; selecting two commanders reduces the available slots from 99 to 98.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">Must-include cards</h6>
+                    <p>
+                        Cards added to the Must-Include list are locked into the deck before the fill pass runs.
+                        Use <strong>Validate Cards</strong> to check each name against Scryfall before building —
+                        unrecognized names block the build entirely. Locked cards are excluded from budget
+                        enforcement and are never candidates for cut suggestions.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">1. Pool gathering</h6>
+                    <p>
+                        Card data — rules text, mana cost, color identity, and legality — is sourced from Scryfall.
+                        Recommendations are then pulled from EDHREC for your commander and each of your chosen themes,
+                        and Commander Spellbook near-miss combo pieces — cards one step away from completing a combo
+                        with your commander — are also included. Cards outside your color identity or on the EDH ban
+                        list are removed before anything else happens.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">2. Template resolution</h6>
+                    <p>
+                        Your archetype and theme weights are blended into per-role coverage targets: how many Ramp
+                        slots, how much Disruption, how many Tutors, and so on. This is deterministic math with no
+                        AI involved. Archetype weights shift the balance — Combo raises Tutor density, Control raises
+                        Disruption, Aggro lowers the curve. Theme weights determine which card types are favored
+                        within each role.
+                    </p>
+                    <p>
+                        If you set a budget, it takes effect here. A per-card price cap excludes candidates above
+                        that price from selection. A total deck budget acts as a soft constraint — if no affordable
+                        card can fill a role, the best available option is used and flagged in the results so you
+                        know what to swap.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">3. Card classification <span class="badge bg-secondary fw-normal ms-1" style="font-size: 0.7em;">AI step 1</span></h6>
+                    <p>
+                        Every card in the pool is assigned a primary role (Ramp, Card Advantage, Tutor, etc.)
+                        and optional secondary roles for cards that contribute to more than one function. Each
+                        role assignment also carries a fractional weight — a card that primarily ramps but also
+                        draws might count as 1.0 toward Ramp and 0.5 toward Card Advantage. These weights are
+                        why the Coverage Report shows decimal values rather than whole numbers.
+                        The cheapest model available for your chosen provider handles this step — classification
+                        is a straightforward pattern-matching task that does not require advanced reasoning, and
+                        the cheapest model is more than capable of it. Results are cached across builds, so most
+                        cards are only classified once.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">4. Card selection <span class="badge bg-secondary fw-normal ms-1" style="font-size: 0.7em;">AI step 2</span></h6>
+                    <p>
+                        For each role, the AI ranks the classified candidates for your specific commander and build
+                        direction. The fill engine then picks the top-ranked cards until the coverage target for
+                        that role is met. Each selected card gets a written rationale explaining why it belongs in
+                        this deck. Your chosen model is used here — this is where the reasoning level you selected
+                        actually makes a difference.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">5. Color-fixing</h6>
+                    <p>
+                        Some basic land slots are upgraded to non-basic color-fixing lands from the pool, ranked
+                        by how much mana fixing they provide for the specific colors your deck needs.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">6. Basic land distribution</h6>
+                    <p>
+                        Remaining basic land slots are split across your colors proportional to pip demand in the 99.
+                        A heavily green deck gets more Forests than Mountains even if it runs both colors.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">7. Coverage Report</h6>
+                    <p class="mb-0">
+                        The first tab in the results shows overlap-aware role coverage vs. the planned targets
+                        from the template. Because cards carry fractional weights across multiple roles, the
+                        totals show decimal values and can legitimately exceed 99. Roles that fall short of
+                        their target are highlighted so you can see where the pool was thin.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}

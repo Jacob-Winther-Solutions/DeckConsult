@@ -1,4 +1,5 @@
 using EdhDeckBuilder.Agent.Models;
+using EdhDeckBuilder.Agent.Prompts;
 using EdhDeckBuilder.Core.Cards;
 using EdhDeckBuilder.Core.Decks;
 using EdhDeckBuilder.Web.Services;
@@ -76,4 +77,6 @@ public partial class CoverageReportPanel : ComponentBase
     private static string RoleName(CardRole role)              => CardRoleDisplay.RoleName(role);
     private static string PrimaryRoleBadgeClass(CardRole role) => CardRoleDisplay.PrimaryRoleBadgeClass(role);
     private static CardRoleDisplay.BadgeInfo SecondaryBadge(RoleContribution contrib) => CardRoleDisplay.SecondaryBadge(contrib);
+    private static string? RoleTooltip(CardRole role) =>
+        CardRoleGlossary.Definitions.TryGetValue(role, out var def) ? def.Description : null;
 }

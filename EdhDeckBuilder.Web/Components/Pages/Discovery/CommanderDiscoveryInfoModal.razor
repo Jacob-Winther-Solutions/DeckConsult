@@ -1,0 +1,69 @@
+@if (Visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" @onclick="OnClose">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document" @onclick:stopPropagation>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How Commander Discovery works</h5>
+                    <button type="button" class="btn-close" @onclick="OnClose"></button>
+                </div>
+                <div class="modal-body">
+
+                    <p class="text-muted">
+                        Discovery helps you find a commander when you know what kind of deck you want to build
+                        but haven't settled on who should lead it.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">Two pathways</h6>
+                    <p>
+                        <strong>Guided</strong> lets you select archetypes (how the deck wins) and themes
+                        (what it does mechanically), plus optional filters for color identity, power bracket,
+                        and budget. The tool matches commanders against these structured criteria.
+                    </p>
+                    <p>
+                        <strong>Custom</strong> lets you describe your strategy in prose instead — useful when
+                        your idea doesn't fit neatly into preset categories or when you want to be more specific
+                        about play patterns and win conditions.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">1. Commander pool</h6>
+                    <p>
+                        All legal commanders from Scryfall's card database are the starting candidate pool.
+                        If you set a color identity filter, only commanders matching those exact colors are kept.
+                        Bracket and budget filters narrow the pool further before scoring begins.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">2. AI scoring <span class="badge bg-secondary fw-normal ms-1" style="font-size: 0.7em;">AI step</span></h6>
+                    <p>
+                        Your chosen model ranks commanders against your criteria using EDHREC data for each
+                        candidate. This is where the reasoning level you selected matters — the AI evaluates
+                        how well each commander's abilities and typical play patterns align with your strategy,
+                        and writes a rationale for each suggestion explaining the fit.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">3. Results</h6>
+                    <p>
+                        Each suggestion shows the commander's card art, oracle text, a written rationale, and
+                        the top popular themes from EDHREC for that commander — ranked by how many EDHREC decks
+                        use them. Blue badges are themes and archetypes the app recognises; grey badges are
+                        EDHREC-specific tags without a direct app equivalent.
+                    </p>
+                    <p class="mb-0">
+                        Clicking a suggestion jumps to the Commander Builder with that commander pre-selected.
+                        If you haven't chosen a theme yourself, the builder link automatically presets the top
+                        known EDHREC theme as a starting point.
+                    </p>
+
+                    <hr class="my-3" />
+
+                    <p class="text-muted small mb-0">
+                        <strong>Partner pairs</strong> are fully supported — both halves of a partner pair
+                        are evaluated together, and recommendations are drawn from both EDHREC partner endpoints.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}

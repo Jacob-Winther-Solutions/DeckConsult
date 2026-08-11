@@ -5,9 +5,14 @@
 <div class="container-fluid">
 
     <div style="padding: 1.5rem 1.5rem 0 1.5rem;">
-        <h2 class="mb-1">Commander Builder</h2>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h2 class="mb-0">Commander Builder</h2>
+            <InfoIconButton OnClick="() => _showModal = true" />
+        </div>
         <p class="text-muted mb-0">Fill in the form below and the agent will construct a tuned 99-card deck.</p>
     </div>
+
+    <CommanderBuilderInfoModal Visible="@_showModal" OnClose="() => _showModal = false" />
 
     @if (Keys.GetApiKey() is null)
     {

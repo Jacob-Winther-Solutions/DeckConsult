@@ -25,6 +25,8 @@ public partial class ApiKeySettings : ComponentBase
     private string       _keyInput      = "";
     private bool         _connected;
     private bool         _showForm;
+    private bool         _showHelp;
+    private bool         _showPrivacy;
     private bool         _remember      = true;
     private bool         _busy;
     private bool         _error;
@@ -201,6 +203,7 @@ public partial class ApiKeySettings : ComponentBase
             var models = ClaudeModels.GetSelectionModels(provider);
             _selectedModel = models.First().Id;
             Keys.SelectedModel = _selectedModel;
+            _showHelp = false;
         }
     }
 

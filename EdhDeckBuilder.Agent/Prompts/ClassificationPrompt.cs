@@ -15,39 +15,11 @@ public static class ClassificationPrompt
     public const string ToolName = "classify_cards";
     private static InstrumentationOptions? _options;
 
-    public const string SystemPrompt =
-        """
+    public static string SystemPrompt =>
+        $"""
         You are an expert Magic: the Gathering deck builder classifying cards for a specific deck.
 
-        ## Roles
-        Each card has exactly one primary role — the role it is most often played for in this deck context.
-        Secondary roles are additional contributions the card makes; only add a secondary role if the card meaningfully fulfils it, not just incidentally.
-
-        If a card does not fit any role in the deck context, assign it the **Unmatched** role.
-        The fill engine will decide whether to include it based on remaining deck slots.
-
-        **Land** — Lands used for mana. Assign this role only to actual land cards.
-
-        **Ramp** — Cards that accelerate mana production beyond one land per turn: mana rocks, land ramp spells, mana dorks, rituals, and effects that grant additional land drops per turn (e.g. Exploration, Oracle of Mul Daya, effects like "you may play an additional land this turn").
-
-        **CardAdvantage** — Cards that generate net card equity: you must end up with more cards in hand or exile than you started with. A card qualifies if it draws 2+ cards, creates multiple impulse-draw effects, or replaces itself and does something else relevant. Cantrips (draw exactly 1), looting (draw X discard X), and rummaging (discard X draw X) do not qualify — they trade one card for one card and belong in Synergy or another more specific role.
-
-        **TargetedDisruption** — Spot removal, counterspells, bounce, and exile targeting one permanent or spell, and combat-denial effects targeting a single creature (tap effects, can't attack this turn, can't block this turn, Maze of Ith-style effects). Global combat-denial that affects all attackers or all blockers (Fog, Propaganda) belongs in MassDisruption instead.
-
-        **MassDisruption** — Board wipes, global effects, stax pieces (Ghostly Prison, Propaganda). Affects many permanents at once.
-
-        **Tutor** — Cards whose primary value is searching your library for a specific card, either with or without certain criteria set, which for instance could include card type or color restrictions.
-
-        **Protection** — Hexproof, indestructible, phasing, shroud, regeneration, protection from colors/types, and other effects that keep your permanents alive against removal or combat damage.
-
-        **Recursion** — Cards that return other cards from the graveyard to either your hand or the battlefield: Regrowth, Eternal Witness, Animate Dead.
-
-        **Plan** — The core strategy cards that directly execute what this deck is trying to do. Highly commander-dependent. In a tokens deck, token makers are Plan; in voltron, equipment and auras are Plan; in spellslinger, the spells being cast are Plan.
-
-        **Payoff** — Cards that reward or multiply the plan without being the plan itself: Purphoros in a tokens deck, Anointed Procession, damage doublers. Converts the plan into a win.
-
-        **Synergy** — Glue cards that support the deck broadly without fitting a more specific role. Cards that fit the theme without driving it.
-
+        {CardRoleGlossary.BuildRolesSection()}
         ## Role Relations (for secondary roles only)
         Only assign secondary roles when the secondary effect is **mechanically core to the card's function in the deck**, not minor or incidental.
         - **Always**: The card simultaneously provides both roles (e.g. Black Market Connections gives Ramp AND CardAdvantage at the same time).

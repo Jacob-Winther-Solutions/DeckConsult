@@ -46,6 +46,13 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 - [ ] **WotC Fan Content Policy check**: confirm the policy permits monetization for a tool
       like this before enabling any affiliate links.
 - [ ] **Apply to TCGplayer's affiliate program** via Impact (impact.com).
+- [ ] **EDHREC ToS review** — the current client hits EDHREC's public JSON endpoints
+      (`json.edhrec.com`). Their ToS permits fan tools with attribution but prohibits
+      commercial scraping. If the app grows or monetises, get explicit written permission
+      from EDHREC before proceeding.
+- [ ] **WotC Fan Content Policy compliance check** — confirm the tool's use of card names
+      and Scryfall data falls within the policy before adding any monetisation feature.
+      Resolve the item above first.
 
 **Implementation tasks:**
 - [ ] `TcgPlayerLinkOptions` (singleton from config): holds `AffiliateCode` and `Medium`.
@@ -59,80 +66,6 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 - [ ] Multi-retailer support (Card Kingdom etc.) — keep the builder interface slot-in-ready.
 
 ---
-
-### Refactoring
-
-- [ ] **Split builder and analyzer pages into Input, Processing, and Results sub-pages.**
-      `GuidedCommanderBuilderTab`, `CustomCommanderBuilderTab`, and `DeckAnalyzerPage` currently
-      host input, live progress, and results all in one Razor component. Split each into:
-      - **Input page** — collects commander, themes, budget, and other user preferences.
-      - **Processing page** — shows live build/analysis progress; navigates away on completion.
-        Carries a build ID so the in-flight operation can be referenced.
-      - **Results page** — purely presentational; driven by the saved result and accessible via
-        a stable ID in the URL (e.g. `/results/{id}`, `/analysis/{id}`). The ID matches the
-        saved result's storage key so a result can be re-opened directly — results become
-        bookmarkable and shareable without a rebuild.
-      Requires deciding how in-flight state (progress, cancellation) transfers across a navigation
-      boundary — one option is completing the build in a background service and redirecting once done.
-
----
-
-### Public documentation and How-To pages
-
-Explain to users how each page works — what their input drives, what external data is fetched,
-and how the LLM steps are structured. This builds trust, helps users interpret results, and is
-just genuinely interesting.
-
-**Scope — one page per feature:**
-
-- [ ] **Commander Builder** — the 12-stage pipeline in plain language: pool gathering
-      (EDHREC + theme endpoints + Commander Spellbook near-miss combos),
-      LLM classification (role assignment per card), LLM selection (ranked picks per role),
-      fill engine (greedy slot-filling + reconciliation), color-fixing and repair passes.
-      Explain how theme/archetype weights shift the template targets. Explain what the
-      Coverage Report tab shows (overlap-aware coverage vs. physical count).
-- [ ] **Commander Discovery** — how suggestions are generated (LLM `ICommanderSelector`
-      using EDHREC tag-page data), what the power-level / popularity signals mean,
-      how partner pairs are handled (EDHREC partner index + merged recommendation pools).
-- [ ] **Deck Analyzer** — paste-in flow: classification → coverage report → bracket estimate
-      (Commander Spellbook) → role gaps → Upgrade Paths → Combo Finder. Explain that
-      "bracket" is Spellbook's combo-based estimate, not a manual review.
-- [ ] **Upgrade Paths** — two-LLM-call pipeline: cheap model prioritises gaps by user
-      feedback text, selector model proposes add+cut pairs. All suggested cards are validated
-      against the EDHREC pool (whitelist check) before being shown.
-- [ ] **Combo Finder** — what Commander Spellbook returns: complete combos the deck already
-      enables, and near-misses (one named piece away). Explain the near-miss threshold.
-
-**Supporting pages / sections:**
-
-- [ ] **Data sources** — attribution page listing Scryfall, EDHREC and Commander Spellbook,
-      a sentence on what each provides, and the required visible credit. Scryfall bulk data is
-      CC BY 4.0; Commander Spellbook is MIT-licensed; EDHREC are attributed by
-      agreement/requirement.
-- [ ] **AI limitations** — the LLM classifies and selects heuristically; it can mis-classify
-      cards, misread synergies, or produce a suboptimal distribution. The deck is a strong
-      starting point, not a guaranteed optimal build. Encourage manual review and adjustment.
-- [ ] **Glossary** — card roles (Plan, Ramp, Removal, Interaction, Wipe, Draw, Threat,
-      Synergy, Payoff, Land, Unmatched), coverage vs. physical count, archetypes vs. themes,
-      bracket definitions (1–5 scale), partner variants. Aimed at newer players.
-- [ ] **Privacy notice** — API keys and saved results are stored only in the user's own
-      browser (encrypted cookies / localStorage). Nothing is stored server-side or shared
-      with third parties. State this clearly; it is also the GDPR-relevant disclosure for
-      EU users.
-- [ ] **Fan content disclaimer** — Magic: The Gathering card names, mana symbols, and oracle
-      text are Wizards of the Coast IP. This is an unofficial fan tool, not affiliated with
-      or endorsed by Wizards of the Coast. Card data is sourced via Scryfall, which operates
-      under WotC's fan content and data policies. Required under the WotC Fan Content Policy.
-
-**Legal / policy actions (non-code, owner's responsibility):**
-
-- [ ] **EDHREC ToS review** — the current client hits EDHREC's public JSON endpoints
-      (`json.edhrec.com`). Their ToS permits fan tools with attribution but prohibits
-      commercial scraping. If the app grows or monetises (e.g. TCGPlayer affiliate links),
-      get explicit written permission from EDHREC before proceeding.
-- [ ] **WotC Fan Content Policy compliance check** — confirm the tool's use of card names
-      and Scryfall data falls within the policy before adding any monetisation feature.
-      (Already flagged under TCGPlayer affiliate linking — resolve that one first.)
 
 ---
 
@@ -260,6 +193,8 @@ All four projects compile; 441 tests pass. All items below are complete.
 **Tests:** 441 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source, creature type catalog pluralisation and slug matching, Scryfall refresh scheduling). All green. Web project exposes internals to the test project via `InternalsVisibleTo`.
 
 **Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). `CoverageReportPanel` (in `Components/Results/`) owns the full Coverage Report tab — summary table, role buckets, basic lands, runner-ups — parameterised with `RenderFragment` slots (`SummaryHeaderActions`, `SummaryBodyPrefix`, `TargetCellContent`, `Alerts`) for host-specific customisation. Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells.
+
+**Public documentation & in-app help:** Contextual, inline documentation rather than a separate /docs page. BYOK inline help in the API key dropdown — per-provider steps, practical tips, and a collapsible privacy disclosure. How-It-Works info modals (ℹ button in each page header) on Commander Builder, Commander Discovery, and Deck Analyzer covering each feature's pipeline, AI steps, and key concepts in plain language. `InfoIconButton` shared component. `CardRoleGlossary` is the single source of truth for all 12 role definitions — both the classification prompt's `## Roles` section and the UI tooltips are built from it. `RoleHelpTip` component renders a `?` badge next to role names in the Coverage Report summary table and role bucket headers; hovering shows the exact definition the classifier used. `AiLimitationsNotice` component shown near all five submit buttons. Privacy disclosure in the API key dropdown, on the Saved Results page subtitle, and in the app footer. Sticky footer on all pages: privacy statement, data source attribution (Scryfall CC BY 4.0, EDHREC, Commander Spellbook), and WotC fan content disclaimer. Default Coverage Report tab now first in deck results.
 
 **Deployment:** Hetzner CX23 VPS + Docker Compose + Caddy reverse proxy (automatic TLS). GitHub Actions CI/CD: test → build → push to `ghcr.io/jacob-winther-solutions/edh-deck-builder` → SSH deploy. Live at https://deckconsult.winther-solutions.dk. Full setup in `TODO/DEPLOYMENT.md`.
 

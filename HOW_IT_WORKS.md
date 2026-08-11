@@ -265,6 +265,16 @@ Decklist" button copies just the raw card list to the clipboard for quick import
 
 ---
 
+## Getting help in the app
+
+Each page has an **ℹ** button in the header that explains how that page works — what the inputs
+drive, which external sources are queried, and which steps involve the LLM. The **API Key** panel
+includes per-provider setup instructions and a privacy disclosure explaining what is stored and
+where. Role names in the Coverage Report carry a **?** badge; hovering shows the exact definition
+the classifier uses for that role.
+
+---
+
 ## What you still decide
 
 **The final deck is a starting point, not a finished product.** The tool's outputs are designed
@@ -358,6 +368,9 @@ so partner decks get recommendations from both halves of the pair.
 
 ## Current limitations
 
+- **AI accuracy.** The LLM classifies and selects cards heuristically — it can mis-classify a
+  card, misread a synergy, or produce a suboptimal role distribution. The deck is a strong
+  starting point, not a guaranteed optimal build. Always review the result before playing.
 - **Context-aware classification** is not implemented. Some cards (e.g. Jeska's Will) behave
   very differently depending on whether the commander is on the board. Classification currently
   treats them as global-stable rather than commander-specific.

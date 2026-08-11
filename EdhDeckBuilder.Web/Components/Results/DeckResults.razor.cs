@@ -30,7 +30,7 @@ public partial class DeckResults : ComponentBase, IDisposable
     // ── View state ─────────────────────────────────────────────────────────
 
     private enum DeckView { ByRole, AllCards, ByType, ByManaValue, UpgradePaths, Combos }
-    private DeckView _view = DeckView.AllCards;
+    private DeckView _view = DeckView.ByRole;
 
     // ── Display helpers ─────────────────────────────────────────────────────
 

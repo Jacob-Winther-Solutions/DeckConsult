@@ -33,7 +33,8 @@ public partial class CommanderBuilder : IDisposable
     [SupplyParameterFromQuery]
     public string? TotalBudget { get; set; }
 
-    private string _activeTab = "guided";
+    private string _activeTab  = "guided";
+    private bool   _showModal;
 
     private int _guidedTabKey = 0;
     private Card? _preCommander;

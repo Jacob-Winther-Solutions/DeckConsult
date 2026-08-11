@@ -54,24 +54,77 @@
 
                 @if (_selectedProvider == AiProvider.Anthropic)
                 {
-                    <p class="small text-muted mb-3">
-                        Builds run on your own key, billed to your account.
-                        Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+                    <p class="small text-muted mb-1">
+                        Builds run on your own Anthropic key, billed to your account.
                     </p>
+                    <button type="button" class="btn btn-link btn-sm p-0 mb-3 small"
+                            @onclick="() => _showHelp = !_showHelp">
+                        How do I get a key? @(_showHelp ? "▲" : "▼")
+                    </button>
+                    @if (_showHelp)
+                    {
+                        <div class="border rounded p-2 mb-3 small bg-light">
+                            <ol class="mb-2 ps-3">
+                                <li>Go to <a class="d-inline ms-0" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a> — sign in or create a free account if needed</li>
+                                <li>Click <strong>Create Key</strong> and give it a name</li>
+                                <li>Copy the key — it starts with <code>sk-ant-</code></li>
+                                <li>Paste it below and click <strong>Connect</strong></li>
+                            </ol>
+                            <p class="text-muted mb-0">
+                                Requires a funded account — there is no free API tier.
+                            </p>
+                        </div>
+                    }
                 }
                 else if (_selectedProvider == AiProvider.OpenAI)
                 {
-                    <p class="small text-muted mb-3">
-                        Builds run on your own key, billed to your account.
-                        Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.
+                    <p class="small text-muted mb-1">
+                        Builds run on your own OpenAI key, billed to your account.
                     </p>
+                    <button type="button" class="btn btn-link btn-sm p-0 mb-3 small"
+                            @onclick="() => _showHelp = !_showHelp">
+                        How do I get a key? @(_showHelp ? "▲" : "▼")
+                    </button>
+                    @if (_showHelp)
+                    {
+                        <div class="border rounded p-2 mb-3 small bg-light">
+                            <ol class="mb-2 ps-3">
+                                <li>Go to <a class="d-inline ms-0" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> — sign in or create an account if needed</li>
+                                <li>Click <strong>Create new secret key</strong> and give it a name</li>
+                                <li>Copy the key — it starts with <code>sk-</code></li>
+                                <li>Paste it below and click <strong>Connect</strong></li>
+                            </ol>
+                            <p class="text-muted mb-0">
+                                Requires billing credit on your account — there is no free API tier.
+                            </p>
+                        </div>
+                    }
                 }
                 else
                 {
-                    <p class="small text-muted mb-3">
-                        Free access to Gemini (completely free, no subscription needed).
-                        Get an API key at <a href="https://ai.google.dev" target="_blank" rel="noopener">ai.google.dev</a>.
+                    <p class="small text-muted mb-1">
+                        Free access to Gemini — no subscription needed for most models.
                     </p>
+                    <button type="button" class="btn btn-link btn-sm p-0 mb-3 small"
+                            @onclick="() => _showHelp = !_showHelp">
+                        How do I get a key? @(_showHelp ? "▲" : "▼")
+                    </button>
+                    @if (_showHelp)
+                    {
+                        <div class="border rounded p-2 mb-3 small bg-light">
+                            <ol class="mb-2 ps-3">
+                                <li>Go to <a class="d-inline ms-0" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with your Google account</li>
+                                <li>Click <strong>Create API key</strong></li>
+                                <li>Copy the key — it starts with <code>AIza</code></li>
+                                <li>Paste it below and click <strong>Connect</strong></li>
+                            </ol>
+                            <p class="text-muted mb-0">
+                                Free tier available — the default model (Gemini 3.1 Flash Lite) allows ~500 requests/day at no cost.
+                                If you see a <em>limit: 0</em> error, attach a billing account to your Google Cloud project —
+                                some models (Gemini 2.0 Flash) require it to unlock free-tier quota, even at $0 usage.
+                            </p>
+                        </div>
+                    }
                 }
 
                 <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
@@ -92,10 +145,33 @@
                         Test
                     </button>
                 </div>
-                <div class="form-check mb-2">
+                <div class="form-check mb-1">
                     <input class="form-check-input" type="checkbox" id="remember-key" @bind="_remember" />
                     <label class="form-check-label small" for="remember-key">Remember for 30 days (encrypted cookie)</label>
                 </div>
+                <button type="button" class="btn btn-link btn-sm p-0 mb-2 small"
+                        @onclick="() => _showPrivacy = !_showPrivacy">
+                    What data is stored? @(_showPrivacy ? "▲" : "▼")
+                </button>
+                @if (_showPrivacy)
+                {
+                    <div class="border rounded p-2 mb-2 small bg-light">
+                        <p class="mb-1">
+                            <strong>API keys</strong> are held in memory for the duration of your session.
+                            If you check "Remember", they are saved as an encrypted cookie on your device
+                            for 30 days — readable only by this app.
+                        </p>
+                        <p class="mb-1">
+                            <strong>Deck builds and analyses</strong> are saved to your browser's local
+                            storage on your device only. The three most recent of each are kept automatically.
+                        </p>
+                        <p class="mb-0">
+                            Nothing is stored on our servers and no data is shared with third parties.
+                            Your key is only ever sent directly to the provider you chose (Anthropic,
+                            OpenAI, or Google).
+                        </p>
+                    </div>
+                }
                 @if (_message is { } msg)
                 {
                     <p class="small @(_error ? "text-danger" : "text-success") mb-0">@msg</p>

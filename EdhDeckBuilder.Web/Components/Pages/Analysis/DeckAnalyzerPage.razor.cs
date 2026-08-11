@@ -30,6 +30,7 @@ public partial class DeckAnalyzerPage : ComponentBase, IDisposable
     public string? LoadId { get; set; }
 
     private bool _triedLoad;
+    private bool _showModal;
 
     private static readonly string[] AnalysisStages =
     [

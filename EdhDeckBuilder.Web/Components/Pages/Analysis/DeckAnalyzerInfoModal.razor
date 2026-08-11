@@ -1,0 +1,89 @@
+@if (Visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" @onclick="OnClose">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document" @onclick:stopPropagation>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How the Deck Analyzer works</h5>
+                    <button type="button" class="btn-close" @onclick="OnClose"></button>
+                </div>
+                <div class="modal-body">
+
+                    <p class="text-muted">
+                        The Deck Analyzer evaluates an existing deck, shows its functional role coverage,
+                        estimates its power bracket, and surfaces targeted upgrade suggestions and combo interactions.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">Choose your commander(s)</h6>
+                    <p>
+                        Pick your commander(s) using the commander search. If your decklist export includes the
+                        commander in the maindeck, the tool filters them out automatically.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">1. Paste and resolve</h6>
+                    <p>
+                        Paste your decklist in any common export format — plain <code>1 Card Name</code>, Arena
+                        (<code>1 Card Name (SET) 123</code>), Moxfield, Archidekt, or MTGO. Section headers,
+                        sideboard lines, and collector numbers are stripped automatically. Use <strong>Validate
+                        Cards</strong> after pasting to check all names against Scryfall before running the
+                        full analysis — unrecognized names are highlighted so you can correct them first.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">2. Card classification <span class="badge bg-secondary fw-normal ms-1" style="font-size: 0.7em;">AI step</span></h6>
+                    <p>
+                        Every card in your deck is assigned a primary role (Ramp, Card Advantage, Tutor,
+                        Disruption, etc.) and optional secondary roles. Each role assignment also carries a
+                        fractional weight — a card that primarily ramps but also draws might count as 1.0
+                        toward Ramp and 0.5 toward Card Advantage. These weights are why the Coverage Report
+                        shows decimal values rather than whole numbers. The cheapest model for your chosen
+                        provider handles this — classification is a straightforward task that does not require
+                        advanced reasoning, and the cheapest model is more than capable of it.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">3. Coverage Report</h6>
+                    <p>
+                        Shows how many cards you have in each functional role compared to a balanced-deck
+                        baseline. Because cards carry fractional weights across multiple roles, the totals show
+                        decimal values and can legitimately exceed 99. <strong>Role Gaps</strong> lists the
+                        roles most under-served in your current list, ordered by shortfall, and feeds directly
+                        into Upgrade Paths.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">4. Bracket Estimate</h6>
+                    <p>
+                        The bracket score (1–5) is provided by Commander Spellbook, based on tutor density
+                        and the number of combos your deck enables. It is an automated estimate, not a manual
+                        power-level review — treat it as a rough signal rather than a definitive ruling.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">5. Upgrade Paths <span class="badge bg-secondary fw-normal ms-1" style="font-size: 0.7em;">AI step</span></h6>
+                    <p>
+                        Fill in what isn't working and an optional price cap, then click <strong>Get Upgrade
+                        Suggestions</strong>. The pipeline runs in two passes:
+                    </p>
+                    <ol class="mb-2">
+                        <li>The cheapest model re-prioritises the role gaps based on your feedback text, so the
+                            most impactful gaps are addressed first.</li>
+                        <li>Your chosen model proposes specific <strong>add + cut</strong> pairs for each gap —
+                            a card to add and a card from your current 99 to cut in its place, with written
+                            rationale for both.</li>
+                    </ol>
+                    <p>
+                        All suggested additions are validated against the EDHREC recommendation pool for your
+                        commander — no hallucinated card names will appear in the results.
+                    </p>
+
+                    <h6 class="fw-semibold mt-3">6. Combo Finder</h6>
+                    <p class="mb-0">
+                        Queries Commander Spellbook for combos your deck already enables, split into two groups:
+                        <strong>complete combos</strong> (all named pieces are in your 99) and
+                        <strong>near-misses</strong> (one named piece away from a complete combo). Near-misses
+                        are useful for spotting combos worth completing with a single swap.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}

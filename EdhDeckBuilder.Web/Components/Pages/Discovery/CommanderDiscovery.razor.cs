@@ -7,7 +7,8 @@ public partial class CommanderDiscovery : ComponentBase
 {
     [Inject] private SessionApiKeyProvider Keys { get; set; } = default!;
 
-    private string _activeTab = "guided";
+    private string _activeTab  = "guided";
+    private bool   _showModal;
 
     private void SetTab(string tab)
     {
