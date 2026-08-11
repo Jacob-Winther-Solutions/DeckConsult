@@ -18,9 +18,9 @@ internal sealed class ScryfallBulkClient(
         PropertyNameCaseInsensitive = true,
     };
 
-    private const string BulkDataUrl     = "https://api.scryfall.com/bulk-data";
+    private const string BulkDataUrl      = "https://api.scryfall.com/bulk-data";
     private const string OracleCardsType  = "oracle_cards";
-    private const string CacheFileName   = "oracle_cards.json";
+    internal const string CacheFileName   = "oracle_cards.json";
 
     public async Task<string> GetOracleCardsFileAsync(CancellationToken ct = default)
     {
@@ -36,6 +36,22 @@ internal sealed class ScryfallBulkClient(
 
         var (downloadUri, isJsonl) = await ResolveDownloadUriAsync(ct);
         logger.LogInformation("Downloading Scryfall oracle cards ({Format}) from {Uri}",
+            isJsonl ? "JSONL.gz" : "JSON", downloadUri);
+
+        await DownloadAndSaveAsync(downloadUri, isJsonl, cachePath, ct);
+
+        logger.LogInformation("Saved Scryfall oracle cards to {Path}", cachePath);
+        return cachePath;
+    }
+
+    internal async Task<string> ForceRefreshAsync(CancellationToken ct = default)
+    {
+        var opts = options.Value;
+        Directory.CreateDirectory(opts.CacheDirectory);
+        var cachePath = Path.Combine(opts.CacheDirectory, CacheFileName);
+
+        var (downloadUri, isJsonl) = await ResolveDownloadUriAsync(ct);
+        logger.LogInformation("Force-refreshing Scryfall oracle cards ({Format}) from {Uri}",
             isJsonl ? "JSONL.gz" : "JSON", downloadUri);
 
         await DownloadAndSaveAsync(downloadUri, isJsonl, cachePath, ct);

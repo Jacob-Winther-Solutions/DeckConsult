@@ -7,4 +7,6 @@ public sealed class ScryfallOptions
         "EdhDeckBuilder", "scryfall");
 
     public TimeSpan CacheMaxAge { get; set; } = TimeSpan.FromHours(24);
+
+    public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromDays(7);
 }

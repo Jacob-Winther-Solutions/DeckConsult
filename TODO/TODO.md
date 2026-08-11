@@ -136,27 +136,6 @@ just genuinely interesting.
 
 ---
 
-### Card Data Refresh (Cache Updates)
-
-Scryfall bulk data is cached locally with a 24-hour max age. New cards released are not
-available until the app restarts and re-downloads. This creates a 24–48 hour lag.
-
-**Options:**
-- **(a) Manual refresh button** — User clicks to force re-download if stale.
-- **(b) Background sync job** — Periodic task checks Scryfall's `updated_at` timestamp.
-- **(c) Hybrid (recommended)** — Show "last updated X hours ago" + optional manual refresh; background job runs nightly as fallback.
-
-**Implementation tasks (option c):**
-- [ ] `ICardRefreshService` interface: checks Scryfall `updated_at`, returns whether refresh happened and when
-- [ ] `CardRefreshService` impl: compares cache timestamp with Scryfall manifest, downloads if newer
-- [ ] Wire into `ScryfallBulkClient` or as separate injected service
-- [ ] Add "Last updated X hours ago" + "Refresh" button to Web UI
-- [ ] Background job: scheduled task runs nightly
-
-**Scope:** ~2–3 hours for manual refresh (option a); add another 2–3 hours for background job (option b).
-
----
-
 ## Potential upgrades
 
 - [ ] **EDHREC budget/price filtering** — The builder lets users set a per-card price cap
@@ -248,7 +227,7 @@ is set per cache (1 min–1 hour).
 
 ## Summary of completed work
 
-All four projects compile; 436 tests pass. All items below are complete.
+All four projects compile; 441 tests pass. All items below are complete.
 
 **Core & Infrastructure:** Domain model, rules, templates, archetypes, themes, bracket system. Scryfall bulk client (JSONL.gz format), EDHREC client (single commander + partner pairs), `SuggestionSource` merge. `CanBeCommander` extended for planeswalker-commanders. MDFC/DFC back-face data fully supported. Colorless basic land (Wastes). Commander Spellbook client (`find-my-combos` + `estimate-bracket`, SHA256-cached). `ComboPoolSource` injects near-miss combo pieces into the builder pool.
 
@@ -276,7 +255,9 @@ All four projects compile; 436 tests pass. All items below are complete.
 
 **Duplicate card fix:** `FillEngine.FillAsync` inner loop now guards against the same `OracleId` appearing twice in a ranked LLM response. `BuildState.Commit` also has a defensive early-return for the same case.
 
-**Tests:** 436 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source, creature type catalog pluralisation and slug matching). All green. Web project exposes internals to the test project via `InternalsVisibleTo`.
+**Card data refresh:** `ICardRefreshService` / `CardRefreshService` (Infrastructure) expose `GetLastRefreshed()` and `ForceRefreshAsync()` via `ScryfallBulkClient`. `ScryfallRefreshBackgroundService` (Web, `BackgroundService`) runs on a configurable interval (default 7 days; override via `Scryfall__RefreshInterval` env var), computes the initial delay from cache file age so restarts don't re-download unnecessarily. `CardDataStatus` component in the layout top bar shows "Cards: X days ago" on every page; a manual "Refresh" button is shown in Development mode only. Scheduling logic extracted to `ScryfallRefreshScheduler` (pure static function, tested independently).
+
+**Tests:** 441 tests (Core rules, archetypes, templates, budget, discovery, partnership index, selection, fill engine, color fixing, repair, BYOK, integration, deck analyzer, upgrade parser, combo pool source, creature type catalog pluralisation and slug matching, Scryfall refresh scheduling). All green. Web project exposes internals to the test project via `InternalsVisibleTo`.
 
 **Component refactoring:** Display helpers (`SecondaryBadge`, `BadgeInfo`, `BracketTagLabel`, `BracketTagCss`) centralised in `CardRoleDisplay`. `DeckBuildStages` constant extracted to `BuildRequestFactory`. Shared components extracted to `Components/Shared/`: `UpgradePathsPanel`, `CombosPanel`, `CardsByTypeList` (with `IsLocked` added to `AnalyzedCard`), `LockedCardInput` (with `LockedCardState` record), and `RoleTargetEditor` (replaces hand-crafted `RenderFragment` builder API code). `CoverageReportPanel` (in `Components/Results/`) owns the full Coverage Report tab — summary table, role buckets, basic lands, runner-ups — parameterised with `RenderFragment` slots (`SummaryHeaderActions`, `SummaryBodyPrefix`, `TargetCellContent`, `Alerts`) for host-specific customisation. Both `DeckResults` and `DeckAnalyzerPage` are now thin nav-tab shells.
 

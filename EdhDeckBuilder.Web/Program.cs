@@ -20,6 +20,7 @@ builder.Services.AddAgent(builder.Configuration);
 builder.Services.AddScoped<IApiKeyStateService, ApiKeyStateService>();
 builder.Services.AddSingleton<DeckResultStore>();
 builder.Services.AddSingleton<CreatureTypeCatalog>();
+builder.Services.AddHostedService<ScryfallRefreshBackgroundService>();
 
 // Configure logging: console in development (via default setup), structured JSON in production.
 // Controlled by Instrumentation:EnableStructuredDeckBuildLogging in appsettings per environment.

@@ -194,7 +194,7 @@ effect, clear the cookie or use an incognito window.
 dotnet restore
 dotnet build
 
-# Run all 436 tests:
+# Run all 441 tests:
 dotnet test Tests
 
 # Run the app:
@@ -251,6 +251,17 @@ architectural pieces in `Services/` are:
 - **`StoredDeckResult`** — the serialization DTO. Contains `DeckBuildResult` plus the build
   parameters needed to reproduce the report and the results page header (commanders,
   archetype weights, themes, bracket, budget, build date).
+
+- **`ScryfallRefreshBackgroundService`** — a `BackgroundService` that keeps the local Scryfall
+  card cache fresh. On startup it reads the cache file age and waits out any remaining time in
+  the current interval before the first run, so a restart never re-downloads unnecessarily. The
+  interval defaults to 7 days and is overridable via `Scryfall__RefreshInterval` (e.g.
+  `1.00:00:00` for daily). Scheduling logic lives in `ScryfallRefreshScheduler` (a pure static
+  function, independently tested).
+
+- **`CardDataStatus`** (`Components/Layout/`) — shows "Cards: X days ago" in the top bar on
+  every page so the cache age is always visible. In Development mode a "Refresh" button triggers
+  an immediate force-download via `ICardRefreshService`.
 
 ### localStorage persistence
 

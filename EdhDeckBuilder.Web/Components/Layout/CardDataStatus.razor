@@ -1,0 +1,9 @@
+<div class="d-flex align-items-center gap-1">
+    @if (IsDevelopment)
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="TriggerRefreshAsync" disabled="@_isRefreshing">
+            @(_isRefreshing ? "Refreshing…" : "Refresh")
+        </button>
+    }
+    <small class="text-muted">Cards: @FormatLastRefreshed()</small>
+</div>

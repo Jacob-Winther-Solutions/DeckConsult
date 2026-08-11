@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
             c.DefaultRequestHeaders.UserAgent.ParseAdd("EdhDeckBuilder/1.0");
             c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         });
+        services.AddTransient<ICardRefreshService, CardRefreshService>();
         services.AddSingleton<IPartnershipEligibilityRule, PartnershipEligibilityRule>();
 
         services.Configure<EdhrecOptions>(configuration.GetSection("Edhrec"));
