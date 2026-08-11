@@ -22,19 +22,6 @@ Core and UI infrastructure are complete. The following enhancements remain:
 
 ---
 
-### Subscription Tier
-
-- [ ] **Define subscription tiers** (e.g. Free, Pro) and their corresponding feature limits —
-      saved builds, saved analyses, and future gated features such as multi-role classification.
-- [ ] **Wire saved-result limit to subscription tier.** Currently hardcoded as
-      `DeckResultStorage.DefaultMaxSavedResults = 3` in `EdhDeckBuilder.Web/Services/DeckResultStorage.cs`.
-      The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
-      as a parameter — no JS changes needed. On the C# side, resolve the limit from a subscription
-      or feature-flag service and pass it to `JS.InvokeVoidAsync("saveDeckResult", key, json,
-      resolvedLimit)` in `GuidedCommanderBuilderTab.razor.cs` and `CustomCommanderBuilderTab.razor.cs`.
-
----
-
 ### TCGPlayer affiliate linking
 
 A "Buy this deck on TCGplayer" action on a finished deck. Sends the full decklist into
@@ -67,8 +54,6 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 ---
 
----
-
 ## Potential upgrades
 
 - [ ] **EDHREC budget/price filtering** — The builder lets users set a per-card price cap
@@ -91,7 +76,18 @@ See `TODO/TCGPLAYER_AFFILIATE_LINKING.md` for the full design spec.
 
 ---
 
-## Future
+## Future (Potential Upgrades)
+
+### Subscription Tier
+
+- [ ] **Define subscription tiers** (e.g. Free, Pro) and their corresponding feature limits —
+      saved builds, saved analyses, and future gated features such as multi-role classification.
+- [ ] **Wire saved-result limit to subscription tier.** Currently hardcoded as
+      `DeckResultStorage.DefaultMaxSavedResults = 3` in `EdhDeckBuilder.Web/Services/DeckResultStorage.cs`.
+      The JavaScript function `saveDeckResult(key, value, maxResults)` already accepts the limit
+      as a parameter — no JS changes needed. On the C# side, resolve the limit from a subscription
+      or feature-flag service and pass it to `JS.InvokeVoidAsync("saveDeckResult", key, json,
+      resolvedLimit)` in `GuidedCommanderBuilderTab.razor.cs` and `CustomCommanderBuilderTab.razor.cs`.
 
 ### Historic Brawl on MTG Arena
 
